@@ -1,0 +1,220 @@
+#region "Initialize"
+import refs/libtest as lib
+import refs/libtest
+import * from refs/libtest
+import refs/libtest1 as lib1
+import * from refs/libtest1
+import refs/visibility as visibility
+#endregion
+
+#region "Private module declarations"
+    assert(true, "visible" in visibility)
+    assert(true, "visibleValue" in visibility)
+    assert(true, "visibleMutable" in visibility)
+    assert(true, "VISIBLE" in visibility)
+    assert(true, "VisibleType" in visibility)
+    assert(false, "hiddenHelper" in visibility)
+    assert(false, "hiddenValue" in visibility)
+    assert(false, "hiddenMutable" in visibility)
+    assert(false, "HIDDEN" in visibility)
+    assert(false, "HiddenType" in visibility)
+    assert(12, visibility.visible(3))
+    assert(11, visibility.visibleValue)
+    assert(21, visibility.visibleMutable)
+    assert(31, visibility.VISIBLE)
+    assert(12, visibility.VisibleType(12).value)
+#endregion
+
+#region "Imports are private by default"
+    assert(false, "userName" in visibility)
+    assert(false, "double" in visibility)
+    assert(false, "internalLib" in visibility)
+    assert("User Ada", visibility.greet("Ada"))
+#endregion
+
+#region "Methods: ToString"
+    let str = lib.ToString()
+    assert(true, str is String)
+#endregion
+
+#region "Methods: Clone"
+    let xs = lib
+    assert(true, xs == xs)
+    assert(true, xs.Clone() == xs)
+#endregion
+
+#region "Methods: GetType"
+    let x = lib
+    assert(true, TypeInfo(x) == Module)
+    assert(true, x.GetType() == Module)
+    mut t = TypeInfo(x)
+    assert("Module", typeName(t))
+#endregion
+
+#region "Member access 1"
+    mut abs = lib.abs(-12)
+    assert(12, abs)
+    assert(2, lib.abs(-2))
+    assert(8, libtest.double(4))
+#endregion
+
+#region "Member access 2"
+    mut a = abs(-12)
+    assert(12, a)
+    mut b = min(2, 1)
+    assert(1, b)
+#endregion
+
+#region "Match module"
+    mut res = match lib {
+        value => value.sign(-12)
+    }
+    assert(-1, res)
+#endregion
+
+#region "Match module using is"
+    mut res = lib.Has("id")
+    assert(false, res)
+#endregion
+
+#region "Qualification 1"
+    mut res = lib1.sayHello()
+    assert("Hello, User Jon", res)
+#endregion
+
+#region "Qualification 2"
+    mut res = lib.double(2)
+    mut res1 = lib1.double(2)
+    assert(4, res)
+    assert("double 2", res1)
+#endregion
+
+#region "Module as tuple 1"
+    mut libMod = lib
+    mut f = libMod.double
+    assert(4, f(2))
+#endregion
+
+#region "Module as tuple 2"
+    mut libMod = lib
+    mut f = libMod.double
+    assert(4, f(2))
+    mut f1 = lib.double
+    assert(4, f1(2))
+#endregion
+
+#region "Types from module"
+    mut fb = Foobar(12, 2)
+    assert(12, fb.x)
+    assert(2, fb.y)
+#endregion
+
+#region "Types from module (qual)"
+    mut fb = lib.Foobar(12, 2)
+    assert(12, fb[0])
+    assert(2, fb[1])
+#endregion
+
+#region "Types from module and optimizer"
+    mut fb = lib.Foobar(12, 2)
+    assert(12, fb[0])
+    assert(2, fb[1])
+    fb = lib.Foobar(12, 2)
+    assert(12, fb[0])
+    assert(2, fb[1])
+#endregion
+
+#region "Extending external type"
+    func Foobar.GetVal1() {
+        "Foobar"
+    }
+    mut fb = Foobar(1, 2)
+    assert("Foobar", fb.GetVal1())
+#endregion
+
+#region "Extending external type (qual)"
+    func lib.Foobar.GetVal2() {
+        "Foobar"
+    }
+    mut fb = lib.Foobar(1, 2)
+    assert("Foobar", fb.GetVal2())
+#endregion
+
+#region "External type name"
+    mut t = Foobar
+    assert("Foobar", typeName(t))
+#endregion
+
+#region "External type name (qual)"
+    mut t = lib.Foobar
+    assert("Foobar", typeName(t))
+#endregion
+
+#region "Constants"
+    assert(3.14, pi)
+    assert(3.14, lib.pi)
+    try {
+        lib.pi = 3.15
+        assert(got: false)
+    } catch e {
+        if constructorName(e) == "OperationNotSupported" {
+            assert(got: true)
+        }
+    }
+#endregion
+
+#region "Iterating module"
+    mut xs = []
+    for (key,_) in lib {
+        xs.Add(key)
+    }
+    mut shouldbe = ["abs","sign","double","min","max","userName","Foobar","Foo","pi"]
+    assert(shouldbe, xs)
+#endregion
+
+#region "Match external type"
+    mut a1 = lib1.Asset.Computer(model: "Lenovo", memory: 16, rank: 3)
+    mut a2 = Asset.Phone("1+", 8)
+    func mem1(a) {
+        if a is lib1.Asset.Computer(model, memory, rank) {
+            memory
+        } else if a is lib1.Asset.Phone(model, memory) {
+            memory
+        }
+    }
+    func mem2(a) {
+        if a is Asset.Computer(model, memory, rank) {
+            memory
+        } else if a is Asset.Phone(model, memory) {
+            memory
+        }
+    }
+    func mem3(a) {
+        if a is Computer(model, memory, rank) {
+            memory
+        } else if a is Phone(model, memory) {
+            memory
+        }
+    }
+    assert(16, mem1(a1))
+    assert(8, mem1(a2))
+    assert(16, mem2(a1))
+    assert(8, mem2(a2))
+    assert(16, mem3(a1))
+    assert(8, mem3(a2))
+#endregion
+
+#region "Test external type"
+    mut t = lib1.Asset
+    assert("Asset", typeName(t))
+    mut c = t.Computer("Acer", 4, 1)
+    assert("Acer41", c.model+c.memory+c.rank)
+    assert(true, c is lib1.Asset)
+#endregion
+
+#region "Methods: in"
+    assert(false, "foobar" in lib1)
+    assert(true, "pi" in lib1)
+    assert(true,  "Asset" in lib1)
+    assert(true,  "double" in lib1)
+#endregion

@@ -1,0 +1,337 @@
+﻿#region "Number: GetType"
+    assert("Number", typeName(Number))
+#endregion
+
+#region "Number"
+    func test(Number n, pattern) {
+        assert(pattern, n)
+    }
+    test(42, 42)
+    test(12.2, 12.2)
+#endregion
+
+#region "Lookup: GetType"
+    assert("Lookup", typeName(Lookup))
+#endregion
+
+#region "Lookup"
+    func elementAt(Lookup xs, index) => xs[index]
+    func length(Lookup xs) => xs.Length()
+    let arr = [1..10]
+    let xs = (1..10,)
+    let tab = Dictionary(x: 1, y: 2)
+    let str = "abcdef"
+    assert(3, elementAt(arr, 2))
+    assert(10, length(arr))
+    assert(3, elementAt(xs, 2))
+    assert(10, length(arr))
+    assert(2, elementAt(tab, "y"))
+    assert(2, length(tab))
+    assert('d', elementAt(str, 3))
+    assert(6, length(str))
+#endregion
+
+#region "Collection: GetType"
+    assert("Collection", typeName(Collection))
+#endregion
+
+#region "Collection"
+    func setElement(Collection xs, index, value) => xs[index] = value
+    let arr = [1,2]
+    let tab = Dictionary(x: 1, y: 2)
+    setElement(arr, 0, 11)
+    assert([11,2], arr)
+    setElement(tab, "x", 11)
+    assert(11, tab["x"])
+#endregion
+
+#region "Functor: GetType"
+    assert("Functor", typeName(Functor))
+#endregion
+
+#region "Functor"
+    func test(Functor fn, arg) {
+        assert("hello, user!", fn(arg))
+    }
+    func hello(arg) => "hello, " + arg + "!"
+    struct Foo {  }
+    impl Foo with Functor {}
+    func Foo.Call(arg) => "hello, " + arg + "!"
+    test(hello, "user")
+    test(Foo(), "user")
+#endregion
+
+#region "Disposable: GetType"
+    assert("Disposable", typeName(Disposable))
+#endregion
+
+#region "Disposable 1"
+    func test(Disposable o) {
+        assert(got: true)
+    }
+    mut msg
+    struct Foo {  }
+    impl Foo with Disposable {}
+    func Foo.Dispose() {
+        msg = "Disposed!"
+    }
+    {
+        use f = Foo()
+        test(f)
+    }
+    assert("Disposed!", msg)
+#endregion
+
+#region "Disposable 2"
+    struct Foo {  }
+    impl Foo with Disposable {}
+    try {
+        {
+            use f = Foo()
+        }
+    } catch e {
+        if constructorName(e) == "NotImplemented" {
+            assert(got: true)
+        }
+    }
+#endregion
+
+#region "Equatable: GetType"
+    assert("Equatable", typeName(Equatable))
+#endregion
+
+#region "Equatable"
+    struct Foo { x, y, z }
+    assert(false, Foo(1,2,3) == Foo(1,2,3))
+    struct Bar { x, y, z }
+    impl Bar with Equatable {}
+    assert(true, Bar(1,2,3) == Bar(1,2,3))
+#endregion
+
+#region "Identity: GetType"
+    assert("Identity", typeName(Identity))
+#endregion
+
+#region "Identity"
+    struct Foo {  }
+    let f = Foo()
+    assert(false, referenceEquals(f, f.Clone()))
+    struct Bar {  }
+    impl Bar with Identity {}
+    let b = Bar()
+    assert(true, referenceEquals(b, b.Clone()))
+#endregion
+
+#region "Order: GetType"
+    assert("Order", typeName(Order))
+#endregion
+
+#region "Order"
+    func gte(Order x, Order y) => x > y
+    assert(true, gte(12, 2))
+    assert(true, gte(12.0456, 2.0023))
+    assert(true, gte('d', 'a'))
+    assert(true, gte("dahoo", "boo"))
+#endregion
+
+#region "Sequence: GetType"
+    assert("Sequence", typeName(Sequence))
+#endregion
+
+#region "Sequence"
+    struct Foo { x, y, z }
+    impl Foo with Sequence {}
+    let f = Foo(10,20,30)
+    let xs = f.Iterate().ToArray()
+    assert([10,20,30], xs)
+#endregion
+
+#region "String conversion is intrinsic"
+    struct Empty {}
+    assert("Empty()", Empty().ToString())
+#endregion
+
+#region "Struct string conversion"
+    struct Foo { x, y } 
+    let f = Foo(1, 2)
+    assert("Foo(x: 1, y: 2)", f.ToString())
+#endregion
+
+#region "Typed struct string conversion"
+    struct Int { x: Integer }
+    let x = Int(42)
+    assert("Int(x: 42)", x.ToString())
+#endregion
+
+#region "Object: GetType"
+    assert("Object", typeName(Object))
+#endregion
+
+#region "Custom type"
+    struct Bar {}
+    func get Bar.First() => this[0]
+    func get Bar.Last() => this[this.Length() - 1]
+    struct Foo { x, y }
+    impl Foo with Bar {}
+    let f = Foo(12, 34)
+    assert(12, f.First)
+    assert(34, f.Last)
+    assert(true, f is Foo)
+    assert(true, f is Bar)
+#endregion
+
+#region "Closed type"
+    struct Bar {}
+    struct Foo {  }
+    impl Foo with Bar {}
+    try {
+        func Bar.Test() { }
+        assert(got: false)
+    } catch e {
+        if constructorName(e) == "TypeClosed" {
+            assert(got: true)
+        }
+    }
+#endregion
+
+#region "Multiple mixins"
+    struct Bar1 {}
+    func get Bar1.First() => this[0]
+    struct Bar2 {}
+    func get Bar2.Last() => this[this.Length() - 1]
+    struct Foo { x, y }
+    impl Foo with Bar1, Bar2 {}
+    let f = Foo(12, 34)
+    assert(12, f.First)
+    assert(34, f.Last)
+    assert(true, f is Foo)
+    assert(true, f is Bar1)
+    assert(true, f is Bar2)
+#endregion
+
+#region "Mixin with operators"
+    struct Bar {}
+    func Bar + (other) {
+        this[0] + other[0]
+    }
+    func Bar - (other) {
+        this[0] - other[0]
+    }
+    struct Num { x }
+    impl Num with Bar {}
+    let x = Num(12)
+    let y = Num(24)
+    assert(-12, x - y)
+    assert(36, x + y)
+    assert(true, x is Bar)
+    assert(true, x is Num)
+    assert(true, y is Bar)
+    assert(true, y is Num)
+#endregion
+
+#region "Implement mixin"
+    struct Foo {  }
+    let x = Foo()
+    try {
+        x.Length()
+        assert(got: false)
+    } catch e {
+        if constructorName(e) == "OperationNotSupported" {
+            assert(got: true)
+        }
+    }
+    struct Bar {  }
+    let b = Bar()
+    assert(0, b.Length())
+#endregion
+
+#region "Array mixins"
+    func test1(Collection xs) {
+        assert([1,2,3], xs)
+    }
+    func test2(Lookup xs) {
+        assert([1,2,3], xs)
+    }
+    let xs = [1,2,3]
+    test1(xs)
+    test2(xs)
+#endregion
+
+#region "Mixin inheritance"
+    struct Foo { mut x, mut y, mut z }
+    impl Foo with Collection {}
+    func test1(Collection xs) {
+        assert(got: true)
+    }
+    func test2(Lookup xs) {
+        assert(got: true)
+    } 
+    let f = Foo(1,2,3)
+    test1(f)
+    test2(f)
+#endregion
+
+#region "Trait and struct aliases"
+    trait Summary {
+        func Describe()
+    }
+    impl Summary {
+        func Describe() => this[0].ToString() + ":" + this[1].ToString()
+    }
+    struct Pair { x, y }
+    impl Pair with Summary {}
+    let p = Pair(12, 34)
+    assert("12:34", p.Describe())
+    assert(true, p is Summary)
+    assert(true, p is Pair)
+#endregion
+
+#region "Impl with trait mixin and members"
+    trait Display {
+        func Describe()
+        func get First()
+    }
+    struct Point { x, y }
+    impl Point with Display, Lookup {
+        func Describe() => this[0].ToString() + ":" + this[1].ToString()
+        func get First() => this[0]
+        func Extra() => this[1]
+    }
+    let point = Point(10, 20)
+    assert("10:20", point.Describe())
+    assert(10, point.First)
+    assert(20, point.Extra())
+    assert(true, point is Display)
+    assert(true, point is Point)
+#endregion
+
+#region "Impl with empty block"
+    trait Marker {}
+    struct Empty {}
+    impl Empty with Marker {}
+    let empty = Empty()
+    assert(true, empty is Marker)
+    assert(true, empty is Empty)
+#endregion
+
+#region "Trait protected state"
+    trait Cached {
+        func Value()
+    }
+    impl Cached {
+        mut cache = 0
+        func bump() {
+            this.cache += 1
+            this.cache
+        }
+    }
+    struct Counter {}
+    impl Counter with Cached {
+        func Value() {
+            this.bump()
+        }
+    }
+    let counter = Counter()
+    assert(1, counter.Value())
+    assert(2, counter.Value())
+#endregion

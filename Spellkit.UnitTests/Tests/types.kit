@@ -1,0 +1,742 @@
+#region "Methods: GetType"
+    struct Foo {  }
+    let x = Foo()
+    assert(true, TypeInfo(x) == Foo)
+    assert(true, x.GetType() == Foo)
+    mut t = TypeInfo(x)
+    assert("Foo", typeName(t))
+#endregion
+
+#region "Methods: Clone"
+    struct Foo {  }
+    impl Foo with Identity, Equatable {}
+    let xs = Foo()
+    assert(true, xs == xs)
+    assert(true, xs.Clone() == xs)
+#endregion
+
+#region "Methods: ToString"
+    struct Foo { x, y, z } 
+    let xs = Foo(1, 2, 3)
+    let str = xs.ToString()
+    assert("Foo(x: 1, y: 2, z: 3)", str)
+#endregion
+
+#region "Statics"
+    try {
+        Integer.ToString()
+        assert(got: false)
+    } catch e {
+        if constructorName(e) == "OperationNotSupported" {
+            assert(got: true)
+        }
+    }
+#endregion
+
+#region "Standard mixins"
+    struct Foo { x }
+    mut f = Foo(42)
+    assert(42, f.x)
+    assert(42, f[0])
+    assert(1, f.Length())
+    if f is Foo(x) {
+        assert(42, x)
+    } else {
+        assert(got: false)
+    }
+#endregion
+
+#region "Empty struct"
+    struct Void {  }
+    mut f = Void()
+    assert(0, f.Length())
+    assert(true, f is Void())
+    assert("Void()", f.ToString())
+#endregion
+
+#region "Multiple productions"
+    enum Asset { Computer(model, memory, rank), Phone(model, memory), Modem(model) }
+    mut a1 = Asset.Computer(model: "Lenovo", memory: 16, rank: 3)
+    mut a2 = Asset.Phone("1+", 8)
+    mut a3 = Asset.Modem("Zyxel")
+    assert(3, a1.Length())
+    assert(2, a2.Length())
+    assert(1, a3.Length())
+    assert("Lenovo"+16+3, a1.model+a1.memory+a1.rank)
+    assert("1+"+8, a2.model+a2.memory)
+    assert("Zyxel", a3.model)
+    assert("Asset.Computer(model: \"Lenovo\", memory: 16, rank: 3)", a1.ToString())
+    assert("Asset.Phone(model: \"1+\", memory: 8)", a2.ToString())
+    assert("Asset.Modem(model: \"Zyxel\")", a3.ToString())
+#endregion
+
+#region "Pattern match 1"
+    enum Asset { Computer(model, memory, rank), Phone(model, memory), Modem(model) }
+    mut a1 = Asset.Computer(model: "Lenovo", memory: 16, rank: 3)
+    mut a2 = Asset.Phone("1+", 8)
+    func mem(a) {
+        if a is Asset.Computer(model, memory, rank) {
+            memory
+        } else if a is Asset.Phone(model, memory) {
+            memory
+        }
+    }
+    assert(16, mem(a1))
+    assert(8, mem(a2))
+#endregion
+
+#region "Extending type 1"
+    struct Bar { args... }
+    impl Bar {
+        let data
+
+        func init(args...) {
+            this.data = args
+        }
+    }
+    func Bar.Length() {
+        this.data.Length()
+    }
+    func get Bar[index] {
+        this.data[index]
+    }
+    mut obj = Bar(1, 2, 3)
+    mut res = match obj {
+        (x, y) => x + y,
+        (x, y, z) => x + y + z
+    }
+    assert(6, res)
+#endregion
+
+#region "Maybe or Some"
+    enum Maybe { None, Some(x) }
+    mut x = Maybe.Some(42)
+    mut y = Maybe.None
+    func doMatch(value) {
+        if value is Some(x) {
+            x
+        } else if value is None() {
+            "None"
+        }
+    }
+    assert(42, doMatch(x))
+    assert("None", doMatch(y))
+    assert("None", doMatch(Maybe.None))
+#endregion
+
+#region "Enum declaration"
+    func unwrap(x) {
+        if x is Ok(value) {
+            value
+        } else if x is Err(message) {
+            message
+        }
+    }
+    assert(42, unwrap(Ok(42)))
+    assert("boom", unwrap(Err("boom")))
+#endregion
+
+#region "Pattern match 2"
+    enum Foo { Bar(x, y, z) }
+    mut f = Foo.Bar(12, "foobar", 3)
+    mut res = fmt("{0},{1}", f.x, f.y)
+    assert("12,foobar", res)
+#endregion
+
+#region "Point struct"
+    struct Point { x, y }
+    mut p = Point(12, 43)
+    assert(12, p[0])
+    assert(43, p[1])
+    assert(12, p.x)
+    assert(43, p.y)
+#endregion
+
+#region "Natural number 1"
+    struct Nat { value }
+    impl Nat {
+        func init(value) {
+            if value < 0 {
+                throw Exception<Error>("Negative number.")
+            }
+        }
+    }
+    func fetch(x) {
+        x >= 0 ? Nat(x) : x
+    }
+    func Nat.ToInteger() {
+        if this is Nat(val) {
+            val
+        }
+    }
+    func Nat + (other) {
+        fetch(this.value + other.value)
+    }
+    func Nat - (other) {
+        fetch(this.value - other.value)
+    }
+    func Nat * (other) {
+        fetch(this.value * other.value)
+    }
+    func Nat / (other) {
+        fetch(this.value / other.value)
+    }
+    func Nat == (other) {
+        this.value == other.value
+    }
+    mut n = Nat(12)
+    assert(Nat(24), n + Nat(12))
+    assert(Nat(2), n - Nat(10))
+    assert(-8, n - Nat(20))
+    assert(Nat(24), n * Nat(2))
+    assert(Nat(6), n / Nat(2))
+    assert(Nat(6), n / Nat(2))
+#endregion
+
+#region "Either"
+    enum Either { Left(x), Right(x) }
+    mut x = Either.Left(12)
+    mut y = Either.Right(24)
+    func doMatch(obj) {
+        if obj is Left(x) {
+            x
+        } else if obj is Right(y) {
+            y
+        }
+    }
+    assert(12, doMatch(x))
+    assert(24, doMatch(y))
+#endregion
+
+#region "Reference cell"
+    struct Cell { value }
+    impl Cell {
+        mut internal: string
+
+        func init(value) {
+            this.internal = value
+        }
+    }
+    let ref = Cell.Cell
+    func Cell.SetValue(value) {
+        this.internal = value
+    }
+    func Cell.GetValue() {
+        this.internal
+    }
+    func get Cell[index] {
+        if index is not 0 {
+            throw Exception<IndexOutOfRange>()
+        }
+        this.internal
+    }
+    func Cell.Length() {
+        1
+    }
+    mut c = ref(12)
+    assert(12, c.GetValue())
+    c.SetValue(24)
+    assert(24, c.GetValue())
+#endregion
+
+#region "Linked list"
+    enum List { Cons(x, next), Empty }
+    func List.ToString() {
+        func walk(xs) {
+            if xs is Cons(x, Empty()) {
+                x.ToString()
+            } else if xs is Cons(x, next) {
+                x.ToString() + "," + walk(next)
+            } else if xs is Empty() {
+                ""
+            }
+        }
+        return "[" + walk(this) + "]"
+    }
+    mut xs = List.Cons(1, List.Cons(2, List.Cons(3, List.Cons(4, List.Empty))))
+    assert("[1,2,3,4]", xs.ToString())
+#endregion
+
+#region "Generate linked list"
+    enum List { Cons(x, next), Empty }
+    func List.ToString() {
+        func walk(xs) {
+            if xs is Cons(x, Empty()) {
+                x.ToString()
+            } else if xs is Cons(x, next) {
+                x.ToString() + "," + walk(next)
+            } else if xs is Empty() {
+                ""
+            }
+        }
+        return "[" + walk(this) + "]"
+    }
+    static func List.Generate(values...) {
+        mut xs = List.Empty
+        for x in values {
+            xs = List.Cons(x, xs)
+        }
+        xs
+    }
+    mut xs = List.Generate(1,2,3,4)
+    assert("[4,3,2,1]", xs.ToString())
+#endregion
+
+#region "Custom ToString"
+    struct Foo {  }
+    mut x = Foo()
+    func Foo.ToString() {
+        if this is Foo() {
+            "nil"
+        }
+    }
+    assert("nil", x.ToString())
+#endregion
+
+#region "Record"
+    struct Record { fields... }
+    impl Record {
+        let data
+
+        func init(fields...) {
+            this.data = fields
+        }
+    }
+    func get Record[index] => this.data[index]
+    mut p = Record(name: "John", age: 33)
+    assert("John", p["name"])
+    assert(33, p.age)
+    mut p2 = Record(name: "John", age: 33)
+    assert("John", p2["name"])
+    assert(33, p2.age)
+#endregion
+
+#region "Read-only fields"
+    struct UserInfo { name,age }
+    impl UserInfo with Collection {}
+    mut u = UserInfo("Jon", 17)
+    assert(17, u.age)
+    try {
+        u.age = 39
+        assert(got: false)
+    } catch e {
+        if constructorName(e) == "IndexReadOnly" {
+            assert(got: true)
+        }
+    }
+#endregion
+
+#region "Default values"
+    struct Foo { a, b = 12, c = 33 }
+    mut t = Foo(1)
+    assert(1, t.a)
+    assert(12, t.b)
+    assert(33, t.c)
+    t = Foo(1, 2)
+    assert(1, t.a)
+    assert(2, t.b)
+    assert(33, t.c)
+    t = Foo(1, 2, 3)
+    assert(1, t.a)
+    assert(2, t.b)
+    assert(3, t.c)
+#endregion
+
+#region "Mutable Point"
+    struct Point { mut x, mut y }
+    impl Point with Collection {}
+    func get Point[index] {
+        match index {
+            0 or "x" => this["x"],
+            1 or "y" => this["y"],
+            _ => throw Exception<IndexOutOfRange>()
+        }
+    }
+    func set Point[index, value] {
+        match index {
+            0 or "x" => this["x"] = value,
+            1 or "y" => this["y"] = value,
+            _ => throw Exception<IndexOutOfRange>()
+        }
+    }
+    mut p = Point(12, 34)
+    p.x += p.x
+    p.y += p.y
+    assert(24, p.x)
+    assert(68, p.y)
+#endregion
+
+#region "Member check 1"
+    mut t = (x: 2)
+    assert(false, t.Has("x"))
+#endregion
+
+#region "Member check 2"
+    func Integer.Foobar() {}
+    assert(true, 12.Has("Foobar"))
+#endregion
+
+#region "Member check 3"
+    struct Foo { x }
+    func Foo.Foobar() {}
+    mut p = Foo(22)
+    assert(false, p.Has("Barfoo"))
+    assert(true, p.Has("Foobar"))
+#endregion
+
+#region "Callable type 1"
+    struct Julia { x }
+    func Julia.Call(y, z) {
+        this.x + y * z 
+    }
+    mut x = Julia(12)
+    mut res = x(44.5, 67.07)
+    assert(2996.615, res)
+#endregion
+
+#region "Callable type 2"
+    func Integer.Call() {
+        this + this
+    }
+    mut res = 14()
+    assert(28, res)
+#endregion
+
+#region "Pattern match: is"
+    let some = Some(42)
+    let none = None
+    mut x
+    if some is Option && none is Option {
+        x = 42
+    }
+    assert(42, x)
+#endregion
+
+#region "Pattern match: inside method"
+    func Option.ExtractValue() {
+        if this is Some(x) {
+            x
+        }
+    }
+    let some = Some(42)
+    assert(42, some.ExtractValue())
+#endregion
+
+#region "String builder"
+    struct StringBuilder {  }
+    impl StringBuilder {
+        let buffer = []
+    }
+
+    func StringBuilder.Append(val) => this.buffer.Add(val.ToString())
+    func StringBuilder.Clear() => this.buffer.Clear()
+    func StringBuilder.ToString() => String.Concat(values: this.buffer)
+    func StringBuilder.Length() {
+        mut count = 0
+        for x in this.buffer {
+            count += x.Length()
+        }
+        return count
+    }
+    let sb = StringBuilder()
+    sb.Append("my ")
+    sb.Append("rank ")
+    sb.Append("is ")
+    sb.Append(123)
+    assert("my rank is 123", sb.ToString())
+    assert(14, sb.Length())
+    sb.Clear()
+    sb.Append(true)
+    sb.Append(false)
+    assert("truefalse", sb.ToString())
+#endregion
+
+#region "Natural number 2"
+    struct RealNat { num }
+    impl RealNat {
+        func init(num) {
+            if num is not Integer {
+                throw Exception<InvalidType>(num)
+            }
+        }
+    }
+    func RealNat + (other) {
+        let res = match other {
+            value when value is RealNat => this.num + value.num,
+            value when value is Integer => this.num + value,
+            _ => throw Exception<InvalidType>(other.GetType())
+        }
+        res >= 0 ? RealNat(res) : res
+    }
+    func RealNat == (other) => this.num == other.num
+    mut (x, y) = (RealNat(12), RealNat(10))
+    assert(RealNat(22), x + y)
+    assert(RealNat(2), x + -10)
+    assert(-2, x + -14)
+#endregion
+
+#region "Mutable struct 1"
+    struct Foo { mut x, y }
+    impl Foo with Collection {}
+    let t = Foo(12, 24)
+    t.x = 120
+    assert(120, t.x)
+    try {
+        t.y = 240
+        assert(got: false)
+    } catch e {
+        if constructorName(e) == "IndexReadOnly" {
+            assert(got: true)
+        }
+    }
+#endregion
+
+#region "Mutable struct 2"
+    struct Foo { mut x: Integer, y }
+    impl Foo with Collection {}
+    let t = Foo(12, 24)
+    t.x = 1
+    assert(1, t.x)
+    try {
+        t.x = "240"
+        assert(got: false)
+    } catch e {
+        if constructorName(e) == "InvalidType" {
+            assert(got: true)
+        }
+    }
+#endregion
+
+#region "Custom constructor with editor-only type hints"
+    struct Foo { mut data }
+    func get Foo[field] {
+        match field {
+            "x" => this["data"],
+            _ => throw Exception<IndexOutOfRange>(field)
+        }
+    }
+    func set Foo[field, Integer value] {
+        match field {
+            "x" => this["data"] = value,
+            _ => throw Exception<IndexOutOfRange>(field)
+        }
+    }
+    let t = Foo(12)
+    t.x = 120
+    t.x = "120"
+    assert("120", t.x)
+#endregion
+
+#region "Enum members"
+    enum Expr { Literal(mut value: Float), Unary(mut op, mut left: Expr) }
+    func Expr.SetValue(value) {
+        this.value = value
+    }
+    func Expr.SetOp(value) {
+        this.op = value
+    }
+    let a = Expr.Literal(12.2)
+    assert(12.2, a.value)
+    a.SetValue(44.4)
+    assert(44.4, a.value)
+    let b = Expr.Unary("-", a)
+    assert("-", b.op)
+    assert(44.4, b.left.value)
+    b.SetOp("+")
+    assert("+", b.op)
+    b.left.SetValue(42.0)
+    assert(42.0, b.left.value)
+#endregion
+
+#region "Properties 1"
+    struct Foo { mut status }
+    impl Foo with Collection {}
+
+    func get Foo.Status() => this.status
+    func set Foo.Status(value) => this.status = value
+    let f = Foo(10)
+    assert(10, f.Status)
+    f.Status = 21
+    assert(21, f.Status)
+    f.Status += 11
+    assert(32, f.Status)
+#endregion
+
+#region "Properties 2"
+    struct Foo {  }
+    impl Foo {
+        mut box
+    }
+
+    func get Foo.Box() => this.box
+    func set Foo.Box(value) => this.box = value
+
+    let f = Foo()
+    assert(42, f.Box ?? 42)
+    f.Box ??= 144
+    assert(144, f.Box)
+    f.Box ??= 288
+    assert(144, f.Box)
+#endregion
+
+#region "Custom conversion"
+    struct Foo { x: Integer }
+    func Foo as Integer { this.x }
+    func Foo as String { "Foo" }
+    let f = Foo(42)
+    assert("Foo", f as String)
+    assert(42, f as Integer)
+#endregion
+
+#region "Type hints 1"
+    struct Foo { x: Integer, y: Float }
+    let _ = Foo(12, 12.12)
+    let x = Foo(12.2, 12)
+    assert(got: x is Foo)
+#endregion
+
+#region "Type hints 2"
+    struct Number { x: Integer|Float }
+    let _ = Number(12)
+    let _ = Number(21.221)
+    let x = Number("string")
+    assert(got: x is Number)
+#endregion
+
+#region "Type hints 3"
+    struct Foo { mut value: Integer }
+    impl Foo with Collection {}
+    let x = Foo(12)
+    assert(12, x.value)
+    x.value = 122
+    assert(122, x.value)
+    x.value = 0.25
+    assert(0.25, x.value)
+#endregion
+
+#region "Type hints 4"
+    struct Foo { mut value: Integer|Char }
+    impl Foo with Collection {}
+    let x = Foo(12)
+    assert(12, x.value)
+    x.value = 'A'
+    assert('A', x.value)
+    x.value = true
+    assert(true, x.value)
+#endregion
+
+#region "Initialization blocks 1"
+    struct Nat { x }
+    impl Nat {
+        let num
+
+        func init(x) {
+            if x == 0 {
+                throw Exception<InvalidValue>(x)
+            }
+            this.num = abs(x)
+        }
+    }
+    func Nat as Integer => this.num
+    mut x = Nat(12)
+    assert(12, x as Integer)
+    x = Nat(-24)
+    assert(24, x as Integer)
+    try {
+        x = Nat(0)
+        assert(got: false)
+    } catch e {
+        if constructorName(e) == "InvalidValue" {
+            let x = e[0]
+            assert(0, x)
+        }
+    }
+#endregion
+
+#region "Initialization blocks 2"
+    enum Expr {
+        Literal(typ) {
+            if typ is not "num" and not "string" {
+                typ = "nil"
+            }
+        }
+        ,
+        Function(args: Integer) {
+            if args < 0 {
+                args = 0
+            }
+        }
+    }
+    assert("num", Expr.Literal("num").typ)
+    assert("nil", Expr.Literal("char").typ)
+    assert(3, Expr.Function(3).args)
+    assert(0, Expr.Function(-5).args)
+#endregion
+
+#region "Custom fields and pattern matching"
+    struct Foo {  }
+    func get Foo[key] {
+	    match key {
+		    "id" => 42,
+		    "code" => "Code:Foo"
+	    }
+    }
+    func Foo.In(field) => field is "id" or "code"
+    let f = Foo()
+    assert(42, f.id)
+    assert("Code:Foo", f.code)
+    assert(true, "id" in f)
+
+    match f {
+	    value when value.id == 42 && value.code == "Code:Foo" => {
+            assert(42, value.id)
+            assert("Code:Foo", value.code)
+        },
+        _ => assert(got: false)
+    }
+#endregion
+
+#region "Default conversions"
+    struct Foo { x, y, z }
+    let f = Foo(1, 2, 3)
+    assert([1,2,3], f as Array)
+    assert((x: 1, y: 2, z: 3), f as Tuple)
+    assert("[\"x\": 1, \"y\": 2, \"z\": 3]", (f as Dictionary).ToString())
+#endregion
+
+#region "Method overwrite 2"
+    struct Foo {  }
+    static func Foo.Bar() { 1 }
+    static func Foo.Bar() { 2 }
+    assert(2, Foo.Bar())
+#endregion
+
+#region "Lower-case methods and properties"
+    struct Counter { value }
+    impl Counter {
+        mut current
+
+        func init(value) {
+            this.current = value
+        }
+    }
+    func Counter.increment(step) {
+        this.current = this.current + step
+        this.current
+    }
+    func Counter.value() {
+        this.current
+    }
+    func get Counter.total() {
+        this.current
+    }
+    func set Counter.total(next) {
+        this.current = next
+    }
+    let counter = Counter(10)
+    assert(15, counter.increment(5))
+    assert(15, counter.value())
+    assert(15, counter.total)
+    counter.total = 99
+    assert(99, counter.value())
+#endregion

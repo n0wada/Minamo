@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>$(SpellkitRuntimeTargetFramework)</TargetFramework>
+    <Title>$(SpellkitProductName)</Title>
+    <Description>Spellkit, a dynamic language for .NET</Description>
+    <PackageIcon>spellkit.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <AssemblyName>Spellkit</AssemblyName>
+    <UseWindowsForms>false</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Spellkit.Generators\Spellkit.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Misc\messages.xml" LogicalName="Spellkit.Resources.messages.xml" />
+    <None Update="Misc\spellkit.png" Pack="true" PackagePath="spellkit.png" />
+    <None Include="..\README.md" Pack="true" PackagePath="README.md" />
+    <None Include="$(SpellkitOutputRoot)tools\generators\$(Configuration)\Spellkit.Generators.dll"
+          Pack="true"
+          PackagePath="analyzers\dotnet\cs"
+          Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>spk</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>spk-tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>spk-language-tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.ComVisibleAttribute">
+      <_Parameter1>false</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.GuidAttribute">
+      <_Parameter1>e74aba7b-5a82-46ee-9eba-6eb0db5792aa</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

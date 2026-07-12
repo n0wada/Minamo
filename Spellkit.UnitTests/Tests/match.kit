@@ -1,0 +1,488 @@
+#region "Initialize"
+#endregion
+
+#region "Patterns: tuple"
+    mut res = match (1,2) {
+        (2, x) => "wrong1",
+        [3, x] => "wrong2",
+        2 => "wrong3",
+        (1, x) => x
+    }
+    assert(2, res)
+#endregion
+
+#region "Patterns: tuple, array"
+    mut res = match (1,2,"str") {
+        (1, 2, "strs") => "wrong",
+        [1, 2, "str"] => "right?"
+    }
+    assert("right?", res)
+#endregion
+
+#region "Patterns: tuple, array, type guard"
+    mut res = match (1,2,"str") {
+        (1, 2, "strs") => "wrong",
+        value when value is Array && value is [1, 2, "str"] => "right?",
+        value when value == (1, 2, "str") => value
+    }
+    assert((1,2,"str"), res)
+#endregion
+
+#region "Guards 1"
+    mut res = match (1,2) {
+        "clear fake" => "wrong1",
+        value when value.First() == 1 && value[1] == 2 => value
+    }
+    assert((1,2), res)
+#endregion
+
+#region "Patterns: type guard"
+    func typeName(x) {
+        match x {
+            value when value is Integer => "Integer",
+            value when value is Float => "Float",
+            value when value is String => "String",
+            value when value is Char => "Char",
+            value when value is Bool => "Bool",
+            value when value is Nil => "Nil",
+            value when value is Tuple => "Tuple",
+            value when value is Array => "Array",
+            value when value is Function => "Function",
+            _ => "Unknown"
+        }
+        mut xs = [
+            typeName(0),
+            typeName(.0),
+            typeName([]),
+            typeName((1,2)),
+            typeName(typeName),
+            typeName([].Iterate()),
+            typeName(false),
+            typeName(""),
+            typeName('\s'),
+            typeName(nil)
+        ]
+        mut expected = [
+            "Integer",
+            "Float",
+            "Array",
+            "Tuple",
+            "Function",
+            "Unknown",
+            "Bool",
+            "String",
+            "Char",
+            "Nil"
+        ]
+        assert(expected, xs)
+    }
+#endregion
+
+#region "Patterns: or"
+    mut res = match 12 {
+        "24" or 24 => 24,
+        "12" or 12 => 12
+    }
+    assert(12, res)
+#endregion
+
+#region "Patterns: array with guards"
+    mut res = match [1, 2, ('f', 'F', [34, 42.2]), "end"] {
+        value when value.Length() <= 3 => "wrong",
+        [1, 2, (_, _, [34, x])] when x > 42 => x
+    }
+    assert(42.2, res)
+#endregion
+
+#region "Patterns: record 1"
+    mut res = match (x: 12, y: 24) {
+        value when value.x == 13 => value.y,
+        value when value.y == 24 => value.x
+    }
+    assert(12, res)
+#endregion
+
+#region "Patterns: record 2"
+    mut res = match (x: 12) {
+        value when value.x == 13 => 13,
+        value => value.x
+    }
+    assert(12, res)
+#endregion
+
+#region "Match range"
+    mut arr = []
+    match [1..5] {
+        [1, 3, x] => nil,
+        [1, 2, 3, 4, 5, x] => nil,
+        [1, x, 3, y] => {
+            arr.Add(x)
+            arr.Add(y)
+        }
+    }
+    assert([2,4], arr)
+#endregion
+
+#region "Patterns: and 1"
+    mut res = match (42, 12) {
+        (x, y) and (_, 12) when x > 10 => x
+    }
+    assert(42, res)
+#endregion
+
+#region "Guards 2"
+    mut res = match (42, 12) {
+        (42, x) when x > 15 => false,
+        (42, x) when x == 12 => true
+    }
+    assert(true, res)
+#endregion
+
+#region "Patterns: and 2"
+    mut res = match (42, 12) {
+        (x, y) and (_, 12) when x > y => x + y
+    }
+    assert(54, res)
+#endregion
+
+#region "Patterns: nil"
+    mut n = nil //Bug #178
+    mut res = match n {
+        nil => true
+    }
+    assert(true, res)
+#endregion
+
+#region "Patterns: record 3"
+    mut res = match (x: 12,) {
+        value when value.x == 13 => 13,
+        value => value.x
+    }
+    assert(12, res)
+#endregion
+
+#region "Pattern in cycle 1"
+    mut arr = []
+    for (1, x) in [(1, 2), (2, 'F'), (3, 'S'), (1, 3), (1, 4), (1.01, true)] {
+        arr.Add(x)
+    }
+    assert([2, 3, 4], arr)
+#endregion
+
+#region "Pattern in cycle 2"
+    mut arr = []
+    for c in ['a', "str", 'b', 'c', 12] when c is Char {
+        arr.Add(c)
+    }
+    assert(['a','b','c'], arr)
+#endregion
+
+#region "Pattern in cycle 3"
+    mut arr = []
+    for value in ['a', "str", 'b', 'c', 12] when value is Char {
+        arr.Add(0)
+    }
+    assert(3, arr.Length())
+#endregion
+
+#region "Pattern in cycle 4"
+    mut arr = []
+    for value in [(1, 2), (2, 'F'), (3, 'S'), (1, 3), (1, 4), (1.01, true)] when value[0] == 1 {
+        arr.Add(value)
+    }
+    assert([(1,2), (1,3), (1,4)], arr)
+#endregion
+
+#region "Pattern in cycle 5"
+    mut arr = []
+    for x in [1,2,3,4,5,6,7,8,9,10] when x % 2 == 0 {
+        arr.Add(x)
+    }
+    assert([2,4,6,8,10], arr)
+#endregion
+
+#region "Patterns: range 1"
+    mut x = 5
+    mut res = match x {
+        1..4 => false,
+        3..10 => true
+    }
+    assert(true, res)
+#endregion
+
+#region "Patterns: range 2"
+    mut x = 'c'
+    mut res = match x {
+        'd'..'z' => 0,
+        'b'..'f' => 144
+    }
+    assert(144, res)
+#endregion
+
+#region "Patterns: member check 1"
+    mut res = 12.Has("foo") ? false : 12.Has("*") ? true : nil
+    assert(true, res)
+#endregion
+
+#region "Patterns: member check 2"
+    mut res = (12,3).Has("foo") ? false : (12,3).Has("Keys") ? true : nil
+    assert(true, res)
+#endregion
+
+#region "Patterns: member check 3"
+    let xs = []
+    assert(true, xs.Has("Iterate"))
+    assert(true, xs.Has("ToString"))
+    assert(true, xs.Has("Has"))
+#endregion
+
+#region "Match in rebinding 1"
+    mut x = 1
+    mut y = 2
+    (x, y) = (y, x)
+    assert(2, x)
+    assert(1, y)
+#endregion
+
+#region "Match in rebinding 2"
+    mut x
+    [1, ('a', 'b'), x, 33] = [1, ('a', 'b'), 42, 33, 88]
+    assert(42, x)
+#endregion
+
+#region "Match and exception 1"
+    func foo() {
+        (41, 2, 3)
+    }
+    mut x
+    mut res = try {
+        (x, 2) = foo()
+    } catch e {
+        if constructorName(e) == "MatchFailed" {
+            "Match failed."
+        }
+    }
+    assert("Match failed.", res)
+#endregion
+
+#region "Match in rebinding 3"
+    (x, y) = (1, 11)
+    assert(1, x)
+    assert(11, y)
+#endregion
+
+#region "Match in mut 1"
+    mut [1, ('a', 'b'), x, 33, y] = [1, ('a', 'b'), 42, 33, 88]
+    assert(42, x)
+    assert(88, y)
+#endregion
+
+#region "Match in mut 2"
+    mut (x,y) = (12, 2)
+    assert(14, x + y)
+    mut (_, z) = (12, 222)
+    assert(222, z)
+#endregion
+
+#region "Match in mut 3"
+    mut [x,y] = [12, 2]
+    assert(14, x + y)
+    mut [_, z] = [12, 222]
+    assert(222, z)
+#endregion
+
+#region "Match in mut 4"
+    mut (x,y) = [12, 2]
+    assert(14, x + y)
+    mut (_, z) = [12, 222]
+    assert(222, z)
+#endregion
+
+#region "Match and exception 2"
+    func foo() {
+        (41, 2, 3)
+    }
+    mut res = try {
+        mut (x, 2) = foo()
+    } catch e {
+        if constructorName(e) == "MatchFailed" {
+            "Match failed."
+        }
+    }
+    assert("Match failed.", res)
+#endregion
+
+#region "Match in let 1"
+    let (x, y, z) = [1, 2, 3]
+    assert(6, x + y + z)
+    let [xx, yy, zz] = [1, 2, 3, 4, 5]
+    assert(6, xx + yy + zz)
+#endregion
+
+#region "Match in let 2"
+    let (x, y, z) = (1, 2, 3)
+    assert(6, x + y + z)
+#endregion
+
+#region "Match as an expression"
+    mut res = match 42 {
+        value when value is Integer => true
+    }
+    assert(true, res)
+#endregion
+
+#region "Match in let 3"
+    let (x, y, z) = "abc"
+    assert(['a','b','c'], [x,y,z])
+#endregion
+
+#region "Match in is 1"
+    mut xs = (1, 2)
+    assert(true, xs is Tuple)
+    assert(false, xs is Array)
+    mut b = xs is Tuple
+    assert(true, b)
+    assert((1,2), xs)
+#endregion
+
+#region "Match in is 2"
+    mut xs = (1, 2, 3, ['a', 'b'])
+    mut res
+    if xs is (1, _, 3, ['a', x]) {
+        res = true
+    }
+    assert(true, res)
+    mut res1 = xs is (1, _, 3, ['a', x])
+    assert(true, res1)
+    assert('b', x)
+#endregion
+
+#region "Match in is 3"
+    mut xs = (1, 2, 3)
+    mut res = xs is (1, _, 3, ['a', x])
+    assert(false, res)
+    assert(nil, x)
+#endregion
+
+#region "Match in is 4"
+    func calcIt(xs) {
+        if xs is (x, y, z) {
+            x + y + z
+        } else {
+            0
+        }
+    }
+    mut xs = (1, 2, 3)
+    mut ys = (1, 2)
+    assert(6, calcIt(xs))
+    assert(0, calcIt(ys))
+#endregion
+
+#region "Match in is 5"
+    mut x = 1
+    mut y = 1.2
+    mut res1 = false
+    mut res2 = false
+    if x is Integer {
+        res1 = true
+    }
+    assert(true, res1)
+    if y is Float {
+        res2 = true
+    }
+    assert(true, res2)
+    if y is Float {
+        assert(1.2, y)
+    }
+#endregion
+
+#region "Custom type check"
+    struct TypeInMatch {  }
+
+    mut t = TypeInMatch()
+    mut res = false
+    if t is TypeInMatch {
+        res = true
+    }
+    assert(true, res)
+#endregion
+
+#region "Match in for with guard"
+    let tup = (
+        (1, 2),
+        (2, 4),
+        (3, 6),
+        (4, 8),
+        (5, 10)
+    )
+    let xs = []
+    for (x, y) in tup when x % 2 == 0 {
+        xs.Add(y)
+    }
+    assert([4, 8], xs)
+#endregion
+
+#region "Match in let 4"
+    let xs = [42]
+    xs is Array
+    assert([42], xs)
+    xs is Array or Array
+    assert(nil, nil)
+#endregion
+
+#region "Match in let 5"
+    let xs = []
+    if xs is [x] || xs is Array {
+        assert(nil, x)
+    } else {
+        assert(true, false)
+    }
+#endregion
+
+#region "Match in let 6"
+    let xs = []
+    match xs {
+        [x] => assert(nil, x),
+        value when value is Array => assert(nil, nil),
+        _ => assert(true, false)
+    }
+#endregion
+
+#region "Patterns: not"
+    let x = nil
+    assert(true, x is nil)
+    assert(false, x is not nil)
+    assert(true, x is not (1,2,3))
+    let y = [1,2,3]
+    assert(true, y is not [1,2,3,4])
+    assert(true, y is [1,2,3])
+    if y is not [a,b,c,4] {
+        assert(true, a is nil)
+        assert(true, b is nil)
+        assert(true, c is nil)
+    }
+    assert(false, y is not Array)
+    assert(true, y is not Tuple)
+    assert(true, y is not Tuple and not Dictionary)
+#endregion
+
+#region "Patterns: comparison"
+    let (x, y) = (1, 2)
+    mut res = x > 0
+    assert(true, res)
+    res = x > 0 && x < 2
+    assert(true, res)
+    res = y == 5 || x >= 1
+    assert(true, res)
+    res = y <= 1 || y > 5
+    assert(false, res)
+#endregion
+
+#region "Not nil pattern"
+    let x = 12
+    if x is not nil {
+        assert(12, x)
+    } else {
+        assert(got: false)
+    }
+#endregion

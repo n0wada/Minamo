@@ -1,0 +1,76 @@
+#region "Nullary function value"
+    let x = () => 2 + 2
+    assert(4, x())
+#endregion
+
+#region "Nullary function is not memoized"
+    mut it = 0
+    let next = () => {
+        it += 1
+        2 + it
+    }
+    assert(3, next())
+    assert(4, next())
+#endregion
+
+#region "Manual memoization object"
+    struct Deferred { fn: Function }
+    impl Deferred {
+        mut cache
+        mut hasValue = false
+    }
+
+    func Deferred.GetValue() {
+        if this.hasValue {
+            return this.cache
+        }
+
+        this.cache = this.fn()
+        this.hasValue = true
+        this.fn = nil
+        return this.cache
+    }
+
+    mut calls = 0
+    let value = Deferred(() => {
+        calls += 1
+        "done"
+    })
+
+    assert("done", value.GetValue())
+    assert("done", value.GetValue())
+    assert(1, calls)
+#endregion
+
+#region "Deferred exceptions"
+    struct Deferred { fn: Function }
+    impl Deferred {
+        mut cache
+        mut hasValue = false
+    }
+
+    func Deferred.GetValue() {
+        if this.hasValue {
+            return this.cache
+        }
+
+        this.cache = this.fn()
+        this.hasValue = true
+        this.fn = nil
+        return this.cache
+    }
+
+    let values = []
+    let failing = Deferred(() => {
+        values.AddRange([1, 2])
+        throw Exception<Unknown>(values)
+    })
+
+    try {
+        let _ = failing.GetValue()
+    } catch e {
+        if constructorName(e) == "Unknown" {
+            assert([1, 2], e[0])
+        }
+    }
+#endregion

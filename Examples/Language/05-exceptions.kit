@@ -1,0 +1,13 @@
+func loadUser(name) {
+    if name == "" {
+        throw Exception<UserError>("A user name is required.")
+    }
+
+    name
+}
+
+try {
+    loadUser("")
+} catch error {
+    print(fmt("[{0}] {1}", error.Name, error.Message))
+}

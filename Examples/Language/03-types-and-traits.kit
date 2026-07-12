@@ -1,0 +1,12 @@
+struct Point { x, y }
+
+trait Displayable {
+    func Describe()
+}
+
+impl Point with Displayable {
+    func Describe() => fmt("({0}, {1})", this.x, this.y)
+}
+
+let point = Point(3, 4)
+print(point.Describe())

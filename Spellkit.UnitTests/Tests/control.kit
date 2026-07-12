@@ -1,0 +1,357 @@
+#region "Guards 1"
+    func safeDiv1(x, y) {
+        if y == 0 {
+            return -1
+        }
+        return x / y
+    }
+    mut x = safeDiv1(4, 2)
+    mut y = safeDiv1(2, 0)
+    assert(2, x)
+    assert(-1, y)
+
+    func safeDiv2(x, y) {
+        if y == 0 {
+            return
+        }
+        return x / y
+    }
+    mut res = safeDiv2(10, 0)
+    assert(nil, res)
+
+    func safeDiv3(x, y) {
+        y is 0 ? 0 : x / y
+    }
+    assert(5, safeDiv3(10, 2))
+    assert(0, safeDiv3(10, 0))
+#endregion
+
+#region "Guards 2"
+    mut x = 0
+    if x < 1 {
+        x += 1
+    }
+    assert(1, x)
+
+    mut y = 0
+    if y < 0 {
+        y += 1
+    }
+    assert(0, y)
+#endregion
+
+#region "Guards 3"
+    mut (x, y) = (1, 2)
+    if x > 0 && y > 1 {
+        (x, y) = (12, 14)
+    }
+    assert((12, 14), (x, y))
+#endregion
+
+#region "Guard statement 1"
+    mut x = 0
+    guard x > 0 {
+        x = 42
+    } else {
+        x = 12
+    }
+    assert(42, x)
+#endregion
+
+#region "Guard statement 2"
+    mut x = 2
+    guard x > 0 {
+        x = 42
+    } else {
+        x = 12
+    }
+    assert(12, x)
+#endregion
+
+#region "Guard statement 3"
+    mut x = 0
+    guard x > 0 {
+        x = 42
+    }
+    assert(42, x)
+#endregion
+
+#region "Guard expression 1"
+    let foo = false
+    let x = guard foo {
+        42
+    } else {
+        0
+    }
+    assert(42, x)
+#endregion
+
+#region "Guard expression 2"
+    let foo = true
+    let x = guard foo {
+        42
+    } else {
+        0
+    }
+    assert(0, x)
+#endregion
+
+#region "If expression requires explicit else"
+    let ready = false
+    let x = if ready {
+        42
+    } else {
+        0
+    }
+    assert(0, x)
+#endregion
+
+#region "Match: Option"
+    let opt = Some(42)
+    let optRes = match opt {
+        Some(x) => x,
+        None => 0
+    }
+    assert(42, optRes)
+#endregion
+
+#region "Match: Result"
+    let res = Err("boom")
+    let matchRes = match res {
+        Ok(x) => x.ToString(),
+        Err(e) => e
+    }
+    assert("boom", matchRes)
+#endregion
+
+#region "Match: enum zero-arg case"
+    enum Color { Red, Green, Blue }
+    let color = Color.Green
+    let colorRes = match color {
+        Red => "stop",
+        Green => "go",
+        Blue => "wait"
+    }
+    assert("go", colorRes)
+#endregion
+
+#region "Bare enum constructor and case values"
+    enum Number { Num(x), Zero }
+    let a = Num(12)
+    let b = Zero
+    assert(12, match a {
+        Num(x) => x,
+        Zero => 0
+    })
+    assert(0, match b {
+        Num(x) => x,
+        Zero => 0
+    })
+#endregion
+
+#region "Return from method"
+    func foo() {
+        return 2
+    }
+    func bar() {
+        return
+        22
+    }
+    assert(2, foo())
+    assert(nil, bar())
+#endregion
+
+#region "Cycle: while with break 1"
+    mut n = 100
+    mut x = while n > 0 {
+        if n == 33 {
+            break n
+        }
+        n = n - 1
+    }
+    assert(33, x)
+#endregion
+
+#region "Cycle: while with break 2"
+    mut n = 100
+    mut x = while n > 0 {
+        if n == 33 {
+            break
+        }
+        n = n - 1
+    }
+    if !x {
+        x = 42
+    }
+    assert(42, x)
+#endregion
+
+#region "Cycle: Nested while"
+    mut z = 5
+    mut c = 0
+    while z >= 1 {
+        mut y = z - 1
+        while y >= 0 {
+            if true {
+                c += 1
+                break
+            }
+            y -= 1
+        }
+        z -= 1
+    }
+    assert(0, z)
+    assert(5, c)
+#endregion
+
+#region "Cycle: do/while 1"
+    mut x = 1
+    do {
+        x -= 1
+    } while x > 0
+    assert(0, x)
+    do {
+        x += 1
+    } while false
+    assert(1, x)
+#endregion
+
+#region "Cycle: do/while 2"
+    mut x = 0
+    do {
+        x += 1
+    } while x < 10
+    assert(10, x)
+#endregion
+
+#region "Cycle: do/while with break"
+    mut x = 0
+    do {
+        x += 1
+        if x == 1 {
+            break
+        }
+    } while x < 10
+    assert(1, x)
+#endregion
+
+#region "Cycle: do/while with continue"
+    mut x = 0
+    mut iter = 0
+    do {
+        x += 1
+        if x == 1 || x == 5 {
+            continue
+        }
+        iter += 1
+    } while x < 10
+    assert(10, x)
+    assert(8, iter)
+#endregion
+
+#region "Cycle: for 1"
+    mut str = ""
+    for i in 1..5 {
+        for _ in 1..i {
+            str += "*"
+        }
+        str += "\n"
+    }
+    mut pattern =
+        "*\n" +
+        "**\n" +
+        "***\n" +
+        "****\n" +
+        "*****\n"
+    assert(pattern, str)
+#endregion
+
+#region "Cycle: for 2"
+    mut arr = []
+    for x in [1,2,3,4] {
+        x = x+x
+        arr.Add(x)
+    }
+    assert([2,4,6,8], arr)
+#endregion
+
+#region "Cycle: for with continue"
+    mut acc = 0
+    for x in 1..5 {
+        if x % 2 != 0 {
+            continue
+        }
+        for y in 6..10 {
+            if y % 2 == 0 {
+                continue
+            }
+            acc += x + y
+        }
+    }
+    assert(44, acc)
+#endregion
+
+#region "Cycle: for with break"
+    mut acc = ""
+    for x in 1..10 {
+        if x > 5 {
+            acc += ">>1"
+            break
+            acc += ">>2"
+            acc += ">>3"
+        }
+    }
+    assert(">>1", acc)
+#endregion
+
+#region "Cycle: for else empty"
+    mut acc = ""
+    for x in [] {
+        acc += x.ToString()
+    } else {
+        acc = "empty"
+    }
+    assert("empty", acc)
+#endregion
+
+#region "Cycle: for else non-empty"
+    mut acc = ""
+    for x in [1,2] {
+        acc += x.ToString()
+    } else {
+        acc = "empty"
+    }
+    assert("12", acc)
+#endregion
+
+#region "Cycle: for else when skips all"
+    mut acc = ""
+    for x in [1,3,5] when x % 2 == 0 {
+        acc += x.ToString()
+    } else {
+        acc = "empty"
+    }
+    assert("empty", acc)
+#endregion
+
+#region "Cycle: for else with break"
+    mut acc = ""
+    for x in [1,2] {
+        acc += x.ToString()
+        break
+    } else {
+        acc = "empty"
+    }
+    assert("1", acc)
+#endregion
+
+#region "Cycle: endless while"
+    mut i = 1
+    while true {
+        if i < 100 {
+            break
+        }
+        i += 1
+    }
+    assert(true, true)
+#endregion

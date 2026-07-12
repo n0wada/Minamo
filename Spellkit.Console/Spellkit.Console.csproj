@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>$(SpellkitRuntimeTargetFramework)</TargetFramework>
+    <ApplicationIcon>spk.ico</ApplicationIcon>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>spk</AssemblyName>
+    <RootNamespace>Spellkit</RootNamespace>
+    <Title>$(SpellkitProductName).Console</Title>
+    <Description>Spellkit, a dynamic language for .NET</Description>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Spellkit.Generators\Spellkit.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Spellkit\Spellkit.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>spk-tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>spk-language-tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.ComVisibleAttribute">
+      <_Parameter1>false</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.GuidAttribute">
+      <_Parameter1>858c07f8-8eec-4cfb-b06c-0b4ef3e0a6c0</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

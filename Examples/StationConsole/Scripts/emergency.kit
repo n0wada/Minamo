@@ -1,0 +1,21 @@
+import station
+
+let reactor = station.Reactor()
+let sameReactor = station.Reactor()
+assert(reactor.Id, sameReactor.Id)
+
+host.Signals.On("station.alert", zone => {
+    host.Log.Warning("Emergency reported in " + zone)
+
+    let door = station.Door(zone)
+    door.Lock()
+    reactor.SetOutput(85.0)
+
+    station.Broadcast(
+        "Locked " + zone + " and raised reactor output to 85%.")
+})
+
+if station.OxygenLevel < 35.0 {
+    reactor.SetOutput(75.0)
+    station.Broadcast("Low oxygen automation enabled.")
+}

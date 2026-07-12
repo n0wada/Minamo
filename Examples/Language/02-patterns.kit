@@ -1,0 +1,9 @@
+func describe(value) => match value {
+    nil => "missing",
+    0 => "zero",
+    1..9 => "single digit",
+    _ => "other"
+}
+
+print(describe(7))
+print(describe(20))

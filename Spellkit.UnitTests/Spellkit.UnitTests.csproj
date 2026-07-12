@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>$(SpellkitRuntimeTargetFramework)</TargetFramework>
+    <AssemblyName>spk-tests</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <!-- Most Spellkit APIs expose optional cancellation for host callers. Tests deliberately
+         exercise both default-token and explicit-token behavior. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(LanguageRunner)' == 'true'">
+    <OutputType>Exe</OutputType>
+    <AssemblyName>spk-language-tests</AssemblyName>
+    <IsTestProject>false</IsTestProject>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <StartupObject>Spellkit.UnitTesting.Program</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Spellkit.Generators\Spellkit.Generators.csproj" Condition="'$(LanguageRunner)' != 'true'" />
+    <ProjectReference Include="..\Spellkit.Console\Spellkit.Console.csproj" />
+    <ProjectReference Include="..\Spellkit\Spellkit.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(LanguageRunner)' != 'true'">
+    <PackageReference Include="coverlet.collector" Version="$(CoverletCollectorVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftNetTestSdkVersion)" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3" Version="$(XunitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Language\Program.cs" Condition="'$(LanguageRunner)' != 'true'" />
+    <Compile Remove="Generators\Snapshots\**\*.cs" />
+    <None Include="Generators\Snapshots\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(LanguageRunner)' == 'true'">
+    <Compile Include="Language\Program.cs" />
+    <Compile Include="Language\TestFormatting.cs" />
+    <Compile Include="Language\TestModels.cs" />
+    <Compile Include="Language\TestOptions.cs" />
+    <Compile Include="Language\TestRunner.cs" />
+    <Compile Include="TestRepository.cs" />
+  </ItemGroup>
+
+</Project>

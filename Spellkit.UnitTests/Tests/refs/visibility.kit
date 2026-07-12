@@ -1,0 +1,27 @@
+import userName from libtest
+import double from libtest
+import libtest as internalLib
+
+private let hiddenValue = 10
+let visibleValue = hiddenValue + 1
+
+private mut hiddenMutable = 20
+mut visibleMutable = hiddenMutable + 1
+
+private const HIDDEN = 30
+const VISIBLE = HIDDEN + 1
+
+private struct HiddenType { value }
+struct VisibleType { value }
+
+private func hiddenHelper(value) {
+    HiddenType(value).value + double(value) + internalLib.abs(-value)
+}
+
+func visible(value) {
+    hiddenHelper(value)
+}
+
+func greet(name) {
+    userName(name)
+}

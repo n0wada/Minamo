@@ -1,0 +1,123 @@
+#region "Lowered IR: dispatcher smoke"
+    import refs/libtest as irlib
+
+    struct IrBox { value }
+    impl IrBox {
+        mut secret: string
+
+        func init(value) {
+            this.secret = "s" + value.ToString()
+        }
+
+        func reveal() => this.secret
+    }
+
+    func IrBox.bump() {
+        this.value += 1
+        this.value
+    }
+
+    func irSquare(x) => x * x
+
+    let box = IrBox(4)
+    mut assigned = 1
+    assigned += irlib.double(2)
+    mut indexed = [1, 2, 3]
+    indexed[1] = assigned
+
+    assert(4, box[0])
+    assert("s4", box.reveal())
+    assert(5, box.bump())
+    assert([1, 5, 3], indexed)
+    assert(9, irSquare(3))
+    assert(8, irlib.double(4))
+
+    let branch = if box.value > 0 {
+        box.value
+    } else {
+        0
+    }
+    assert(5, branch)
+#endregion
+
+#region "Lowered IR: declaration metadata"
+    trait IrSummary {
+        func Describe()
+    }
+
+    impl IrSummary {
+        func Describe() => this[0].ToString()
+    }
+
+    struct IrNamed { value }
+    impl IrNamed with IrSummary {
+        func Twice(factor = 2) => this.value * factor
+    }
+
+    enum IrSignal { Off, On(value) }
+
+    let named = IrNamed(7)
+    let signal = On(5)
+
+    assert("7", named.Describe())
+    assert(14, named.Twice())
+    assert(21, named.Twice(3))
+    assert(5, match signal {
+        On(value) => value,
+        Off => 0
+    })
+#endregion
+
+#region "Lowered IR: value dispatch coverage"
+    const IR_DISPATCH_EXPECTED = 12
+
+    mut (left, right) = (1, 2)
+    (left, right) = (3, 4)
+
+    let doubled = [x * 2 for x in 1..3]
+    let converted = 'A' as Integer
+
+    func dispatchIterator() {
+        yield left
+        yield right
+        yield break
+    }
+
+    assert(12, IR_DISPATCH_EXPECTED)
+    assert([2, 4, 6], doubled)
+    assert(65, converted)
+    assert((3, 4), dispatchIterator().ToTuple())
+#endregion
+
+#region "Lowered IR: control flow smoke"
+    mut log = []
+    let result =
+        try {
+            mut total = 0
+
+            for x in [1,2,3] {
+                if x == 2 {
+                    continue
+                }
+                total += x
+            } else {
+                total = -1
+            }
+
+            while total < 5 {
+                total += 1
+            }
+
+            match Some(total) {
+                Some(v) => v,
+                None => 0
+            }
+        } catch e {
+            -1
+        } finally {
+            log.Add("finally")
+        }
+
+    assert(5, result)
+    assert(["finally"], log)
+#endregion

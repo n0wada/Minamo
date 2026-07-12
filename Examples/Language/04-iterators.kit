@@ -1,0 +1,9 @@
+func squares() {
+    for value in 1..5 {
+        yield value * value
+    }
+}
+
+for value in squares() {
+    print(fmt("square: {0}", value))
+}

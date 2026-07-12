@@ -1,0 +1,76 @@
+<Project>
+  <PropertyGroup>
+    <!-- Product identity lives here so a future rename does not require editing every project. -->
+    <SpellkitProductName>Spellkit</SpellkitProductName>
+    <SpellkitVersion>0.9.0</SpellkitVersion>
+    <SpellkitCompany>Spellkit Contributors</SpellkitCompany>
+    <SpellkitCopyright>Copyright (c) Spellkit Contributors</SpellkitCopyright>
+    <MicrosoftCodeAnalysisVersion>4.1.0</MicrosoftCodeAnalysisVersion>
+    <MicrosoftCodeAnalysisAnalyzersVersion>3.3.3</MicrosoftCodeAnalysisAnalyzersVersion>
+    <MicrosoftNetTestSdkVersion>18.7.0</MicrosoftNetTestSdkVersion>
+    <CoverletCollectorVersion>10.0.1</CoverletCollectorVersion>
+    <XunitVersion>3.2.2</XunitVersion>
+    <XunitRunnerVisualStudioVersion>3.1.5</XunitRunnerVisualStudioVersion>
+    <SpellkitRuntimeTargetFramework>net10.0</SpellkitRuntimeTargetFramework>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <SpellkitOutputRoot>$(MSBuildThisFileDirectory)bin\</SpellkitOutputRoot>
+    <SpellkitProductProject Condition="'$(MSBuildProjectName)' == 'Spellkit'
+      Or '$(MSBuildProjectName)' == 'Spellkit.Console'">true</SpellkitProductProject>
+    <OutputPath>$(SpellkitOutputRoot)projects\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
+
+    <Version Condition="'$(Version)' == ''">$(SpellkitVersion)</Version>
+    <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(SpellkitVersion)</AssemblyVersion>
+    <FileVersion Condition="'$(FileVersion)' == ''">$(SpellkitVersion)</FileVersion>
+    <Company Condition="'$(Company)' == ''">$(SpellkitCompany)</Company>
+    <Product Condition="'$(Product)' == ''">$(SpellkitProductName)</Product>
+    <Copyright Condition="'$(Copyright)' == ''">$(SpellkitCopyright)</Copyright>
+    <Trademark Condition="'$(Trademark)' == ''">$(SpellkitCompany)</Trademark>
+    <PackageLicenseExpression Condition="'$(PackageLicenseExpression)' == ''">MIT</PackageLicenseExpression>
+    <PackageProjectUrl Condition="'$(PackageProjectUrl)' == ''" />
+    <RepositoryUrl Condition="'$(RepositoryUrl)' == ''" />
+    <RepositoryType Condition="'$(RepositoryType)' == ''" />
+    <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
+    <WarningLevel Condition="'$(WarningLevel)' == ''">9999</WarningLevel>
+    <Configurations>Debug;Release;DebugGenerators</Configurations>
+
+    <RestoreConfigFile>$(MSBuildThisFileDirectory)NuGet.Config</RestoreConfigFile>
+    <RestorePackagesPath>$(MSBuildThisFileDirectory).nuget\packages</RestorePackagesPath>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+
+  <!-- Keep distributable Release files at bin root and isolate development-only outputs. -->
+  <PropertyGroup Condition="'$(SpellkitProductProject)' == 'true' And '$(Configuration)' == 'Release'">
+    <OutputPath>$(SpellkitOutputRoot)</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(SpellkitProductProject)' == 'true' And '$(Configuration)' == 'Debug'">
+    <OutputPath>$(SpellkitOutputRoot)debug\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(SpellkitProductProject)' == 'true' And '$(Configuration)' == 'DebugGenerators'">
+    <OutputPath>$(SpellkitOutputRoot)debug-generators\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Spellkit.UnitTests'
+    And '$(LanguageRunner)' != 'true'">
+    <OutputPath>$(SpellkitOutputRoot)tests\unit\$(Configuration)\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Spellkit.UnitTests'
+    And '$(LanguageRunner)' == 'true'">
+    <BaseIntermediateOutputPath>obj\language-runner\</BaseIntermediateOutputPath>
+    <OutputPath>$(SpellkitOutputRoot)tests\language\$(Configuration)\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Spellkit.Generators'">
+    <OutputPath>$(SpellkitOutputRoot)tools\generators\$(Configuration)\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'StationConsole'">
+    <OutputPath>$(SpellkitOutputRoot)examples\StationConsole\$(Configuration)\</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'DebugGenerators'">
+    <NoWarn Condition="'$(NoWarn)' == ''">1701;1702;CA1822</NoWarn>
+  </PropertyGroup>
+</Project>

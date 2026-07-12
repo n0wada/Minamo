@@ -1,0 +1,252 @@
+﻿#region "Initialize"
+    struct Box { key }
+    let boxCollector = []
+    func Box.Dispose() => boxCollector.Add(this.key)
+#endregion
+
+#region "Simple 1"
+    {
+        use x = Box("foo")
+        boxCollector.Add("wait.foo")
+    }
+    assert(["wait.foo", "foo"], boxCollector)
+#endregion
+
+#region "Simple 2"
+    {
+        use x = Box("foo")
+        boxCollector.Add("wait.foo")
+        {
+            use y = Box("bar")
+            boxCollector.Add("wait.bar")
+        }
+    }
+    assert(["wait.foo", "wait.bar", "bar", "foo"], boxCollector)
+#endregion
+
+#region "Simple 3"
+    for x in 1..6 {
+        use obj = Box(x)
+        if x == 3 {
+            continue
+        }
+        if x == 6 {
+            break
+        }
+    }
+    assert([1,2,3,4,5,6], boxCollector)
+#endregion
+
+#region "Simple 4"
+    func doit(b) {
+        if b {
+            use a = Box(2)
+        } else {
+            use b = Box(4)
+        }
+        use c = Box(100)
+    }
+    doit(true)
+    doit(false)
+    assert([2, 100, 4, 100], boxCollector)
+#endregion
+
+#region "Simple 5"
+    mut x = 5
+    while x > 0 {
+        use a = Box(x)
+        if x == 1 {
+            break
+        }
+        x = x - 1
+        if x == 3 {
+            continue
+        }
+    }
+    assert([5,4,3,2,1], boxCollector)
+#endregion
+
+#region "Autos in functions 1"
+    func run() {
+        use x = Box("foo")
+        use y = Box("bar")
+    }
+    run()
+    assert(["foo", "bar"], boxCollector)
+#endregion
+
+#region "Autos in functions 2"
+    func iter() {
+        use x = Box("fin")
+        boxCollector.Add(1)
+        yield 1
+        boxCollector.Add(2)
+        yield 2
+        boxCollector.Add(3)
+        yield 3
+    }
+    for _ in iter() { }
+    assert([1,2,3,"fin"], boxCollector)
+#endregion
+
+#region "Autos in functions 3"
+    func testFn() {
+        use x = Box("x")
+        {
+            use y = Box("y")
+            if true {
+                use z = Box("z")
+                return
+            }
+        }
+    }
+    testFn()
+    assert(["z","y","x"], boxCollector)
+#endregion
+
+#region "Autos in functions 4"
+    func foobar(flag) {
+        use a = Box('a')
+        if flag {
+            return
+        }
+        use b = Box('b')
+    }
+
+    foobar(flag: true)
+    foobar(flag: false)
+    foobar(flag: true)
+    assert(['a', 'a', 'b', 'a'], boxCollector)
+#endregion
+
+#region "Autos in functions 5"
+    func iter() {
+        use a = Box(10)
+        yield { use a = Box(2) }
+        yield { use a = Box(4) }
+        yield { use a = Box(6) }
+        yield { use a = Box(8) }
+        { use a = Box(9) }
+    }
+    for _ in iter() { }
+    assert([2,4,6,8,9,10], boxCollector)
+#endregion
+
+#region "Autos and exceptions 1"
+    func testE() {
+        use x = Box(12)
+        throw Exception<Error>()
+    }
+
+    try {
+        testE()
+    } catch _ {
+        assert([12], boxCollector)
+    }
+#endregion
+
+#region "Autos and exceptions 2"
+    func test1() {
+        use x = Box("y")
+        {
+            use y = Box("z")
+            throw Exception<Error>("Error")
+        }
+    }
+    func run() {
+        use old = Box("x")
+        test1()
+    }
+    let msg = try {
+        run()
+    } catch e {
+        e[0]
+    }
+    assert("Error", msg)
+    assert(["z", "y", "x"], boxCollector)
+#endregion
+
+#region "Autos and exceptions 3"
+    try {
+        use x = Box(42)
+        throw Exception<Error>(84)
+    } catch e {
+        boxCollector.Add(e[0])
+    }
+    assert([42,84], boxCollector)
+#endregion
+
+#region "Autos and exceptions 4"
+    func divide(x, y) {
+        use def = Box(-100)
+        try {
+            use box = Box(12)
+            return x / y
+        } catch _ {
+            return def.key
+        }
+    }
+    mut xs = [divide(10, 2), divide(2, 0)]
+    assert([5, -100], xs)
+    assert([12, -100, 12, -100], boxCollector)
+#endregion
+
+#region "Autos and exceptions 5"
+    func doit() {
+        mut x = {
+            throw Exception<Error>(24)
+            use b = Box(12)
+        }
+    }
+    try {
+        doit()
+    } catch e {
+        use b = Box(e[0])
+    }
+    assert([24], boxCollector)
+#endregion
+
+#region "Autos in catch 1"
+    try {
+        throw Exception<Error>()
+    } catch _ {
+        use b = Box(1)
+    }
+    assert([1], boxCollector)
+#endregion
+
+#region "Autos in catch 2"
+    func inner() {
+        try {
+            throw Exception<Error>("err")
+        } catch e {
+            use b = Box(1)
+            throw
+        }
+    }
+    try {
+        inner()
+    } catch e {
+        assert(e[0], "err")
+        assert([1], boxCollector)
+    }
+#endregion
+
+#region "Autos in catch 3"
+    func inside() {
+        try {
+            throw Exception<Error>('a')
+        } catch _ {
+            use b = Box("auto")
+            throw Exception<Error>('b')
+            throw
+        }
+    }
+    mut x
+    try {
+        inside()
+    } catch e {
+        x = e[0]
+    }
+    assert('b', x)
+#endregion
