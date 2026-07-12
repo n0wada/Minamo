@@ -356,7 +356,6 @@ are reserved by Spellkit's built-in host APIs:
 | `state.read` | `host.State[key]`, `host.State.Keys()`, `Has()`, and `Owner()` |
 | `state.write` | Assignment to `host.State[key]`, `Remove()`, and `Clear()` |
 | `log.write` | `host.Log.Debug()`, `Info()`, `Warning()`, and `Error()` |
-| `runtime.eval` | The built-in `eval` function during hosted execution |
 
 Signal capabilities are chosen when calling `AddSignal` through `listenCapability` and
 `emitCapability`. Module commands, generated commands and properties, and resource commands use
@@ -666,10 +665,6 @@ cancelled by either the operation token or `MaxExecutionTime`, so a command that
 C# work should observe it itself. The VM checks cancellation and time periodically while executing
 bytecode and again when a host command returns. .NET does not provide a safe way to forcibly stop a
 synchronous handler that ignores cancellation.
-
-In an instance with an explicit allow-list, the built-in `eval` function requires the
-`runtime.eval` capability. An allowed nested evaluation inherits the current instruction, time,
-call-depth, and cancellation control instead of starting an unrestricted VM execution.
 
 `SpellkitExecutionResult.Metrics` and `SpellkitSignalDispatchResult.Metrics` contain total, compilation, and VM
 durations plus instruction, host-command, and Signal counts. Instruction counting is enabled when

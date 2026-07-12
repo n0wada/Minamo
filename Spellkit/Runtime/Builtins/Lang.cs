@@ -9,7 +9,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 
 namespace Spellkit.Linker;
 
@@ -387,81 +386,6 @@ internal sealed partial class Lang : ForeignUnit
         }
 
         return LiteralEvaluator.Eval(res.Value!.Root.Nodes[0]);
-    }
-
-    [SpkStaticMethod("eval")]
-    public static SpkObject Eval(ExecutionContext ctx, string source, SpkTuple? args = null)
-    {
-        var environment = ctx.GetContextVariable<SpellkitHostEnvironment>(SpellkitHostEnvironment.ContextKey);
-        environment?.Capabilities.Demand("runtime.eval");
-
-        var sb = new StringBuilder();
-        sb.Append("func __sys_x12(");
-        
-        if (args is not null)
-        {
-            var tv = args.UnsafeAccess();
-            
-            for (var i = 0; i < args.Count; i++)
-            {
-                var o = tv[i];
-
-                if (o is not SpkLabel lab)
-                {
-                    continue;
-                }
-
-                if (i > 0)
-                {
-                    sb.Append(',');
-                }
-
-                sb.Append(lab.Label);
-            }
-        }
-
-        sb.Append("){");
-        sb.Append(source);
-        sb.Append('}');
-        sb.Append("__sys_x12");
-
-        var linker = new SpkLinker(FileLookup.Default);
-        var result = linker.Make(SourceBuffer.FromString(sb.ToString()));
-
-        if (!result.Success)
-        {
-            throw new SpkBuildException(result.Messages);
-        }
-
-        var newctx = SpkMachine.CreateExecutionContext(result.Value!);
-        newctx.Control = ctx.Control;
-        foreach (var (key, value) in ctx.RuntimeContext.Variables)
-        {
-            newctx.SetContextVariable(key, value);
-        }
-
-        var result2 = SpkMachine.Execute(newctx);
-        var func = result2.Value!;
-        var argsList = new List<SpkObject>();
-
-        if (args is null)
-        {
-            return func.Invoke(newctx, argsList.ToArray());
-        }
-
-        var tvv = args.UnsafeAccess();
-
-        for (var i = 0; i < args.Count; i++)
-        {
-            var o = tvv[i];
-
-            if (o is SpkLabel lab)
-            {
-                argsList.Add(lab.Value);
-            }
-        }
-
-        return func.Invoke(newctx, argsList.ToArray());
     }
 
     [SpkStaticMethod("__invoke")]

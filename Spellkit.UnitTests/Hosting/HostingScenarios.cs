@@ -1287,23 +1287,11 @@ internal static class HostingScenarios
             AssertEqual(1, session.DispatchSignals().Delivered, "remaining signal delivery");
         }
 
-        using (var deniedEval = new SpellkitHost().AddCapabilities("other").CreateInstance())
+        using (var removedEval = new SpellkitHost().CreateInstance())
         {
-            Failure(deniedEval, "eval(\"1 + 1\")");
+            Failure(removedEval, "eval(\"1 + 1\")");
         }
 
-        using (var limitedEval = new SpellkitHost(new()
-        {
-            Limits = new() { MaxInstructions = 100 }
-        })
-            .AddCapabilities("runtime.eval")
-            .CreateInstance())
-        {
-            var result = FailureResult(
-                limitedEval,
-                "eval(\"mut value = 0\\nwhile true { value += 1 }\")");
-            AssertLimit(result, SpkExecutionLimitKind.Instructions);
-        }
     }
 
     internal static void ResultContracts()

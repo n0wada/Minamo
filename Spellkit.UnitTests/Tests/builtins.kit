@@ -42,14 +42,6 @@
     assert(4, FOUR)
 #endregion
 
-#region "eval" 
-    mut z = eval("x + y", (x: 2, y: 3) )
-    assert(5, z)
-    let src = "x + y * z"
-    let res = eval(src, (x: 2, y: 12, z: 3) )
-    assert(38, res)
-#endregion
-
 #region "round" 
     mut x = round(42.12345) //Evaluates to 42.12
     mut y = round(42.12345, 4) //Evaluates to 42.1234
