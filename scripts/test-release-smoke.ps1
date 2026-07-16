@@ -7,6 +7,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $console = Join-Path $repoRoot "bin\spk.dll"
 $station = Join-Path $repoRoot "bin\examples\StationConsole\$Configuration\Spellkit.Examples.StationConsole.dll"
+$workflow = Join-Path $repoRoot "bin\projects\OrderWorkflow\$Configuration\Spellkit.Examples.OrderWorkflow.dll"
 $smokeDirectory = Join-Path $repoRoot "artifacts\release-smoke"
 $languageExamples = Join-Path $repoRoot "Examples\Language"
 $source = Join-Path $smokeDirectory "smoke test.kit"
@@ -63,5 +64,24 @@ foreach ($expected in @(
     if ($stationText.IndexOf($expected, [System.StringComparison]::Ordinal) -lt 0)
     {
         throw "Station Console output is missing '$expected'."
+    }
+}
+
+$workflowOutput = & dotnet $workflow 2>&1
+if ($LASTEXITCODE -ne 0)
+{
+    throw "Order Workflow smoke test failed."
+}
+
+$workflowText = $workflowOutput -join "`n"
+foreach ($expected in @(
+    "Load workflow: OK",
+    "Shipment requested: OK",
+    "ORD-1001: shipped via courier (express)",
+    "ORD-1002: not accepted"))
+{
+    if ($workflowText.IndexOf($expected, [System.StringComparison]::Ordinal) -lt 0)
+    {
+        throw "Order Workflow output is missing '$expected'."
     }
 }

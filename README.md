@@ -18,7 +18,7 @@ handles.
 - **Explicit host boundaries** — scripts see registered commands and resources, not arbitrary CLR
   members.
 - **Controlled execution** — optional capability allow-lists, cancellation, and limits for
-  instructions, time, host calls, signals, and call depth.
+  instructions, time, host calls, signals, pending signal queues, and call depth.
 - **A compact but expressive language** — functions, iterators, pattern matching, modules,
   user-defined types, traits, exceptions, and extension methods.
 - **Useful diagnostics** — structured compilation failures, runtime failures, metrics, and
@@ -189,6 +189,7 @@ The Hosting API also supports:
 - module commands and instance-scoped resource handles;
 - host-owned and script-owned instance state;
 - queued signals delivered at host-selected safe points;
+- instance-local input and output selected by the embedding host;
 - capability-gated commands and host features;
 - logging, execution metrics, and tracing;
 - per-operation cancellation and execution limits.
@@ -243,6 +244,14 @@ handles, capabilities, queued signals, telemetry, tracing, metrics, and executio
 
 ```powershell
 dotnet run --project .\Examples\StationConsole\StationConsole.csproj
+```
+
+The [Order Workflow](Examples/OrderWorkflow/README.md) example is a script-first order pipeline.
+Its five `.kit` files separate the domain model, validation, shipment selection, notifications,
+and signal handlers; the small C# host only exposes the order-system boundary:
+
+```powershell
+dotnet run --project .\Examples\OrderWorkflow\OrderWorkflow.csproj
 ```
 
 ## Validate the checkout

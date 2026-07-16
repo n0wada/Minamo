@@ -1,0 +1,14 @@
+enum Delivery { Draft, Paid, Shipped(tracking), Cancelled(reason) }
+
+func describe(delivery) => match delivery {
+    Draft => "waiting for payment",
+    Paid => "ready to ship",
+    Shipped(code) => fmt("shipped ({0})", code),
+    Cancelled(reason) => fmt("cancelled ({0})", reason)
+}
+
+let history = [Draft, Paid, Shipped("TRK-42"), Cancelled("duplicate")]
+
+for delivery in history {
+    print(describe(delivery))
+}

@@ -1,0 +1,16 @@
+func makeCounter(start) {
+    mut value = start
+    () => {
+        value += 1
+        value
+    }
+}
+
+func apply(value, transform) => transform(value)
+
+let nextInvoice = makeCounter(100)
+let withTax = amount => amount * 11 / 10
+
+print(fmt("invoice {0}", nextInvoice()))
+print(fmt("invoice {0}", nextInvoice()))
+print(fmt("with tax: {0}", apply(200, withTax)))

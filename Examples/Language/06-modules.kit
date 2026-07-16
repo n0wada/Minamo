@@ -1,0 +1,8 @@
+import modules/pricing as pricing
+import receiptLine from modules/text
+
+let subtotal = 1200
+let discount = pricing.Discount(subtotal, "member")
+
+print(receiptLine("Ada", subtotal, discount))
+print(pricing.Tier(subtotal))

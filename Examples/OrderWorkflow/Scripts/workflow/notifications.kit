@@ -1,0 +1,13 @@
+import workflow/model as model
+
+func Submitted(order) =>
+    "Accepted " + model.Describe(order) + "; requesting payment."
+
+func Rejected(order, reason) =>
+    "Rejected " + model.Describe(order) + ": " + reason
+
+func Paid(order, plan) =>
+    "Payment confirmed for " + order.id + "; " + plan.priority + " delivery selected."
+
+func Shipped(order, plan) =>
+    "Shipment created for " + order.id + " with " + plan.carrier + "."

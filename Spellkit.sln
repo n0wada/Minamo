@@ -23,6 +23,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Spellkit.Generators", "Spel
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StationConsole", "Examples\StationConsole\StationConsole.csproj", "{01A12118-5033-4885-B9AD-3B51E222E713}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrderWorkflow", "Examples\OrderWorkflow\OrderWorkflow.csproj", "{A5C938F0-84F6-45A3-AB20-5CEDE0875461}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,6 +38,12 @@ Global
 		{23F4BAA6-838A-4F92-8D80-1BFB09507B3D}.DebugGenerators|Any CPU.Build.0 = DebugGenerators|Any CPU
 		{23F4BAA6-838A-4F92-8D80-1BFB09507B3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{23F4BAA6-838A-4F92-8D80-1BFB09507B3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A5C938F0-84F6-45A3-AB20-5CEDE0875461}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A5C938F0-84F6-45A3-AB20-5CEDE0875461}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A5C938F0-84F6-45A3-AB20-5CEDE0875461}.DebugGenerators|Any CPU.ActiveCfg = DebugGenerators|Any CPU
+		{A5C938F0-84F6-45A3-AB20-5CEDE0875461}.DebugGenerators|Any CPU.Build.0 = DebugGenerators|Any CPU
+		{A5C938F0-84F6-45A3-AB20-5CEDE0875461}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A5C938F0-84F6-45A3-AB20-5CEDE0875461}.Release|Any CPU.Build.0 = Release|Any CPU
 		{35777D7A-C304-45E8-9323-088298491476}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{35777D7A-C304-45E8-9323-088298491476}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{35777D7A-C304-45E8-9323-088298491476}.DebugGenerators|Any CPU.ActiveCfg = DebugGenerators|Any CPU

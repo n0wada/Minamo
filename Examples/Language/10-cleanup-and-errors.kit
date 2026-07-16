@@ -1,0 +1,19 @@
+func openConnection(name) {
+    if name == "" {
+        throw Exception<ConnectionError>("A connection name is required.")
+    }
+
+    fmt("connected to {0}", name)
+}
+
+mut cleanup = []
+let message = try {
+    openConnection("")
+} catch error {
+    fmt("recovered from {0}", error.Name)
+} finally {
+    cleanup.Add("connection resources released")
+}
+
+print(message)
+print(cleanup[0])

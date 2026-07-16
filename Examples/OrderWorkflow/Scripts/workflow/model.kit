@@ -1,0 +1,7 @@
+struct Order { id, customer, total }
+
+func FromPayload(payload) =>
+    Order(payload[0], payload[1], payload[2])
+
+func Describe(order) =>
+    fmt("{0} for {1} ({2})", order.id, order.customer, order.total)

@@ -1,0 +1,29 @@
+trait Billable {
+    func Name()
+    func Price()
+    func Describe()
+}
+
+// A trait can provide shared behavior, like an abstract base class.
+impl Billable {
+    func Describe() => fmt("{0}: {1}", this.Name(), this.Price())
+}
+
+struct Subscription { customer, monthlyFee }
+impl Subscription with Billable {}
+func Subscription.Name() => this.customer
+func Subscription.Price() => this.monthlyFee
+
+struct UsageCharge { customer, units, unitPrice }
+impl UsageCharge with Billable {}
+func UsageCharge.Name() => this.customer
+func UsageCharge.Price() => this.units * this.unitPrice
+
+func printInvoice(Billable item) {
+    print(item.Describe())
+}
+
+let items = [Subscription("Ada", 20), UsageCharge("Ben", 3, 7)]
+for item in items {
+    printInvoice(item)
+}

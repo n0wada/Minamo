@@ -1,0 +1,6 @@
+struct Plan { carrier, priority }
+
+func For(order) =>
+    order.total >= 1000
+        ? Plan("courier", "express")
+        : Plan("postal", "standard")

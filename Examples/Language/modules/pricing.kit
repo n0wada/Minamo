@@ -1,0 +1,11 @@
+private const MemberRate = 0.10
+
+func Discount(amount, customerKind) {
+    if customerKind == "member" {
+        amount * MemberRate
+    } else {
+        0
+    }
+}
+
+func Tier(amount) => amount >= 1000 ? "large order" : "standard order"

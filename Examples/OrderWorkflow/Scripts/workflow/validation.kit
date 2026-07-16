@@ -1,0 +1,8 @@
+func Accept(order) =>
+    order.id != "" && order.customer != "" && order.total > 0
+
+func Reason(order) =>
+    order.id == "" ? "order id is missing"
+    : order.customer == "" ? "customer is missing"
+    : order.total <= 0 ? "total must be positive"
+    : "accepted"

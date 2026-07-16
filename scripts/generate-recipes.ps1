@@ -32,6 +32,36 @@ $recipes = @(
         Title = "Exceptions"
         Description = "Throws and catches an application error while keeping the script running."
     }
+    [pscustomobject]@{
+        File = "06-modules.kit"
+        Title = "Modules and visibility"
+        Description = "Imports two local modules, uses an alias and a selected import, and keeps a pricing constant private to its module."
+    }
+    [pscustomobject]@{
+        File = "07-enums-and-state.kit"
+        Title = "Enums and state"
+        Description = "Models delivery states with enum cases and turns each state into a user-facing message with match."
+    }
+    [pscustomobject]@{
+        File = "08-functions-and-closures.kit"
+        Title = "Functions and closures"
+        Description = "Builds a stateful counter with a closure and passes a lambda as a transformation function."
+    }
+    [pscustomobject]@{
+        File = "09-dictionaries-and-tuples.kit"
+        Title = "Dictionaries and tuples"
+        Description = "Converts a labeled tuple into a dictionary, updates a value, applies a fallback, and enumerates the entries."
+    }
+    [pscustomobject]@{
+        File = "10-cleanup-and-errors.kit"
+        Title = "Cleanup and errors"
+        Description = "Recovers from an application error and uses finally to release work owned by the attempted operation."
+    }
+    [pscustomobject]@{
+        File = "11-traits-as-interfaces.kit"
+        Title = "Traits as interfaces"
+        Description = "Uses a trait as a common billable interface, shares a default description, and accepts multiple concrete types through the trait contract."
+    }
 )
 
 $lines = [System.Collections.Generic.List[string]]::new()

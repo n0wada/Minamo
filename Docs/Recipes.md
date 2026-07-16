@@ -134,4 +134,192 @@ dotnet .\bin\spk.dll .\Examples\Language\05-exceptions.kit -nologo
 
 Source: [05-exceptions.kit](../Examples/Language/05-exceptions.kit)
 
+## Modules and visibility
+
+Imports two local modules, uses an alias and a selected import, and keeps a pricing constant private to its module.
+
+```swift
+import modules/pricing as pricing
+import receiptLine from modules/text
+
+let subtotal = 1200
+let discount = pricing.Discount(subtotal, "member")
+
+print(receiptLine("Ada", subtotal, discount))
+print(pricing.Tier(subtotal))
+```
+
+Run it with:
+
+```powershell
+dotnet .\bin\spk.dll .\Examples\Language\06-modules.kit -nologo
+```
+
+Source: [06-modules.kit](../Examples/Language/06-modules.kit)
+
+## Enums and state
+
+Models delivery states with enum cases and turns each state into a user-facing message with match.
+
+```swift
+enum Delivery { Draft, Paid, Shipped(tracking), Cancelled(reason) }
+
+func describe(delivery) => match delivery {
+    Draft => "waiting for payment",
+    Paid => "ready to ship",
+    Shipped(code) => fmt("shipped ({0})", code),
+    Cancelled(reason) => fmt("cancelled ({0})", reason)
+}
+
+let history = [Draft, Paid, Shipped("TRK-42"), Cancelled("duplicate")]
+
+for delivery in history {
+    print(describe(delivery))
+}
+```
+
+Run it with:
+
+```powershell
+dotnet .\bin\spk.dll .\Examples\Language\07-enums-and-state.kit -nologo
+```
+
+Source: [07-enums-and-state.kit](../Examples/Language/07-enums-and-state.kit)
+
+## Functions and closures
+
+Builds a stateful counter with a closure and passes a lambda as a transformation function.
+
+```swift
+func makeCounter(start) {
+    mut value = start
+    () => {
+        value += 1
+        value
+    }
+}
+
+func apply(value, transform) => transform(value)
+
+let nextInvoice = makeCounter(100)
+let withTax = amount => amount * 11 / 10
+
+print(fmt("invoice {0}", nextInvoice()))
+print(fmt("invoice {0}", nextInvoice()))
+print(fmt("with tax: {0}", apply(200, withTax)))
+```
+
+Run it with:
+
+```powershell
+dotnet .\bin\spk.dll .\Examples\Language\08-functions-and-closures.kit -nologo
+```
+
+Source: [08-functions-and-closures.kit](../Examples/Language/08-functions-and-closures.kit)
+
+## Dictionaries and tuples
+
+Converts a labeled tuple into a dictionary, updates a value, applies a fallback, and enumerates the entries.
+
+```swift
+let profile = (name: "Ada", plan: "pro", credits: 3)
+mut settings = Dictionary.FromTuple(profile)
+
+settings["credits"] += 2
+let region = settings.TryGet("region") ?? "unknown"
+
+print(fmt("{0} has {1} credits", settings.name, settings.credits))
+print(fmt("region={0}", region))
+
+for key, value in settings {
+    print(fmt("{0}={1}", key, value))
+}
+```
+
+Run it with:
+
+```powershell
+dotnet .\bin\spk.dll .\Examples\Language\09-dictionaries-and-tuples.kit -nologo
+```
+
+Source: [09-dictionaries-and-tuples.kit](../Examples/Language/09-dictionaries-and-tuples.kit)
+
+## Cleanup and errors
+
+Recovers from an application error and uses finally to release work owned by the attempted operation.
+
+```swift
+func openConnection(name) {
+    if name == "" {
+        throw Exception<ConnectionError>("A connection name is required.")
+    }
+
+    fmt("connected to {0}", name)
+}
+
+mut cleanup = []
+let message = try {
+    openConnection("")
+} catch error {
+    fmt("recovered from {0}", error.Name)
+} finally {
+    cleanup.Add("connection resources released")
+}
+
+print(message)
+print(cleanup[0])
+```
+
+Run it with:
+
+```powershell
+dotnet .\bin\spk.dll .\Examples\Language\10-cleanup-and-errors.kit -nologo
+```
+
+Source: [10-cleanup-and-errors.kit](../Examples/Language/10-cleanup-and-errors.kit)
+
+## Traits as interfaces
+
+Uses a trait as a common billable interface, shares a default description, and accepts multiple concrete types through the trait contract.
+
+```swift
+trait Billable {
+    func Name()
+    func Price()
+    func Describe()
+}
+
+// A trait can provide shared behavior, like an abstract base class.
+impl Billable {
+    func Describe() => fmt("{0}: {1}", this.Name(), this.Price())
+}
+
+struct Subscription { customer, monthlyFee }
+impl Subscription with Billable {}
+func Subscription.Name() => this.customer
+func Subscription.Price() => this.monthlyFee
+
+struct UsageCharge { customer, units, unitPrice }
+impl UsageCharge with Billable {}
+func UsageCharge.Name() => this.customer
+func UsageCharge.Price() => this.units * this.unitPrice
+
+func printInvoice(Billable item) {
+    print(item.Describe())
+}
+
+let items = [Subscription("Ada", 20), UsageCharge("Ben", 3, 7)]
+for item in items {
+    printInvoice(item)
+}
+```
+
+Run it with:
+
+```powershell
+dotnet .\bin\spk.dll .\Examples\Language\11-traits-as-interfaces.kit -nologo
+```
+
+Source: [11-traits-as-interfaces.kit](../Examples/Language/11-traits-as-interfaces.kit)
+
 The Release smoke test executes every listed recipe. Run `scripts/generate-recipes.ps1 -Check` to verify that this page matches the source files.

@@ -1,0 +1,12 @@
+let profile = (name: "Ada", plan: "pro", credits: 3)
+mut settings = Dictionary.FromTuple(profile)
+
+settings["credits"] += 2
+let region = settings.TryGet("region") ?? "unknown"
+
+print(fmt("{0} has {1} credits", settings.name, settings.credits))
+print(fmt("region={0}", region))
+
+for key, value in settings {
+    print(fmt("{0}={1}", key, value))
+}

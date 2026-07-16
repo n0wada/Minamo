@@ -1,0 +1,49 @@
+import workflow/model as model
+import workflow/validation as validation
+import workflow/shipping as shipping
+import workflow/notifications as notifications
+import orders
+
+host.State["submitted"] = 0
+host.State["paid"] = 0
+host.State["shipped"] = 0
+
+func increase(key) {
+    host.State[key] = (host.State[key] ?? 0) + 1
+}
+
+func onSubmitted(payload) {
+    let order = model.FromPayload(payload)
+    increase("submitted")
+
+    if validation.Accept(order) {
+        orders.RequestPayment(order.id)
+        host.Log.Info(notifications.Submitted(order))
+    } else {
+        host.Log.Warning(notifications.Rejected(order, validation.Reason(order)))
+    }
+}
+
+func onPaymentConfirmed(payload) {
+    let order = model.FromPayload(payload)
+    let plan = shipping.For(order)
+
+    increase("paid")
+    host.Log.Info(notifications.Paid(order, plan))
+    host.Signals.Emit("order.shipment.requested", (order, plan))
+}
+
+func onShipmentRequested(event) {
+    let order = event[0]
+    let plan = event[1]
+
+    increase("shipped")
+    orders.CreateShipment(order.id, plan.carrier, plan.priority)
+    host.Log.Info(notifications.Shipped(order, plan))
+}
+
+host.Signals.On("order.submitted", onSubmitted)
+host.Signals.On("order.payment.confirmed", onPaymentConfirmed)
+host.Signals.On("order.shipment.requested", onShipmentRequested)
+
+print("Order workflow loaded.")
