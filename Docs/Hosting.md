@@ -35,6 +35,7 @@ The Hosting API uses a small set of names consistently on the C# side and the Sp
 | Resources | `host.AddResourceType<T>()`, `context.Resource(...)` | Returned handles | Instance-scoped opaque CLR objects |
 | State | `Environment.State.Set/SetScript` | `host.State` | Instance memory with host-owned and script-owned keys |
 | Signals | `host.AddSignal(...)`, `Environment.Signals` | `host.Signals` | Queued events delivered by `DispatchSignals()` |
+| Input and output | `SpellkitEnvironment.UseInput/UseOutput` | `readLine`, `print` | Instance-local text I/O selected by the host |
 | Capabilities | `host.AddCapabilities(...)`, `Environment.Capabilities` | None | Host-owned allow-list for protected features |
 | Logging | `SpellkitHostOptions.Log` | `host.Log` | User-facing structured log events |
 | Tracing | `SpellkitHostOptions.Trace` | None | Observational diagnostics for the embedding host |
@@ -44,6 +45,8 @@ Use module commands for live host operations, resources for objects with identit
 and `State` for instance facts or script working memory.
 `Signals` are queued and explicit: `DispatchSignals()` dispatches the pending
 queue at a host-chosen safe point rather than immediately re-entering a running VM.
+Input and output can be selected per hosted instance. When a delegate is not supplied, the builtins
+retain their normal process Console behavior for compatibility.
 
 ## Host Setup
 
@@ -262,6 +265,29 @@ self + world
 Name resolution checks script locals, outer scopes, imports, and built-in types before consulting
 the environment. A missing exposed name is a runtime error. Assignment to the same bare name creates
 or updates a script binding; it does not write back into the `SpellkitEnvironment`.
+
+### Instance input and output
+
+Configure text I/O on the `SpellkitEnvironment` when an instance needs isolated input or output:
+
+```csharp
+var output = new StringBuilder();
+var environment = new SpellkitEnvironment(game)
+    .UseInput(cancellationToken => commandQueue.Read(cancellationToken))
+    .UseOutput(text => output.Append(text));
+
+using var instance = host.CreateInstance(environment);
+var result = instance.Execute("print(readLine(), terminator: nil)");
+```
+
+The input delegate receives the current operation's cancellation token. Returning `null` represents
+end of input and produces an empty Spellkit string, matching Console behavior. The output delegate
+receives the same text chunks that `print` writes: values, separators, and terminators.
+
+Without a delegate, `readLine` and `print` retain their Console behavior. The `setOut` builtin can
+temporarily redirect `print` to a Spellkit callback, but the redirect is stored in the instance
+runtime and never changes `Console.Out`. The command-line host explicitly connects its instance
+environment to `Console.ReadLine` and `Console.Write`.
 
 Use `ExecuteFile` when the host has explicitly selected an entry script:
 
@@ -533,6 +559,34 @@ var subscription = instance.Environment.Signals.Subscribe(
     signal => Console.WriteLine(signal.GetPayload<int>()));
 
 instance.Environment.Signals.Unsubscribe(subscription);
+```
+
+Pending queues are unbounded by default for compatibility. Set `Signals.MaxPending` on the host
+options when producers can outpace dispatch:
+
+```csharp
+var host = new SpellkitHost(new()
+{
+    Signals = new() { MaxPending = 1024 }
+});
+```
+
+The limit is copied into every instance created by that host. `TryEmit` returns `false` when the
+queue is full; `Emit` throws `InvalidOperationException` on the C# side and produces a runtime
+failure when called by a script. Invalid signal names and disposed dispatchers still throw from
+both methods. `PendingCount` reports the current queue length.
+
+```csharp
+if (!instance.Environment.Signals.TryEmit("player.hit", 10))
+    droppedSignals.Increment();
+```
+
+Spellkit can select the same non-throwing behavior:
+
+```swift
+if !host.Signals.TryEmit("player.hit", 10) {
+    host.Log.Warning("signal queue is full")
+}
 ```
 
 Use `GetPayload<T>()` or `TryGetPayload<T>()` to consume signal payloads without depending on

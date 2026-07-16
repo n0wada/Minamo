@@ -195,6 +195,7 @@ internal static class HostingScenarios
         AssertNoMethod<SpellkitHost>("OnProgress", "removed progress registration");
         AssertNoMethod<SpellkitHost>("OnTrace", "tracing moved to host options");
         AssertHasProperty<SpellkitHostOptions>("Limits", "host execution limits");
+        AssertHasProperty<SpellkitHostOptions>("Signals", "host signal queue options");
         AssertHasProperty<SpellkitHostOptions>("CapabilityMode", "host capability mode");
         AssertHasProperty<SpellkitHostOptions>("Log", "host log handler");
         AssertNoProperty<SpellkitHostOptions>("Progress", "removed host progress handler");
@@ -240,6 +241,8 @@ internal static class HostingScenarios
         AssertHasProperty<SpellkitProgram>("Diagnostics", "compiled program diagnostics");
         AssertHasMethod<SpellkitEnvironment>("Expose", "environment name exposure");
         AssertHasMethod<SpellkitEnvironment>("Set", "environment bindings");
+        AssertHasMethod<SpellkitEnvironment>("UseInput", "instance input setup");
+        AssertHasMethod<SpellkitEnvironment>("UseOutput", "instance output setup");
 
         AssertHasProperty<SpellkitExecutionLimits>("MaxExecutionTime", "operation time limit");
         AssertNoProperty<SpellkitExecutionLimits>("MaxTime", "old time limit name");
@@ -252,6 +255,9 @@ internal static class HostingScenarios
         AssertNoMethod<SpellkitStateStore>("SetRaw", "internal raw host state setter");
         AssertNoMethod<SpellkitStateStore>("SetScriptRaw", "internal raw script state setter");
         AssertNoMethod<SpellkitSignalDispatcher>("EmitRaw", "internal raw signal emission");
+        AssertHasMethod<SpellkitSignalDispatcher>("TryEmit", "bounded signal emission");
+        AssertHasProperty<SpellkitSignalDispatcher>("MaxPending", "pending signal limit");
+        AssertHasProperty<SpellkitSignalDispatcher>("PendingCount", "pending signal count");
         AssertHasMethod<SpellkitSignal>("GetPayload", "typed signal payload");
         AssertHasMethod<SpellkitSignal>("TryGetPayload", "optional typed signal payload");
         AssertNoProperty<SpellkitHostEnvironment>("Resources", "internal resource registry");

@@ -27,7 +27,11 @@ internal sealed class ReplSession : IDisposable
         var lookup = FileLookup.Create(BuildOptions,
             nofn ? Environment.CurrentDirectory! : Path.GetDirectoryName(options.FileNames![0])!, options.Paths);
         host.UseFileLookup(lookup);
-        session = host.CreateInstance(new SpellkitEnvironment(), options.UserArguments);
+        session = host.CreateInstance(
+            new SpellkitEnvironment()
+                .UseInput(_ => Console.ReadLine())
+                .UseOutput(Console.Write),
+            options.UserArguments);
         CompilationLinker = new SpkIncrementalLinker(lookup, options.UserArguments);
         commands = new ReplCommands(this);
     }

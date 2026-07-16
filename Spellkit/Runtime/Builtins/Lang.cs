@@ -7,7 +7,6 @@ using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 
 namespace Spellkit.Linker;
@@ -82,16 +81,16 @@ internal sealed partial class Lang : ForeignUnit
         {
             if (!fst && !string.IsNullOrEmpty(separator))
             {
-                Console.Write(separator);
+                WriteOutput(ctx, separator);
             }
 
             if (a is SpkString s)
             {
-                Console.Write(s.Value);
+                WriteOutput(ctx, s.Value);
             }
             else
             {
-                Console.Write(a.ToString(ctx));
+                WriteOutput(ctx, a.ToString(ctx).Value);
             }
 
             fst = false;
@@ -104,7 +103,7 @@ internal sealed partial class Lang : ForeignUnit
 
         if (terminator.TypeId is Spk.String or Spk.Char)
         {
-            Console.Write(terminator.ToString());
+            WriteOutput(ctx, terminator.ToString());
         }
         else if (terminator.TypeId is not Spk.Nil)
         {
@@ -134,23 +133,26 @@ internal sealed partial class Lang : ForeignUnit
     [SpkStaticMethod("setOut")]
     public static void SetOutput(ExecutionContext ctx, SpkObject? output = null)
     {
-        if (output is null)
-        {
-            var outputWriter = ctx.GetContextVariable<TextWriter>(VarConsoleOutput);
-            if (outputWriter is not null)
-            {
-                Console.SetOut(outputWriter);
-            }
-        }
-        else
-        {
-            if (!ctx.HasContextVariable(VarConsoleOutput))
-            {
-                ctx.SetContextVariable(VarConsoleOutput, Console.Out);
-            }
+        ctx.SetContextVariable(VarConsoleOutput, output ?? SpkNil.Instance);
+    }
 
-            Console.SetOut(new ConsoleTextWriter(ctx, output));
+    private static void WriteOutput(ExecutionContext ctx, string value)
+    {
+        var redirect = ctx.GetContextVariable<SpkObject>(VarConsoleOutput);
+        if (redirect is not null and not SpkNil)
+        {
+            redirect.Invoke(ctx, SpkString.Get(value));
+            return;
         }
+
+        var environment = ctx.GetContextVariable<SpellkitEnvironment>(SpellkitEnvironment.ContextKey);
+        if (environment is not null)
+        {
+            environment.Write(value);
+            return;
+        }
+
+        Console.Write(value);
     }
 
     [SpkStaticMethod("constructorName")]
@@ -225,7 +227,13 @@ internal sealed partial class Lang : ForeignUnit
     }
 
     [SpkStaticMethod("readLine")]
-    public static string Read() => Console.ReadLine() ?? "";
+    public static string Read(ExecutionContext ctx)
+    {
+        var environment = ctx.GetContextVariable<SpellkitEnvironment>(SpellkitEnvironment.ContextKey);
+        return environment is null
+            ? Console.ReadLine() ?? string.Empty
+            : environment.ReadLine(ctx.Control?.CancellationToken ?? default);
+    }
 
     [SpkStaticMethod("rnd")]
     public static int Randomize(ExecutionContext ctx, int min = 0, int max = int.MaxValue, int? seed = null)

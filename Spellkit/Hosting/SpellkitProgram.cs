@@ -4,6 +4,7 @@ using Spellkit.Runtime.Types;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 
 namespace Spellkit.Hosting;
 
@@ -31,6 +32,8 @@ public sealed class SpellkitEnvironment
     internal const string ContextKey = "Spellkit.Hosting.SpellkitEnvironment";
 
     private readonly Dictionary<string, object?> bindings = new(StringComparer.OrdinalIgnoreCase);
+    private Func<CancellationToken, string?>? input;
+    private Action<string>? output;
 
     public SpellkitEnvironment(object? hostContext = null) => HostContext = hostContext;
 
@@ -49,8 +52,33 @@ public sealed class SpellkitEnvironment
     public SpellkitEnvironment Set(string name, object? value) =>
         Expose(name, value);
 
+    public SpellkitEnvironment UseInput(Func<CancellationToken, string?> readLine)
+    {
+        input = readLine ?? throw new ArgumentNullException(nameof(readLine));
+        return this;
+    }
+
+    public SpellkitEnvironment UseOutput(Action<string> write)
+    {
+        output = write ?? throw new ArgumentNullException(nameof(write));
+        return this;
+    }
+
     public bool TryGet(string name, out object? value) =>
         bindings.TryGetValue(name, out value);
+
+    internal string ReadLine(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var readLine = input ?? (_ => Console.ReadLine());
+        return readLine(cancellationToken) ?? string.Empty;
+    }
+
+    internal void Write(string value)
+    {
+        var write = output ?? Console.Write;
+        write(value);
+    }
 
     internal bool TryResolve(string name, out SpkObject value)
     {

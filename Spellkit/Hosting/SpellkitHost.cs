@@ -22,6 +22,7 @@ public sealed class SpellkitHostOptions
     public BuilderOptions? BuilderOptions { get; init; }
     public SpellkitCapabilityMode CapabilityMode { get; init; }
     public SpellkitExecutionLimits Limits { get; init; } = new();
+    public SpellkitSignalOptions Signals { get; init; } = new();
     public Action<SpellkitLogEntry>? Log { get; init; }
     public Action<SpellkitTraceEvent>? Trace { get; init; }
     public bool ExposeHostObject { get; init; } = true;
@@ -42,6 +43,7 @@ public sealed class SpellkitHost
     private readonly IReadOnlyList<Action<SpellkitLogEntry>> logHandlers;
     private readonly IReadOnlyList<Action<SpellkitTraceEvent>> traceHandlers;
     private readonly SpellkitExecutionLimits limits;
+    private readonly int? maxPendingSignals;
     private readonly SpellkitCapabilityMode capabilityMode;
     private readonly bool exposeHostObject;
 
@@ -59,6 +61,10 @@ public sealed class SpellkitHost
         limits = options.Limits
             ?? throw new ArgumentNullException(nameof(options), "Limits cannot be null.");
         limits.Validate();
+        var signalOptions = options.Signals
+            ?? throw new ArgumentNullException(nameof(options), "Signals cannot be null.");
+        signalOptions.Validate();
+        maxPendingSignals = signalOptions.MaxPending;
         logHandlers = Handlers(options.Log);
         traceHandlers = Handlers(options.Trace);
         exposeHostObject = options.ExposeHostObject;
@@ -199,7 +205,8 @@ public sealed class SpellkitHost
             },
             logHandlers.ToArray(),
             traceHandlers.ToArray(),
-            limits);
+            limits,
+            maxPendingSignals);
         return new SpellkitInstance(instanceLookup, hostEnvironment, environment, program, arguments);
     }
 

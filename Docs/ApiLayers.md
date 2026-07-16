@@ -25,7 +25,8 @@ var result = instance.Execute("40 + 2");
 
 Application code does not need to construct a parser, linker, compiler unit, runtime context, or
 evaluation stack. Typed result, signal, state, and command helpers keep ordinary host code outside
-the runtime object model.
+the runtime object model. `SpellkitEnvironment` can supply instance-local input and output when
+hosted scripts use `readLine` or `print`.
 
 Compiler and parser results expose a fixed `Messages` snapshot together with filtered `Errors` and
 `Warnings` lists. Use `TryGetValue(out var value)` for normal branching or `GetValueOrThrow()` when

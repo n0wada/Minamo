@@ -366,7 +366,8 @@ public sealed class SpellkitHostEnvironment : IDisposable
         bool unrestricted,
         IReadOnlyList<Action<SpellkitLogEntry>> logHandlers,
         IReadOnlyList<Action<SpellkitTraceEvent>> traceHandlers,
-        SpellkitExecutionLimits limits)
+        SpellkitExecutionLimits limits,
+        int? maxPendingSignals)
     {
         HostContext = hostContext;
         Limits = limits;
@@ -379,7 +380,7 @@ public sealed class SpellkitHostEnvironment : IDisposable
         resourceDefinitions = resourceTypes.ToDictionary(definition => definition.ResourceType);
         Resources = new(this);
         State = new();
-        Signals = new(this, signals);
+        Signals = new(this, signals, maxPendingSignals);
         Commands = new(this, modules, resourceDefinitions.Values);
         Root = CreateRoot();
     }
@@ -517,7 +518,9 @@ public sealed class SpellkitHostEnvironment : IDisposable
         {
             Signals.EmitFromScript(Key(arguments[0]), arguments[1]);
             return SpkNil.Instance;
-        })));
+        })),
+        new("TryEmit", Api("TryEmit", new[] { new Par("name"), new Par("payload", SpkNil.Instance) }, arguments =>
+            Bool(Signals.TryEmitFromScript(Key(arguments[0]), arguments[1])))));
 
     private SpkObject CreateLogApi() => View(
         new("Debug", LogApi("Debug", SpellkitLogLevel.Debug)),

@@ -1,12 +1,25 @@
 using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using EditorBrowsableAttribute = System.ComponentModel.EditorBrowsableAttribute;
 using EditorBrowsableState = System.ComponentModel.EditorBrowsableState;
 
 namespace Spellkit.Hosting;
+
+public sealed class SpellkitSignalOptions
+{
+    public int? MaxPending { get; init; }
+
+    internal void Validate()
+    {
+        if (MaxPending is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(MaxPending), MaxPending, "The pending signal limit must be positive.");
+        }
+    }
+}
 
 public enum SpellkitStateOwner
 {
@@ -239,7 +252,7 @@ public sealed class SpellkitSignalDispatcher : IDisposable
     private readonly Dictionary<string, List<ScriptSubscription>> scriptSubscriptions =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<long, HostSubscription> hostSubscriptions = new();
-    private readonly ConcurrentQueue<SpellkitSignal> queue = new();
+    private readonly Queue<SpellkitSignal> queue = new();
     private readonly SpellkitHostEnvironment environment;
     private readonly System.Threading.Lock syncRoot = new();
     private long nextSubscription;
@@ -247,9 +260,11 @@ public sealed class SpellkitSignalDispatcher : IDisposable
 
     internal SpellkitSignalDispatcher(
         SpellkitHostEnvironment environment,
-        IEnumerable<HostSignalDefinition> definitions)
+        IEnumerable<HostSignalDefinition> definitions,
+        int? maxPending)
     {
         this.environment = environment;
+        MaxPending = maxPending;
         this.definitions = definitions.ToDictionary(
             definition => definition.Name,
             StringComparer.OrdinalIgnoreCase);
@@ -260,6 +275,20 @@ public sealed class SpellkitSignalDispatcher : IDisposable
             || environment.Capabilities.Allows(definition.EmitCapability))
         .Select(definition => definition.Name)
         .ToArray();
+
+    public int? MaxPending { get; }
+
+    public int PendingCount
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                ThrowIfDisposed();
+                return queue.Count;
+            }
+        }
+    }
 
     public long Subscribe(string name, Action<SpellkitSignal> handler)
     {
@@ -283,16 +312,41 @@ public sealed class SpellkitSignalDispatcher : IDisposable
         }
     }
 
-    public void Emit(string name, object? payload = null) =>
-        EmitRaw(name, TypeConverter.ConvertFrom(payload));
+    public void Emit(string name, object? payload = null)
+    {
+        if (!TryEmit(name, payload))
+        {
+            throw QueueFull();
+        }
+    }
+
+    public bool TryEmit(string name, object? payload = null) =>
+        TryEmitRaw(name, TypeConverter.ConvertFrom(payload));
 
     internal void EmitRaw(string name, SpkObject payload)
     {
+        if (!TryEmitRaw(name, payload))
+        {
+            throw QueueFull();
+        }
+    }
+
+    internal bool TryEmitRaw(string name, SpkObject payload)
+    {
         RequireDefinition(name);
         ArgumentNullException.ThrowIfNull(payload);
-        ThrowIfDisposed();
-        queue.Enqueue(new(name, payload));
+        lock (syncRoot)
+        {
+            ThrowIfDisposed();
+            if (MaxPending is not null && queue.Count >= MaxPending.Value)
+            {
+                return false;
+            }
+
+            queue.Enqueue(new(name, payload));
+        }
         environment.Tracing.Write(SpellkitTraceKind.SignalEmitted, name);
+        return true;
     }
 
     internal long SubscribeScript(string name, SpkFunction handler, bool once)
@@ -355,13 +409,31 @@ public sealed class SpellkitSignalDispatcher : IDisposable
     {
         var definition = RequireDefinition(name);
         environment.Capabilities.Demand(definition.EmitCapability);
-        queue.Enqueue(new(name, payload));
-        environment.Tracing.Write(SpellkitTraceKind.SignalEmitted, name);
+        EmitRaw(name, payload);
     }
 
-    internal int PendingCount => queue.Count;
+    internal bool TryEmitFromScript(string name, SpkObject payload)
+    {
+        var definition = RequireDefinition(name);
+        environment.Capabilities.Demand(definition.EmitCapability);
+        return TryEmitRaw(name, payload);
+    }
 
-    internal bool TryDequeue(out SpellkitSignal signal) => queue.TryDequeue(out signal!);
+    internal bool TryDequeue(out SpellkitSignal signal)
+    {
+        lock (syncRoot)
+        {
+            ThrowIfDisposed();
+            if (queue.Count == 0)
+            {
+                signal = null!;
+                return false;
+            }
+
+            signal = queue.Dequeue();
+            return true;
+        }
+    }
 
     internal IReadOnlyList<SpkFunction> GetScriptHandlers(string name)
     {
@@ -395,9 +467,8 @@ public sealed class SpellkitSignalDispatcher : IDisposable
         lock (syncRoot)
         {
             scriptSubscriptions.Clear();
+            queue.Clear();
         }
-
-        while (queue.TryDequeue(out _)) { }
     }
 
     public void Dispose()
@@ -406,9 +477,9 @@ public sealed class SpellkitSignalDispatcher : IDisposable
         {
             scriptSubscriptions.Clear();
             hostSubscriptions.Clear();
+            queue.Clear();
             disposed = true;
         }
-        while (queue.TryDequeue(out _)) { }
     }
 
     private HostSignalDefinition RequireDefinition(string name)
@@ -427,6 +498,9 @@ public sealed class SpellkitSignalDispatcher : IDisposable
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(disposed, this);
+
+    private InvalidOperationException QueueFull() => new(
+        $"The pending signal limit of {MaxPending} has been reached.");
 
     private sealed record ScriptSubscription(long Id, SpkFunction Handler, bool Once);
     private sealed record HostSubscription(string Name, Action<SpellkitSignal> Handler);
