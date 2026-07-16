@@ -1,5 +1,6 @@
 using Spellkit.Hosting;
 using Spellkit.Library.Binary;
+using Spellkit.Library.Http;
 using Spellkit.Library.IO;
 using Spellkit.Library.Text;
 using Spellkit.Library.Time;
@@ -14,6 +15,7 @@ internal static class SpellkitLibraryExtensions
         ArgumentNullException.ThrowIfNull(host);
         return host
             .AddBinaryModule()
+            .AddHttpModule()
             .AddTextModule()
             .AddTimeModule()
             .AddUuidModule()

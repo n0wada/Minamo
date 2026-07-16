@@ -1025,8 +1025,37 @@ The optional library modules can be enabled explicitly with their generated exte
 
 ```csharp
 host.AddBinaryModule()
+    .AddHttpModule()
     .AddTextModule()
     .AddTimeModule()
     .AddUuidModule()
     .AddIoModule();
+```
+
+The console library's `http` module follows a requests-style shape while keeping Spellkit keyword
+rules intact:
+
+```kit
+import * from http
+
+let res = Get("https://api.example.test/users",
+    params: [active: true],
+    headers: ["Accept": "application/json"],
+    timeout: 5)
+
+if res.ok {
+    print(res.json()["items"])
+}
+```
+
+Use `Session` when several requests share a base URL, headers, auth, or timeout:
+
+```kit
+let api = Session(
+    baseUrl: "https://api.example.test",
+    headers: ["Accept": "application/json"],
+    auth: [bearer: token],
+    timeout: 10)
+
+let created = api.Post("orders", json: [id: 42, customer: "Ada"]).raiseForStatus()
 ```
