@@ -1,6 +1,5 @@
 using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
-using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace Spellkit.Hosting;
@@ -22,19 +21,6 @@ public sealed class SpellkitCallback
 
     public TResult? Invoke<TResult>(params object?[] arguments)
     {
-        var value = InvokeRaw(arguments);
-        return context.HasErrors
-            ? default
-            : Runtime.TypeConverter.ConvertTo<TResult>(context, value);
-    }
-
-    public TResult? InvokeTuple<TArgs, TResult>(TArgs arguments)
-        where TArgs : ITuple =>
-        Invoke<TResult>(ExpandTuple(arguments));
-
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public SpkObject InvokeRaw(params object?[] arguments)
-    {
         ArgumentNullException.ThrowIfNull(arguments);
         scope.ThrowIfInactive();
 
@@ -44,8 +30,15 @@ public sealed class SpellkitCallback
             converted[i] = SpellkitCommandConvert.FromObject(arguments[i]);
         }
 
-        return function.Call(context, converted);
+        var value = function.Call(context, converted);
+        return context.HasErrors
+            ? default
+            : Runtime.TypeConverter.ConvertTo<TResult>(context, value);
     }
+
+    public TResult? InvokeTuple<TArgs, TResult>(TArgs arguments)
+        where TArgs : ITuple =>
+        Invoke<TResult>(ExpandTuple(arguments));
 
     private static object?[] ExpandTuple(ITuple tuple)
     {

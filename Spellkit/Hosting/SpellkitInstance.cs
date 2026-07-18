@@ -5,7 +5,6 @@ using Spellkit.Parser.Model;
 using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -90,6 +89,8 @@ public interface ISpellkitOperationResult
 
 public sealed class SpellkitExecutionResult : ISpellkitOperationResult
 {
+    private readonly SpkObject? value;
+
     internal SpellkitExecutionResult(
         SpkObject? value,
         IReadOnlyList<BuildMessage> messages,
@@ -98,7 +99,7 @@ public sealed class SpellkitExecutionResult : ISpellkitOperationResult
         Guid executionId,
         SpellkitExecutionMetrics metrics)
     {
-        Value = value;
+        this.value = value;
         Diagnostics = messages.Select(SpellkitDiagnostic.From).ToArray();
         Failure = failure ?? (messages.Any(message => message.Type == BuildMessageType.Error)
             ? SpellkitFailure.Compilation(Diagnostics)
@@ -111,14 +112,11 @@ public sealed class SpellkitExecutionResult : ISpellkitOperationResult
 
     public bool Success => Failure is null;
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public SpkObject? Value { get; }
-
     public T? GetValue<T>() =>
-        SpellkitHostValueConverter.Convert<T>(Value, "Execution result");
+        SpellkitHostValueConverter.Convert<T>(value, "Execution result");
 
     public bool TryGetValue<T>(out T? value) =>
-        SpellkitHostValueConverter.TryConvert(Value, out value);
+        SpellkitHostValueConverter.TryConvert(this.value, out value);
 
     public IReadOnlyList<SpellkitDiagnostic> Diagnostics { get; }
 
@@ -422,7 +420,7 @@ public sealed class SpellkitInstance : IDisposable
                         try
                         {
                             var context = CreateExecutionContext(runtimeContext, control);
-                            handler.Call(context, SpellkitHostRootTypeInfo.Wrap(context, signal.Payload));
+                            handler.Call(context, SpellkitHostRootTypeInfo.Wrap(context, signal.RawPayload));
                             context.ThrowIf();
                         }
                         catch (Exception ex)

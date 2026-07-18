@@ -3,19 +3,12 @@ global using static Spellkit.SpkTypes;
 global using static Spellkit.CultureInfoSettings;
 
 using Spellkit.Codegen;
-using Spellkit.Compiler;
-using Spellkit.Hosting;
-using Spellkit.Linker;
-using Spellkit.Parser;
-using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Runtime.ExceptionServices;
 
 namespace Spellkit;
 
@@ -157,58 +150,6 @@ public static partial class Spk
     }
     static partial void GetMixinByCodeGenerated(int code, ref SpkTypeInfo name);
 
-    public static SpkObject? Eval(SourceBuffer buffer, BuilderOptions options, FileLookup lookup, object? args = null)
-    {
-        SpkTuple? tup = null;
-
-        if (args is not null)
-        {
-            var arr = args.GetType().GetProperties().Select(pi =>
-                new SpkLabel(pi.Name, TypeConverter.ConvertFrom(pi.GetValue(args)))).ToArray();
-            tup = new SpkTuple(arr);
-        }
-
-        var actualOptions = options ?? BuilderOptions.Default();
-        var actualLookup = lookup ?? FileLookup.Default;
-        var host = new SpellkitHost(new()
-        {
-            BuilderOptions = actualOptions
-        }).UseFileLookup(actualLookup);
-        using var session = host.CreateInstance(new SpellkitEnvironment(), tup);
-        var result = session.Execute(buffer);
-
-        if (result.Success)
-        {
-            return result.Value;
-        }
-
-        if (result.Failure?.Kind == SpellkitFailureKind.Compilation)
-        {
-            var messages = result.Diagnostics.Select(diagnostic => new BuildMessage(
-                diagnostic.Message,
-                diagnostic.Severity switch
-                {
-                    SpellkitDiagnosticSeverity.Error => BuildMessageType.Error,
-                    SpellkitDiagnosticSeverity.Warning => BuildMessageType.Warning,
-                    _ => BuildMessageType.Hint
-                },
-                diagnostic.Code,
-                diagnostic.Line,
-                diagnostic.Column,
-                diagnostic.File));
-            throw new SpkBuildException(messages);
-        }
-
-        if (result.Failure?.Exception is { } exception)
-        {
-            ExceptionDispatchInfo.Capture(exception).Throw();
-        }
-
-        throw new SpkException(result.Failure?.Message ?? "Execution failed.");
-    }
-
-    public static SpkObject? Eval(SourceBuffer buffer, object? args = null) =>
-        Eval(buffer, FileLookup.Default.BuilderOptions, FileLookup.Default, args);
 }
 
 internal static class FileProbe

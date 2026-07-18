@@ -2,8 +2,6 @@ using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System.Collections.Generic;
 using System.Linq;
-using EditorBrowsableAttribute = System.ComponentModel.EditorBrowsableAttribute;
-using EditorBrowsableState = System.ComponentModel.EditorBrowsableState;
 
 namespace Spellkit.Hosting;
 
@@ -212,15 +210,25 @@ internal sealed record HostSignalDefinition(
     string? ListenCapability,
     string? EmitCapability);
 
-public sealed record SpellkitSignal(
-    string Name,
-    [property: EditorBrowsable(EditorBrowsableState.Never)] SpkObject Payload)
+public sealed class SpellkitSignal
 {
+    private readonly SpkObject payload;
+
+    internal SpellkitSignal(string name, SpkObject payload)
+    {
+        Name = name;
+        this.payload = payload;
+    }
+
+    public string Name { get; }
+
     public T? GetPayload<T>() =>
-        SpellkitHostValueConverter.Convert<T>(Payload, $"Signal '{Name}' payload");
+        SpellkitHostValueConverter.Convert<T>(payload, $"Signal '{Name}' payload");
 
     public bool TryGetPayload<T>(out T? payload) =>
-        SpellkitHostValueConverter.TryConvert(Payload, out payload);
+        SpellkitHostValueConverter.TryConvert(this.payload, out payload);
+
+    internal SpkObject RawPayload => payload;
 }
 
 public sealed class SpellkitSignalDispatchResult : ISpellkitOperationResult

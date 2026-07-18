@@ -236,6 +236,7 @@ internal static class HostingScenarios
         AssertHasMethod<SpellkitInstance>("DispatchSignalsAsync", "asynchronous signal dispatch");
         AssertHasMethod<SpellkitExecutionResult>("GetValue", "typed execution result");
         AssertHasMethod<SpellkitExecutionResult>("TryGetValue", "optional typed execution result");
+        AssertNoProperty<SpellkitExecutionResult>("Value", "removed raw execution result");
         AssertHasProperty<SpellkitExecutionResult>("Execution", "execution details");
         AssertHasProperty<SpellkitSignalDispatchResult>("Execution", "signal dispatch execution details");
         AssertHasProperty<SpellkitProgram>("Diagnostics", "compiled program diagnostics");
@@ -260,6 +261,7 @@ internal static class HostingScenarios
         AssertHasProperty<SpellkitSignalDispatcher>("PendingCount", "pending signal count");
         AssertHasMethod<SpellkitSignal>("GetPayload", "typed signal payload");
         AssertHasMethod<SpellkitSignal>("TryGetPayload", "optional typed signal payload");
+        AssertNoProperty<SpellkitSignal>("Payload", "removed raw signal payload");
         AssertNoProperty<SpellkitHostEnvironment>("Resources", "internal resource registry");
         Assert(
             typeof(SpellkitHost).Assembly.GetType(
@@ -270,6 +272,7 @@ internal static class HostingScenarios
         AssertHasMethod<SpellkitCommandContext>("Callback", "host callback argument");
         AssertHasMethod<SpellkitCommandContext>("CallbackTuple", "host tuple callback argument");
         AssertHasMethod<SpellkitCommandContext>("CallbackAction", "host callback action argument");
+        AssertNoMethod<SpellkitCallback>("InvokeRaw", "removed raw callback invocation");
         AssertNoMethod<SpellkitHost>("Service", "removed service registration");
         AssertHasMethod<SpellkitCommandParameter>("Required", "required command parameter factory");
         AssertHasMethod<SpellkitCommandParameter>("Optional", "optional command parameter factory");

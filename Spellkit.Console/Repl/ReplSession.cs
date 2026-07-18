@@ -186,11 +186,12 @@ internal sealed class ReplSession : IDisposable
             return false;
         }
 
-        if (result.Value is not null and not Spellkit.Runtime.Types.SpkNil
+        var value = result.GetValue<Spellkit.Runtime.Types.SpkObject>();
+        if (value is not null and not Spellkit.Runtime.Types.SpkNil
             && RuntimeContext is not null)
         {
             var context = SpkMachine.CreateExecutionContext(RuntimeContext);
-            ConsoleOutput.Output(ConsoleOutput.Format(result.Value, context));
+            ConsoleOutput.Output(ConsoleOutput.Format(value, context));
         }
 
         if (measureTime)
