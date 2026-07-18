@@ -194,24 +194,8 @@ public sealed class SpellkitCommandGenerator : IIncrementalGenerator
 
         writer.Block($"public static class {extensionName}", typeWriter =>
         {
-            typeWriter.Block(
-                $"public static global::Spellkit.Hosting.SpellkitHost Add{Sanitize(moduleType.Name)}(this global::Spellkit.Hosting.SpellkitHost host)",
-                methodWriter =>
-                {
-                    EmitRegistration(
-                        methodWriter,
-                        moduleType,
-                        moduleName!,
-                        commands,
-                        properties,
-                        foreignTypes,
-                        isForeignUnit,
-                        instance: null);
-                });
-
             if (!moduleType.IsStatic && !isForeignUnit)
             {
-                typeWriter.AppendLine();
                 typeWriter.Block(
                     $"public static global::Spellkit.Hosting.SpellkitHost AddModule(this global::Spellkit.Hosting.SpellkitHost host, {TypeName(moduleType)} instance)",
                     methodWriter =>
@@ -227,6 +211,23 @@ public sealed class SpellkitCommandGenerator : IIncrementalGenerator
                             foreignTypes,
                             isForeignUnit: false,
                             instance: "instance");
+                    });
+            }
+            else
+            {
+                typeWriter.Block(
+                    $"public static global::Spellkit.Hosting.SpellkitHost {GetStaticModuleRegistrationName(moduleType)}(this global::Spellkit.Hosting.SpellkitHost host)",
+                    methodWriter =>
+                    {
+                        EmitRegistration(
+                            methodWriter,
+                            moduleType,
+                            moduleName!,
+                            commands,
+                            properties,
+                            foreignTypes,
+                            isForeignUnit,
+                            instance: null);
                     });
             }
         });
@@ -736,6 +737,23 @@ public sealed class SpellkitCommandGenerator : IIncrementalGenerator
 
     private static string GetExtensionName(INamedTypeSymbol type) =>
         Sanitize(type.Name) + "HostingExtensions";
+
+    private static string GetStaticModuleRegistrationName(INamedTypeSymbol type)
+    {
+        const string commandsSuffix = "Commands";
+        const string moduleSuffix = "Module";
+        var name = type.Name;
+        if (name.EndsWith(commandsSuffix, StringComparison.Ordinal))
+        {
+            name = name.Substring(0, name.Length - commandsSuffix.Length);
+        }
+        else if (name.EndsWith(moduleSuffix, StringComparison.Ordinal))
+        {
+            name = name.Substring(0, name.Length - moduleSuffix.Length);
+        }
+
+        return $"Add{Sanitize(name)}Module";
+    }
 
     private static string GetHintName(INamedTypeSymbol type) =>
         Sanitize(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));

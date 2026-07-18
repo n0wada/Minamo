@@ -4,7 +4,7 @@ namespace GeneratorFixture;
 
 public static class SnapshotCommandsHostingExtensions
 {
-    public static global::Spellkit.Hosting.SpellkitHost AddSnapshotCommands(this global::Spellkit.Hosting.SpellkitHost host)
+    public static global::Spellkit.Hosting.SpellkitHost AddSnapshotModule(this global::Spellkit.Hosting.SpellkitHost host)
     {
         return host.Module("snapshot", module =>
         {

@@ -78,6 +78,9 @@ public sealed class GeneratorContractTests
         var commandsType = assembly.GetType("GeneratorFixture.SampleCommands")!;
         var extensionsType = assembly.GetType(
             "GeneratorFixture.SampleCommandsHostingExtensions")!;
+        Assert.Null(extensionsType.GetMethod(
+            "AddSampleCommands",
+            BindingFlags.Public | BindingFlags.Static));
         var addCommands = extensionsType.GetMethod(
             "AddModule",
             BindingFlags.Public | BindingFlags.Static)!;

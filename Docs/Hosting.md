@@ -930,8 +930,8 @@ var instance = host.CreateInstance();
 
 The module instance is captured by its generated registration, so it does not occupy the instance's
 general-purpose host context. This is the preferred form for cohesive application commands with
-dependencies. The generated `AddGameCommands()` method remains available for static modules and
-for existing code that resolves instance methods from `CreateInstance(hostContext)`.
+dependencies. Static modules generate a parameterless registration method such as
+`AddGameModule()`.
 
 A `SpellkitCommandContext` parameter is injected rather than exposed to Spellkit. C# optional
 parameter values and the `Description` property are copied into command metadata.
