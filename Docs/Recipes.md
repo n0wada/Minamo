@@ -26,7 +26,7 @@ for score in passed {
 Run it with:
 
 ```powershell
-dotnet .\bin\spk.dll .\Examples\Language\01-collections.kit -nologo
+.\bin\spk.exe .\Examples\Language\01-collections.kit -nologo
 ```
 
 Source: [01-collections.kit](../Examples/Language/01-collections.kit)
@@ -50,7 +50,7 @@ print(describe(20))
 Run it with:
 
 ```powershell
-dotnet .\bin\spk.dll .\Examples\Language\02-patterns.kit -nologo
+.\bin\spk.exe .\Examples\Language\02-patterns.kit -nologo
 ```
 
 Source: [02-patterns.kit](../Examples/Language/02-patterns.kit)
@@ -77,7 +77,7 @@ print(point.Describe())
 Run it with:
 
 ```powershell
-dotnet .\bin\spk.dll .\Examples\Language\03-types-and-traits.kit -nologo
+.\bin\spk.exe .\Examples\Language\03-types-and-traits.kit -nologo
 ```
 
 Source: [03-types-and-traits.kit](../Examples/Language/03-types-and-traits.kit)
@@ -101,7 +101,7 @@ for value in squares() {
 Run it with:
 
 ```powershell
-dotnet .\bin\spk.dll .\Examples\Language\04-iterators.kit -nologo
+.\bin\spk.exe .\Examples\Language\04-iterators.kit -nologo
 ```
 
 Source: [04-iterators.kit](../Examples/Language/04-iterators.kit)
@@ -129,7 +129,7 @@ try {
 Run it with:
 
 ```powershell
-dotnet .\bin\spk.dll .\Examples\Language\05-exceptions.kit -nologo
+.\bin\spk.exe .\Examples\Language\05-exceptions.kit -nologo
 ```
 
 Source: [05-exceptions.kit](../Examples/Language/05-exceptions.kit)
@@ -152,7 +152,7 @@ print(pricing.Tier(subtotal))
 Run it with:
 
 ```powershell
-dotnet .\bin\spk.dll .\Examples\Language\06-modules.kit -nologo
+.\bin\spk.exe .\Examples\Language\06-modules.kit -nologo
 ```
 
 Source: [06-modules.kit](../Examples/Language/06-modules.kit)
@@ -181,7 +181,7 @@ for delivery in history {
 Run it with:
 
 ```powershell
-dotnet .\bin\spk.dll .\Examples\Language\07-enums-and-state.kit -nologo
+.\bin\spk.exe .\Examples\Language\07-enums-and-state.kit -nologo
 ```
 
 Source: [07-enums-and-state.kit](../Examples/Language/07-enums-and-state.kit)
@@ -212,7 +212,7 @@ print(fmt("with tax: {0}", apply(200, withTax)))
 Run it with:
 
 ```powershell
-dotnet .\bin\spk.dll .\Examples\Language\08-functions-and-closures.kit -nologo
+.\bin\spk.exe .\Examples\Language\08-functions-and-closures.kit -nologo
 ```
 
 Source: [08-functions-and-closures.kit](../Examples/Language/08-functions-and-closures.kit)
@@ -239,7 +239,7 @@ for key, value in settings {
 Run it with:
 
 ```powershell
-dotnet .\bin\spk.dll .\Examples\Language\09-dictionaries-and-tuples.kit -nologo
+.\bin\spk.exe .\Examples\Language\09-dictionaries-and-tuples.kit -nologo
 ```
 
 Source: [09-dictionaries-and-tuples.kit](../Examples/Language/09-dictionaries-and-tuples.kit)
@@ -273,7 +273,7 @@ print(cleanup[0])
 Run it with:
 
 ```powershell
-dotnet .\bin\spk.dll .\Examples\Language\10-cleanup-and-errors.kit -nologo
+.\bin\spk.exe .\Examples\Language\10-cleanup-and-errors.kit -nologo
 ```
 
 Source: [10-cleanup-and-errors.kit](../Examples/Language/10-cleanup-and-errors.kit)
@@ -317,7 +317,7 @@ for item in items {
 Run it with:
 
 ```powershell
-dotnet .\bin\spk.dll .\Examples\Language\11-traits-as-interfaces.kit -nologo
+.\bin\spk.exe .\Examples\Language\11-traits-as-interfaces.kit -nologo
 ```
 
 Source: [11-traits-as-interfaces.kit](../Examples/Language/11-traits-as-interfaces.kit)

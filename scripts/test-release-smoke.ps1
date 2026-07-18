@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$console = Join-Path $repoRoot "bin\spk.dll"
+$console = Join-Path $repoRoot "bin\spk.exe"
 $station = Join-Path $repoRoot "bin\examples\StationConsole\$Configuration\Spellkit.Examples.StationConsole.dll"
 $workflow = Join-Path $repoRoot "bin\projects\OrderWorkflow\$Configuration\Spellkit.Examples.OrderWorkflow.dll"
 $smokeDirectory = Join-Path $repoRoot "artifacts\release-smoke"
@@ -21,19 +21,19 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 New-Item -ItemType Directory -Force -Path $smokeDirectory | Out-Null
 "print(40 + 2)" | Set-Content -Encoding UTF8 $source
 
-$help = & dotnet $console --help 2>&1
+$help = & $console --help 2>&1
 if ($LASTEXITCODE -ne 0 -or ($help -join "`n") -notmatch "Usage: spk")
 {
     throw "Spellkit console help smoke test failed."
 }
 
-$version = & dotnet $console --version 2>&1
+$version = & $console --version 2>&1
 if ($LASTEXITCODE -ne 0 -or ($version -join "`n") -notmatch '^spk ')
 {
     throw "Spellkit console version smoke test failed."
 }
 
-$execution = & dotnet $console $source -nologo 2>&1
+$execution = & $console $source -nologo 2>&1
 if ($LASTEXITCODE -ne 0 -or ($execution -join "`n") -notmatch '42')
 {
     throw "Spellkit source execution smoke test failed."
@@ -41,7 +41,7 @@ if ($LASTEXITCODE -ne 0 -or ($execution -join "`n") -notmatch '42')
 
 foreach ($example in Get-ChildItem $languageExamples -Filter "*.kit" -File | Sort-Object Name)
 {
-    & dotnet $console $example.FullName -nologo | Out-Null
+    & $console $example.FullName -nologo | Out-Null
     if ($LASTEXITCODE -ne 0)
     {
         throw "Spellkit language recipe '$($example.Name)' failed."

@@ -35,3 +35,47 @@ if ($LASTEXITCODE -ne 0)
 {
     exit $LASTEXITCODE
 }
+
+if ($Configuration -eq "Release")
+{
+    $consoleProject = Join-Path $repoRoot "Spellkit.Console\Spellkit.Console.csproj"
+    $releaseOutput = Join-Path $repoRoot "bin"
+
+    dotnet restore $consoleProject `
+        --configfile $nugetConfig `
+        -m:1 `
+        -p:BuildInParallel=false
+
+    if ($LASTEXITCODE -ne 0)
+    {
+        exit $LASTEXITCODE
+    }
+
+    dotnet publish $consoleProject `
+        -c Release `
+        --self-contained false `
+        --no-restore `
+        -o $releaseOutput `
+        -p:DebugType=None `
+        -m:1 `
+        -p:BuildInParallel=false
+
+    if ($LASTEXITCODE -ne 0)
+    {
+        exit $LASTEXITCODE
+    }
+
+    foreach ($fileName in @(
+        "Spellkit.deps.json",
+        "Spellkit.pdb",
+        "Spellkit.Generators.deps.json",
+        "Spellkit.Generators.pdb",
+        "spk.pdb"))
+    {
+        $file = Join-Path $releaseOutput $fileName
+        if (Test-Path -LiteralPath $file)
+        {
+            Remove-Item -LiteralPath $file -Force
+        }
+    }
+}

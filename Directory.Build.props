@@ -14,6 +14,8 @@
     <SpellkitRuntimeTargetFramework>net10.0</SpellkitRuntimeTargetFramework>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <SpellkitOutputRoot>$(MSBuildThisFileDirectory)bin\</SpellkitOutputRoot>
+    <SpellkitGeneratorOutputPath Condition="'$(Configuration)' == 'Release'">$(SpellkitOutputRoot)Spellkit.Generators.dll</SpellkitGeneratorOutputPath>
+    <SpellkitGeneratorOutputPath Condition="'$(Configuration)' != 'Release'">$(SpellkitOutputRoot)tools\generators\$(Configuration)\Spellkit.Generators.dll</SpellkitGeneratorOutputPath>
     <SpellkitProductProject Condition="'$(MSBuildProjectName)' == 'Spellkit'
       Or '$(MSBuildProjectName)' == 'Spellkit.Console'">true</SpellkitProductProject>
     <OutputPath>$(SpellkitOutputRoot)projects\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
@@ -62,7 +64,11 @@
     <OutputPath>$(SpellkitOutputRoot)tests\language\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Spellkit.Generators'">
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Spellkit.Generators' And '$(Configuration)' == 'Release'">
+    <OutputPath>$(SpellkitOutputRoot)</OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Spellkit.Generators' And '$(Configuration)' != 'Release'">
     <OutputPath>$(SpellkitOutputRoot)tools\generators\$(Configuration)\</OutputPath>
   </PropertyGroup>
 

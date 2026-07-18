@@ -18,7 +18,7 @@
     <EmbeddedResource Include="Misc\messages.xml" LogicalName="Spellkit.Resources.messages.xml" />
     <None Update="Misc\spellkit.png" Pack="true" PackagePath="spellkit.png" />
     <None Include="..\README.md" Pack="true" PackagePath="README.md" />
-    <None Include="$(SpellkitOutputRoot)tools\generators\$(Configuration)\Spellkit.Generators.dll"
+    <None Include="$(SpellkitGeneratorOutputPath)"
           Pack="true"
           PackagePath="analyzers\dotnet\cs"
           Visible="false" />

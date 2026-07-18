@@ -49,19 +49,26 @@ You need the .NET 10 SDK. From PowerShell at the repository root:
 Start the interactive console:
 
 ```powershell
-dotnet .\bin\spk.dll
+.\bin\spk.exe
 ```
 
 Or execute a source file:
 
 ```powershell
-dotnet .\bin\spk.dll .\hello.kit
+.\bin\spk.exe .\hello.kit
 ```
 
 Use `--help` or `--version` for command-line information; enter `#help` in the REPL for
 interactive commands.
 
+The Windows `spk.exe` distribution is framework-dependent and requires the .NET 10
+Runtime to be installed.
+
 ## Embed Spellkit in C#
+
+Embedding requires references to `Spellkit.dll` (the Hosting API and runtime) and
+`Spellkit.Generators.dll` (the source generator). Reference the generator as an analyzer
+at build time; the running application requires `Spellkit.dll`.
 
 The application-facing API lives in `Spellkit.Hosting`. Source generation turns attributed
 C# methods into commands:
