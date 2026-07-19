@@ -251,39 +251,39 @@ internal sealed partial class SpkSetTypeInfo : SpkTypeInfo
     [SpkMethod(BuiltinMethodNames.Add)]
     internal static bool AddItem(SpkSet self, SpkObject value) => self.Add(value);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Remove)]
     internal static bool Remove(SpkSet self, SpkObject value) => self.Remove(value);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Clear)]
     internal static void Clear(SpkSet self) => self.Clear();
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ToArray)]
     internal static SpkObject ToArray(ExecutionContext ctx, SpkSet self) => self.ToArray(ctx);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ToTuple)]
     internal static SpkObject ToTuple(ExecutionContext ctx, SpkSet self) => self.ToTuple(ctx);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IntersectWith)]
     internal static void IntersectWith(ExecutionContext ctx, SpkSet self, SpkObject other) =>
         self.IntersectWith(ctx, other);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.UnionWith)]
     internal static void UnionWith(ExecutionContext ctx, SpkSet self, SpkObject other) =>
         self.UnionWith(ctx, other);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ExceptOf)]
     internal static void ExceptOf(ExecutionContext ctx, SpkSet self, SpkObject other) =>
         self.ExceptWith(ctx, other);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.OverlapsWith)]
     internal static bool OverlapsWith(ExecutionContext ctx, SpkSet self, SpkObject other) =>
         self.Overlaps(ctx, other);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IsSubsetOf)]
     internal static bool IsSubsetOf(ExecutionContext ctx, SpkSet self, SpkObject other) =>
         self.IsSubsetOf(ctx, other);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IsSupersetOf)]
     internal static bool IsSupersetOf(ExecutionContext ctx, SpkSet self, SpkObject other) =>
         self.IsSupersetOf(ctx, other);
 

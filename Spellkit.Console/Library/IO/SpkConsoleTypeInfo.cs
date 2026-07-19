@@ -1,9 +1,10 @@
 using Spellkit.Codegen;
+using Spellkit.Hosting;
 using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System.IO;
 
-namespace Spellkit.Library.IO;
+namespace Spellkit.Library.ConsoleLibrary;
 
 [SpkType]
 public sealed partial class SpkConsoleTypeInfo : SpkForeignTypeInfo
@@ -71,7 +72,13 @@ public sealed partial class SpkConsoleTypeInfo : SpkForeignTypeInfo
     internal static char Read() => (char)Console.Read();
 
     [SpkStaticMethod]
-    internal static string ReadLine() => Console.ReadLine() ?? "";
+    internal static string ReadLine(ExecutionContext ctx)
+    {
+        var environment = ctx.GetContextVariable<SpellkitEnvironment>(SpellkitEnvironment.ContextKey);
+        return environment is null
+            ? Console.ReadLine() ?? string.Empty
+            : environment.ReadLine(ctx.Control?.CancellationToken ?? default);
+    }
 
     [SpkStaticMethod]
     internal static void Clear(ExecutionContext ctx, string? backColor = null)

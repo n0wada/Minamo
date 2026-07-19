@@ -1,3 +1,7 @@
+#region "Initialize"
+import math as math
+#endregion
+
 #region "Methods: GetType"
     struct Foo {  }
     let x = Foo()
@@ -634,7 +638,7 @@
             if x == 0 {
                 throw Exception<InvalidValue>(x)
             }
-            this.num = abs(x)
+            this.num = math.abs(x)
         }
     }
     func Nat as Integer => this.num

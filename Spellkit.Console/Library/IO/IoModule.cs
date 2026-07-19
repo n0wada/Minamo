@@ -12,7 +12,6 @@ namespace Spellkit.Library.IO;
 
 [SpellkitModule("io")]
 [SpellkitForeignType(typeof(SpkDriveTypeInfo))]
-[SpellkitForeignType(typeof(SpkConsoleTypeInfo))]
 public static class IoModule
 {
     [SpellkitCommand(Type = "File")]

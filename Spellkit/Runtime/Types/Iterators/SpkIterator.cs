@@ -126,13 +126,13 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
     internal static bool Contains(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkObject item) =>
         self.Any(o => o.Equals(item, ctx));
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ToArray)]
     internal static SpkObject ToArray(IEnumerable<SpkObject> self) => new SpkArray(self.ToArray());
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ToTuple)]
     internal static SpkObject ToTuple(IEnumerable<SpkObject> self) => new SpkTuple(self.ToArray());
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ToDictionary)]
     internal static SpkObject ToDictionary(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction keySelector, SpkFunction? valueSelector = null)
     {
         try
@@ -162,13 +162,13 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         }
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Take)]
     internal static IEnumerable<SpkObject> Take(IEnumerable<SpkObject> self, int count) => self.Take(count < 0 ? 0 : count);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Skip)]
     internal static IEnumerable<SpkObject> Skip(IEnumerable<SpkObject> self, int count) => self.Skip(count < 0 ? 0 : count);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.First)]
     internal static SpkObject First(IEnumerable<SpkObject> self) => self.FirstOrDefault() ?? Nil;
 
     [SpkMethod]
@@ -184,14 +184,14 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         return two[0];
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Last)]
     internal static SpkObject Last(ExecutionContext ctx, SpkObject self) =>
         SpkIterator.ToEnumerable(ctx, self).LastOrDefault() ?? Nil;
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Reverse)]
     internal static IEnumerable<SpkObject> Reverse(IEnumerable<SpkObject> self) => self.Reverse();
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Slice)]
     internal static IEnumerable<SpkObject> Slice(IEnumerable<SpkObject> self, int index = 0, int? endIndex = null)
     {
         int? count = null;
@@ -219,7 +219,7 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         return self.Skip(index).Take(endIndex.Value - index + 1);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ElementAt)]
     internal static SpkObject ElementAt(IEnumerable<SpkObject> self, int index)
     {
         try
@@ -232,14 +232,14 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         }
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Sort)]
     internal static IEnumerable<SpkObject> Sort(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction? comparer = null)
     {
         var sortComparer = new SortComparer(comparer, ctx);
         return self.OrderBy(item => item, sortComparer);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Shuffle)]
     internal static IEnumerable<SpkObject> Shuffle(IEnumerable<SpkObject> self)
     {
         var rnd = new Random();
@@ -260,7 +260,7 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         return self.OrderBy(sorter);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Count)]
     internal static int Count(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction? predicate = null)
     {
         var count = 0;
@@ -292,23 +292,23 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         return count;
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Map)]
     internal static IEnumerable<SpkObject> Map(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction converter) =>
         new MapEnumerable(ctx, self, converter);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Filter)]
     internal static IEnumerable<SpkObject> Filter(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction predicate) =>
         new FilterEnumerable(ctx, self, predicate);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.TakeWhile)]
     internal static IEnumerable<SpkObject> TakeWhile(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction predicate) =>
         new TakeWhileEnumerable(ctx, self, predicate);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.SkipWhile)]
     internal static IEnumerable<SpkObject> SkipWhile(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction predicate) =>
         new SkipWhileEnumerable(ctx, self, predicate);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Reduce)]
     internal static SpkObject Reduce(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction converter, [Default(0)]SpkObject initial)
     {
         var result = initial;
@@ -325,7 +325,7 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         return result;
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Any)]
     internal static bool Any(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction predicate)
     {
         foreach (var item in self)
@@ -345,7 +345,7 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         return false;
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.All)]
     internal static bool All(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction predicate)
     {
         foreach (var item in self)
@@ -360,7 +360,7 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         return true;
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ForEach)]
     internal static void ForEach(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction action)
     {
         foreach (var o in self)
@@ -369,7 +369,7 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         }
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ToSet)]
     internal static SpkObject ToSet(IEnumerable<SpkObject> self)
     {
         var set = new HashSet<SpkObject>();
@@ -377,7 +377,7 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         return new SpkSet(set);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Distinct)]
     internal static IEnumerable<SpkObject> Distinct(ExecutionContext ctx, IEnumerable<SpkObject> self, SpkFunction? selector = null)
     {
         if (selector is not null)
@@ -390,14 +390,14 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         }
     }
 
-    [SpkStaticMethod]
+    [SpkStaticMethod(BuiltinMethodNames.Concat)]
     internal static IEnumerable<SpkObject> Concat(ExecutionContext ctx, params SpkObject[] values) =>
         new MultiPartEnumerable(ctx, values);
 
     [SpkStaticMethod(BuiltinMethodNames.Iterator)]
     internal static IEnumerable<SpkObject> Iterator(ExecutionContext ctx, params SpkObject[] values) => Concat(ctx, values);
 
-    [SpkStaticMethod]
+    [SpkStaticMethod(BuiltinMethodNames.Range)]
     internal static IEnumerable<SpkObject> Range(ExecutionContext ctx, [Default(0)]SpkObject start, [Default]SpkObject end, [Default(1)]SpkObject step, bool exclusive = false) =>
         GenerateRange(ctx, start, end ?? Nil, step, exclusive);
 
@@ -479,10 +479,10 @@ internal sealed partial class SpkIteratorTypeInfo : SpkTypeInfo
         return !ctx.HasErrors;
     }
 
-    [SpkStaticMethod]
+    [SpkStaticMethod(BuiltinMethodNames.Empty)]
     internal static IEnumerable<SpkObject> Empty() => Enumerable.Empty<SpkObject>();
 
-    [SpkStaticMethod]
+    [SpkStaticMethod(BuiltinMethodNames.Repeat)]
     internal static IEnumerable<SpkObject> Repeat(ExecutionContext ctx, SpkObject value) => Repeater(ctx, value);
 
     private static IEnumerable<SpkObject> Repeater(ExecutionContext ctx, SpkObject val)

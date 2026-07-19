@@ -1,37 +1,6 @@
-#region "parse 1"
-    let res = parse("[1,2,3,('c',true,23.4),nil]")
-    assert([1,2,3,('c',true,23.4),nil], res)
-    assert(true, parse("true"))
-    assert((1,2), parse("(1,2)"))
-    assert([1,2,3], parse("[1,2,3]"))
-    
-    let xs = parse("[12.0, true, (1,2)]")
-    let pat = [12.0, true, (1,2)]
-    assert(pat, xs)
+#region "Initialize"
+import math as math
 #endregion
-
-#region "parse 2"
-    try {
-        parse("[1+2, 3]")
-        assert(got: false)
-    } catch e {
-        if constructorName(e) == "ParsingFailed" {
-            assert(got: true)
-        }
-    }
-#endregion
-
-#region "parse 3"
-    let xs = parse("[x: 1, y: 2]")
-    assert(1, xs.x)
-    assert(2, xs.y)
-#endregion
-
-#region "parse 4"
-    let xs = parse("(1, 2)")
-    assert((1, 2), xs)
-#endregion
-
 #region "const declarations"
     const { ONE, TWO = "2", THREE = 3 }
     assert("ONE", ONE)
@@ -41,76 +10,60 @@
     const FOUR = 4
     assert(4, FOUR)
 #endregion
-
 #region "round" 
-    mut x = round(42.12345) //Evaluates to 42.12
-    mut y = round(42.12345, 4) //Evaluates to 42.1234
+    mut x = math.round(42.12345) //Evaluates to 42.12
+    mut y = math.round(42.12345, 4) //Evaluates to 42.1234
     assert(42.12, x)
     assert(42.1234, y)
 #endregion
 
 #region "min" 
-    mut x = min(12, 2)
+    mut x = math.min(12, 2)
     assert(2, x)
-    x = min(2, 24)
+    x = math.min(2, 24)
     assert(2, x)
-    x = min(12, 12)
+    x = math.min(12, 12)
     assert(12, x)
-    x = min(-12, 0)
+    x = math.min(-12, 0)
     assert(-12, x)
 #endregion
 
 #region "max" 
-    mut x = max(12, 2)
+    mut x = math.max(12, 2)
     assert(12, x)
-    x = max(2, 24)
+    x = math.max(2, 24)
     assert(24, x)
-    x = max(12, 12)
+    x = math.max(12, 12)
     assert(12, x)
-    x = max(-12, 0)
+    x = math.max(-12, 0)
     assert(0, x)
 #endregion
 
 #region "sign" 
-    mut x = sign(123)
+    mut x = math.sign(123)
     assert(1, x)
-    x = sign(-668)
+    x = math.sign(-668)
     assert(-1, x)
-    x = sign(0)
+    x = math.sign(0)
     assert(0, x)
 #endregion
 
 #region "sqrt" 
-    mut x = sqrt(246)
-    x = round(x, 4)
+    mut x = math.sqrt(246)
+    x = math.round(x, 4)
     assert(15.6844, x)
 #endregion
 
 #region "abs" 
-    assert(12, abs(-12))
-    assert(42, abs(42))
+    assert(12, math.abs(-12))
+    assert(42, math.abs(42))
     let x = -14.102
-    assert(14.102, abs(x))
-#endregion
-
-#region "rnd" 
-    let x = rnd(max: 10, min: 3)
-    assert(true, x <= 10 && x >= 3)
+    assert(14.102, math.abs(x))
 #endregion
 
 #region "pow"
-    assert(46918, Integer(pow(12.2, 4.3)))
-    assert(3111696, Integer(pow(42, 4)))
-#endregion
-
-#region "setOut"
-    let xs = []
-    setOut(s => xs.Add(s))
-    print("String", terminator: nil)
-    print(true, terminator: nil)
-    print(42, terminator: nil)
-    setOut()
-    assert(["String", "true", "42"], xs)
+    assert(46918, Integer(math.pow(12.2, 4.3)))
+    assert(3111696, Integer(math.pow(42, 4)))
 #endregion
 
 #region "assert"
@@ -190,36 +143,9 @@
     assert(false, referenceEquals(xs, ys))
 #endregion
 
-#region "toString"
-    func Integer.ToString() => "Nothing here!"
-    assert("Nothing here!", 12.ToString())
-    assert("12", toString(12))
-#endregion
-
-#region "mixins"
-    let v = "str"
-    let xs = mixins(v).Iterate().Map(typeName).ToArray()
-    assert(["Object", "Lookup", "Order", "Equatable", "Sequence"], xs)
-#endregion
-
-#region "length 1"
-    assert(3, length((1,2,3)))
-    assert(2, length([1,2]))
-    assert(2, length([x: 1, y: 2]))
-    assert(4, length(Set(1,2,3,4)))
-    assert(3, length("abc"))
-    assert(nil, length(12))
-#endregion
-
-#region "length 2"
-    struct Foo {  }
-    assert(0, length(Foo()))
-    struct Bar { x }
-    assert(1, length(Bar(42)))
-#endregion
-
-#region "clone"
-    assert(true, referenceEquals(42, clone(42)))
-    let xs = [1,2,3]
-    assert(false, referenceEquals(xs, clone(xs)))
+#region "isCallable"
+    func echo(value) => value
+    assert(true, isCallable(echo))
+    assert(true, isCallable(value => value))
+    assert(false, isCallable(42))
 #endregion

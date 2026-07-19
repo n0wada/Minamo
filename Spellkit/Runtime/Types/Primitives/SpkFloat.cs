@@ -243,22 +243,22 @@ internal sealed partial class SpkFloatTypeInfo : SpkTypeInfo
     }
     #endregion
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IsNaN)]
     internal static bool IsNaN(double self) => double.IsNaN(self);
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Max)]
     internal static SpkObject Max() => SpkFloat.Max;
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Min)]
     internal static SpkObject Min() => SpkFloat.Min;
 
     [SpkStaticProperty]
     internal static SpkObject Infinity() => SpkFloat.PositiveInfinity;
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Default)]
     internal static SpkObject Default() => SpkFloat.Zero;
 
-    [SpkStaticMethod]
+    [SpkStaticMethod(BuiltinMethodNames.Parse)]
     internal static double? Parse(string value)
     {
         if (double.TryParse(value, NumberStyles.Float, InvariantCulture.NumberFormat, out var i))

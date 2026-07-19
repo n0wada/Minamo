@@ -93,6 +93,7 @@ public sealed class GeneratorContractTests
         var result = session.Execute("""
             import sample
             assert("oneone", sample.echo("one"))
+            assert(true, isCallable(sample.echo))
             assert(1, sample.Count)
             sample.Count = 3
             assert(3, sample.Count)

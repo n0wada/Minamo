@@ -260,12 +260,12 @@ public static class Extensions
         return ret;
     }
 
-    //Returns a function if an objects is a function or implements "Call" method
-    public static SpkFunction? ToFunction(this SpkObject self, ExecutionContext ctx)
+    internal static bool TryGetFunction(this SpkObject self, ExecutionContext ctx, out SpkFunction? function)
     {
         if (self is SpkFunction func)
         {
-            return func;
+            function = func;
+            return true;
         }
 
         if (self.Is(Spk.TypeInfo))
@@ -274,7 +274,8 @@ public static class Extensions
 
             if (ti.TryGetStaticMember(ctx, ti.ReflectedTypeName, out var value))
             {
-                return value as SpkFunction;
+                function = value as SpkFunction;
+                return function is not null;
             }
         }
         else
@@ -283,8 +284,21 @@ public static class Extensions
 
             if (typ.TryGetInstanceMember(ctx, self, Builtins.Call, out var value))
             {
-                return value as SpkFunction;
+                function = value as SpkFunction;
+                return function is not null;
             }
+        }
+
+        function = null;
+        return false;
+    }
+
+    //Returns a function if an object is a function or implements "Call".
+    public static SpkFunction? ToFunction(this SpkObject self, ExecutionContext ctx)
+    {
+        if (self.TryGetFunction(ctx, out var function))
+        {
+            return function;
         }
 
         ctx.InvalidType(Spk.Function, self);

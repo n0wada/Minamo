@@ -150,7 +150,7 @@ internal abstract partial class SpkCollTypeInfo : SpkTypeInfo
     }
     #endregion
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Indices)]
     internal static IEnumerable<SpkObject> Indices(SpkCollection self)
     {
         IEnumerable<SpkObject> Iterate()
@@ -164,7 +164,7 @@ internal abstract partial class SpkCollTypeInfo : SpkTypeInfo
         return Iterate();
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Slice)]
     internal static IEnumerable<SpkObject> Slice(SpkCollection self, int index, [Default]int? size)
     {
         var arr = self.UnsafeAccess();
@@ -209,7 +209,7 @@ internal abstract partial class SpkCollTypeInfo : SpkTypeInfo
         return new SpkCollectionEnumerable(arr, index, len, self);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ToSet)]
     internal static HashSet<SpkObject> ToSet(SpkCollection self) => new (self.ToArray());
 }
 

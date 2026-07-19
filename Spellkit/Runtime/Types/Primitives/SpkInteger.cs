@@ -297,10 +297,10 @@ internal sealed partial class SpkIntegerTypeInfo : SpkTypeInfo
         };
     #endregion
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IsMultipleOf)]
     internal static bool IsMultipleOf(long self, long value) => (self % value) == 0;
 
-    [SpkStaticMethod]
+    [SpkStaticMethod(BuiltinMethodNames.Parse)]
     internal static long? Parse(string value)
     {
         if (long.TryParse(value, NumberStyles.Integer, InvariantCulture.NumberFormat, out var i))
@@ -335,12 +335,12 @@ internal sealed partial class SpkIntegerTypeInfo : SpkTypeInfo
         throw new SpkCodeException(SpkError.InvalidType, value);
     }
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Max)]
     internal static SpkObject Max() => SpkInteger.Max;
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Min)]
     internal static SpkObject Min() => SpkInteger.Min;
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Default)]
     internal static SpkObject Default() => SpkInteger.Zero;
 }

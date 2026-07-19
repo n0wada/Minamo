@@ -304,7 +304,7 @@ internal sealed partial class SpkArrayTypeInfo : SpkCollTypeInfo
         self.Insert(index, value);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.AddRange)]
     internal static void AddRange(SpkArray self, IEnumerable<SpkObject> values)
     {
         foreach (var o in values)
@@ -313,7 +313,7 @@ internal sealed partial class SpkArrayTypeInfo : SpkCollTypeInfo
         }
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.InsertRange)]
     internal static void InsertRange(SpkArray self, int index, IEnumerable<SpkObject> values)
     {
         if (!CorrectIndex(self, ref index, insert: true))
@@ -391,7 +391,7 @@ internal sealed partial class SpkArrayTypeInfo : SpkCollTypeInfo
         self.RemoveRange(index, count.Value);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.RemoveAll)]
     internal static void RemoveAll(ExecutionContext ctx, SpkArray self, SpkFunction predicate)
     {
         var toDelete = new List<int>();
@@ -419,10 +419,10 @@ internal sealed partial class SpkArrayTypeInfo : SpkCollTypeInfo
     [SpkMethod(BuiltinMethodNames.Clear)]
     internal static void ClearItems(SpkArray self) => self.Clear();
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IndexOf)]
     internal static int IndexOf(ExecutionContext ctx, SpkArray self, SpkObject value) => self.IndexOf(ctx, value);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.LastIndexOf)]
     internal static int LastIndexOf(ExecutionContext ctx, SpkArray self, SpkObject value) => self.LastIndexOf(ctx, value);
 
     [SpkMethod(BuiltinMethodNames.Sort)]
@@ -438,7 +438,7 @@ internal sealed partial class SpkArrayTypeInfo : SpkCollTypeInfo
         Array.Sort(self.UnsafeAccess(), 0, self.Count, sortComparer);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Swap)]
     internal static void Swap(SpkArray self, int index, int other)
     {
         if (!CorrectIndex(self, ref index))
@@ -454,7 +454,7 @@ internal sealed partial class SpkArrayTypeInfo : SpkCollTypeInfo
         self.Swap(index, other);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Compact)]
     internal static void Compact(ExecutionContext ctx, SpkArray self, SpkFunction? predicate = null)
     {
         if (self.Count == 0)
@@ -490,7 +490,7 @@ internal sealed partial class SpkArrayTypeInfo : SpkCollTypeInfo
         }
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Reverse)]
     internal static void Reverse(SpkArray self)
     {
         self.Compact();
@@ -523,7 +523,7 @@ internal sealed partial class SpkArrayTypeInfo : SpkCollTypeInfo
         return arr;
     }
 
-    [SpkStaticMethod]
+    [SpkStaticMethod(BuiltinMethodNames.Empty)]
     internal static SpkObject[] Empty(ExecutionContext ctx, int count, [ParameterName("default")] SpkObject? def = null)
     {
         var arr = new SpkObject[count];
@@ -559,11 +559,11 @@ internal sealed partial class SpkArrayTypeInfo : SpkCollTypeInfo
         return arr;
     }
 
-    [SpkStaticMethod]
+    [SpkStaticMethod(BuiltinMethodNames.Concat)]
     internal static SpkObject[] Concat(ExecutionContext ctx, params SpkObject[] values) =>
         SpkCollection.ConcatValues(ctx, values);
 
-    [SpkStaticMethod]
+    [SpkStaticMethod(BuiltinMethodNames.Copy)]
     internal static SpkObject Copy(SpkArray source, int index = 0, SpkArray? destination = null, int destinationIndex = 0, int? count = null)
     {
         count ??= source.Count - index;

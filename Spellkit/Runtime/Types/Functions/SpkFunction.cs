@@ -387,7 +387,7 @@ internal sealed partial class SpkFunctionTypeInfo : SpkTypeInfo
         name == "Call" ? self : base.GetInstanceMember(self, name, ctx);
     #endregion
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Apply)]
     internal static SpkObject Apply(SpkFunction self, [VarArg]SpkTuple parameters)
     {
         var tv = parameters.UnsafeAccess();
@@ -420,7 +420,7 @@ internal sealed partial class SpkFunctionTypeInfo : SpkTypeInfo
         return fn;
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Compose)]
     internal static SpkObject Compose(SpkFunction self, SpkFunction other) => new CompositionContainer(self, other);
 
     [SpkProperty("Object")]

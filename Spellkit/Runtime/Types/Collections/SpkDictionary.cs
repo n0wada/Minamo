@@ -270,7 +270,7 @@ internal sealed partial class SpkDictionaryTypeInfo : SpkTypeInfo
     [SpkMethod]
     internal static bool ContainsKey(SpkDictionary self, SpkObject key) => self.ContainsKey(key);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ContainsValue)]
     internal static bool ContainsValue(SpkDictionary self, SpkObject value) => self.ContainsValue(value);
 
     [SpkMethod(BuiltinMethodNames.GetAndRemove)]

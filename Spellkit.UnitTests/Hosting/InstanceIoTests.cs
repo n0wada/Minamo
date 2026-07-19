@@ -1,4 +1,5 @@
 using Spellkit.Hosting;
+using Spellkit.Library;
 using System.Text;
 using Xunit;
 
@@ -11,12 +12,12 @@ public sealed class InstanceIoTests
     public void RoutesInputAndOutputThroughTheInstanceEnvironment()
     {
         var output = new StringBuilder();
-        using var instance = new SpellkitHost().CreateInstance(
+        using var instance = new SpellkitHost().AddStandardLibrary().CreateInstance(
             new SpellkitEnvironment()
                 .UseInput(_ => "instance input")
                 .UseOutput(value => output.Append(value)));
 
-        var result = instance.Execute("print(readLine(), terminator: nil)");
+        var result = instance.Execute("import * from console\nprint(readLine(), terminator: nil)");
 
         Assert.True(result.Success, result.Failure?.Message);
         Assert.Equal("instance input", output.ToString());
@@ -33,40 +34,19 @@ public sealed class InstanceIoTests
     }
 
     [Fact]
-    public void KeepsScriptOutputRedirectionInsideTheInstance()
-    {
-        var output = new StringBuilder();
-        using var instance = new SpellkitHost().CreateInstance(
-            new SpellkitEnvironment().UseOutput(value => output.Append(value)));
-
-        var result = instance.Execute("""
-            mut redirected = []
-            setOut(value => redirected.Add(value))
-            print("redirected", terminator: nil)
-            setOut()
-            print("instance", terminator: nil)
-            redirected[0]
-            """);
-
-        Assert.True(result.Success, result.Failure?.Message);
-        Assert.Equal("redirected", result.GetValue<string>());
-        Assert.Equal("instance", output.ToString());
-    }
-
-    [Fact]
     public async Task IsolatesIoAcrossConcurrentInstances()
     {
         using var rendezvous = new Barrier(2);
         var firstOutput = new StringBuilder();
         var secondOutput = new StringBuilder();
-        var host = new SpellkitHost();
+        var host = new SpellkitHost().AddStandardLibrary();
         using var first = host.CreateInstance(
             Environment("first", firstOutput, rendezvous));
         using var second = host.CreateInstance(
             Environment("second", secondOutput, rendezvous));
 
-        var firstRun = first.ExecuteAsync("print(readLine(), terminator: nil)");
-        var secondRun = second.ExecuteAsync("print(readLine(), terminator: nil)");
+        var firstRun = first.ExecuteAsync("import * from console\nprint(readLine(), terminator: nil)");
+        var secondRun = second.ExecuteAsync("import * from console\nprint(readLine(), terminator: nil)");
         var results = await Task.WhenAll(firstRun, secondRun);
 
         Assert.All(results, result => Assert.True(result.Success, result.Failure?.Message));

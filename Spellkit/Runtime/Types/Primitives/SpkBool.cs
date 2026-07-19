@@ -59,12 +59,12 @@ internal sealed partial class SpkBoolTypeInfo : SpkTypeInfo
     [SpkStaticMethod(BuiltinMethodNames.Bool)]
     internal static bool CreateBool(SpkObject value) => value.IsTrue();
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Default)]
     internal static SpkBool Default() => False;
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Max)]
     internal static SpkBool Max() => True;
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Min)]
     internal static SpkBool Min() => False;
 }

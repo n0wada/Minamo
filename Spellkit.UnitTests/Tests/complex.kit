@@ -1,3 +1,7 @@
+#region "Initialize"
+import math as math
+#endregion
+
 #region "FizzBuzz"
     mut n = 1
     mut acc = ""
@@ -193,7 +197,7 @@
         mut values = []
         mut x = 0
         while x <= n {
-            values.Add(x + "=" + round(y))
+            values.Add(x + "=" + math.round(y))
             y += h * fn(y)
             x += h
         }
@@ -343,7 +347,7 @@
                 r.Add(r[r.Length() - 1] + cache[0][0])
             } else {
                 for x in 1..l {
-                    r.Add(r[r.Length() - 1] + cache[l - x][min(x, l-x)])
+                    r.Add(r[r.Length() - 1] + cache[l - x][math.min(x, l-x)])
                 }
             }
             cache.Add(r)
@@ -571,21 +575,6 @@
         assert(patterns[i], s.ToString())
         i += 1
     }
-#endregion
-
-#region "Sleeping beauty"
-    //Bug #522
-    let experiments = 10
-    mut heads = 0
-    mut wakenings = 0
-    for _ in 1..experiments {
-        wakenings += 1
-        match rnd(min: 0, max: 10) {
-            value when value < 5 => heads += 1,
-            _ => wakenings += 1
-        }
-    }
-    assert(true, wakenings > 0)
 #endregion
 
 #region "Complex iterator"

@@ -59,6 +59,7 @@
     func Foo.Call(arg) => "hello, " + arg + "!"
     test(hello, "user")
     test(Foo(), "user")
+    assert(true, isCallable(Foo()))
 #endregion
 
 #region "Disposable: GetType"

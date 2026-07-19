@@ -135,34 +135,34 @@ internal sealed partial class SpkCharTypeInfo : SpkTypeInfo
         };
     #endregion
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IsLower)]
     internal static bool IsLower(char self) => char.IsLower(self);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IsUpper)]
     internal static bool IsUpper(char self) => char.IsUpper(self);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IsControl)]
     internal static bool IsControl(char self) => char.IsControl(self);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IsDigit)]
     internal static bool IsDigit(char self) => char.IsDigit(self);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IsLetter)]
     internal static bool IsLetter(char self) => char.IsLetter(self);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IsLetterOrDigit)]
     internal static bool IsLetterOrDigit(char self) => char.IsLetterOrDigit(self);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.IsWhiteSpace)]
     internal static bool IsWhiteSpace(char self) => char.IsWhiteSpace(self);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Lower)]
     internal static char Lower(char self) => char.ToLower(self);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Upper)]
     internal static char Upper(char self) => char.ToUpper(self);
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Order)]
     internal static int Order(char self) => self;
 
     [SpkStaticMethod(BuiltinMethodNames.Char)]
@@ -191,12 +191,12 @@ internal sealed partial class SpkCharTypeInfo : SpkTypeInfo
         throw new SpkCodeException(SpkError.InvalidCast, value.TypeName, nameof(Spk.Char));
     }
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Max)]
     internal static SpkChar Max() => SpkChar.Max;
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Min)]
     internal static SpkChar Min() => SpkChar.Min;
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Default)]
     internal static SpkChar Default() => SpkChar.Empty;
 }

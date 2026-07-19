@@ -35,7 +35,7 @@ The Hosting API uses a small set of names consistently on the C# side and the Sp
 | Resources | `host.AddResourceType<T>()`, `context.Resource(...)` | Returned handles | Instance-scoped opaque CLR objects |
 | State | `Environment.State.Set/SetScript` | `host.State` | Instance memory with host-owned and script-owned keys |
 | Signals | `host.AddSignal(...)`, `Environment.Signals` | `host.Signals` | Queued events delivered by `DispatchSignals()` |
-| Input and output | `SpellkitEnvironment.UseInput/UseOutput` | `readLine`, `print` | Instance-local text I/O selected by the host |
+| Input and output | `SpellkitEnvironment.UseInput/UseOutput` | `readLine` (console library), `print` | Instance-local text I/O selected by the host |
 | Capabilities | `host.AddCapabilities(...)`, `Environment.Capabilities` | None | Host-owned allow-list for protected features |
 | Logging | `SpellkitHostOptions.Log` | `host.Log` | User-facing structured log events |
 | Tracing | `SpellkitHostOptions.Trace` | None | Observational diagnostics for the embedding host |
@@ -277,17 +277,14 @@ var environment = new SpellkitEnvironment(game)
     .UseOutput(text => output.Append(text));
 
 using var instance = host.CreateInstance(environment);
-var result = instance.Execute("print(readLine(), terminator: nil)");
+var result = instance.Execute("print(\"ready\", terminator: nil)");
 ```
 
 The input delegate receives the current operation's cancellation token. Returning `null` represents
-end of input and produces an empty Spellkit string, matching Console behavior. The output delegate
-receives the same text chunks that `print` writes: values, separators, and terminators.
-
-Without a delegate, `readLine` and `print` retain their Console behavior. The `setOut` builtin can
-temporarily redirect `print` to a Spellkit callback, but the redirect is stored in the instance
-runtime and never changes `Console.Out`. The command-line host explicitly connects its instance
-environment to `Console.ReadLine` and `Console.Write`.
+end of input and produces an empty Spellkit string. The optional console library exposes that input
+as `readLine` after `import * from console`; the output delegate receives the text chunks that
+`print` writes: values, separators, and terminators. Without delegates, the console library and
+`print` retain their process Console behavior.
 
 Use `ExecuteFile` when the host has explicitly selected an entry script:
 

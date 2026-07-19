@@ -5,15 +5,11 @@
 #endregion
 
 #region "Anonymous function block body"
-    let output = []
-    setOut(text => output.Add(text))
     let f = x => {
         x += 1
         print(x)
     }
     assert(nil, f(1))
-    setOut()
-    assert(["2", "\n"], output)
 
     let doubleAfterIncrement = x => {
         x += 1
@@ -256,25 +252,6 @@
     assert(12, f(12))
 #endregion
 
-#region "Caller and current"
-    func foo() {
-        assert("foo", current().Name)
-        assert("bar", caller().Name)
-    }
-    func bar() {
-        foo()
-    }
-    bar()
-#endregion
-
-#region "Function info"
-    func foo() {
-        assert(foo.Name, current().Name)
-    }
-    foo()
-    assert(nil, caller())
-#endregion
-
 #region "Call chain 1"
     func thy() { caller() }
     func snd() { thy() }
@@ -286,17 +263,6 @@
 #region "Anonymous function name"
     let f = x => x * x
     assert("<func>", f.Name)
-#endregion
-
-#region "Call chain 2"
-    func foo() {
-        return fmt("{0} is called by {1}", current().Name, caller().Name)
-    }
-    func bar() {
-        foo()
-    }
-    mut s = bar()
-    assert("foo is called by bar", s)
 #endregion
 
 #region "Complex variadic"
@@ -461,64 +427,6 @@
         x + y + z
     }
     assert(9, sum3(2, 3, 4))
-#endregion
-
-#region "Defaults and foreign call 1"
-    func double(x = 2) => x + x
-    func sum2(x, y = 3) => x + y
-    func sum3(x = 1, y = 0.5, z = 0.25) => x + y + z
-    assert(4, __invoke(double))
-    assert(6.33, __invoke(sum2, 3.33))
-    assert(1.75, __invoke(sum3))
-#endregion
-
-#region "Defaults and foreign call 2"
-    assert(12.12, __invoke(round, 12.1245677))
-    let r = __invoke(rnd, 10)
-    assert(true, r >= 10)
-    assert(true, __invoke(rnd) >= 0)
-    let r2 = __invoke(rnd, 1, 5)
-    assert(true, r2 >= 1 && r2 <= 5)
-#endregion
-
-#region "Defaults and foreign call 3"
-    mut cell
-    func collector(args..., x = 5) {
-        mut xs = [x]
-        xs.AddRange(args)
-        cell = xs
-    }
-    __invoke(collector, 4)
-    assert([5, 4], cell)
-#endregion
-
-#region "Defaults and foreign call 4"
-    mut cell
-    func collector(x, y, args...) {
-        mut xs = [x, y]
-        xs.AddRange(args)
-        cell = xs
-    }
-    __invoke(collector, 1, 2, (3, 4))
-    assert([1, 2, 3, 4], cell)
-#endregion
-
-#region "Defaults and foreign call 5"
-    mut cell
-    func collector(x, y, args...) {
-        mut xs = [x, y]
-        xs.AddRange(args)
-        cell = xs
-    }
-    __invoke(collector, 5, 6, [7, 8])
-    assert([5, 6, 7, 8], cell)
-#endregion
-
-#region "External call"
-    func checkIt() {
-        assert(nil, caller())
-    }
-    __invoke(checkIt)
 #endregion
 
 #region "Type annotations 1"

@@ -564,7 +564,7 @@ internal sealed partial class SpkTupleTypeInfo : SpkCollTypeInfo
         return new SpkTuple(arr);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Remove)]
     internal static SpkObject Remove(ExecutionContext ctx, SpkTuple self, SpkObject value)
     {
         var tv = self.UnsafeAccess();
@@ -598,7 +598,7 @@ internal sealed partial class SpkTupleTypeInfo : SpkCollTypeInfo
         return self;
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.RemoveAt)]
     internal static SpkObject RemoveAt(SpkTuple self, int index)
     {
         index = index < 0 ? self.Count + index : index;
@@ -628,7 +628,7 @@ internal sealed partial class SpkTupleTypeInfo : SpkCollTypeInfo
         return new SpkTuple(arr);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Insert)]
     internal static SpkObject Insert(SpkTuple self, int index, SpkObject value)
     {
         index = index < 0 ? self.Count + index : index;
@@ -658,7 +658,7 @@ internal sealed partial class SpkTupleTypeInfo : SpkCollTypeInfo
         return new SpkTuple(arr);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Keys)]
     internal static SpkObject Keys(SpkTuple self)
     {
         IEnumerable<SpkObject> Iterate()
@@ -676,7 +676,7 @@ internal sealed partial class SpkTupleTypeInfo : SpkCollTypeInfo
         return SpkIterator.Create(Iterate());
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.First)]
     internal static SpkObject First(ExecutionContext ctx, SpkTuple self)
     {
         var ret = self.GetItem(ctx, 0);
@@ -684,7 +684,7 @@ internal sealed partial class SpkTupleTypeInfo : SpkCollTypeInfo
         return ret;
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Second)]
     internal static SpkObject Second(ExecutionContext ctx, SpkTuple self)
     {
         var ret = self.GetItem(ctx, 1);
@@ -692,7 +692,7 @@ internal sealed partial class SpkTupleTypeInfo : SpkCollTypeInfo
         return ret;
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Sort)]
     internal static SpkObject Sort(ExecutionContext ctx, SpkTuple self, SpkFunction? comparer = null)
     {
         var sortComparer = new SortComparer(comparer, ctx);
@@ -702,14 +702,14 @@ internal sealed partial class SpkTupleTypeInfo : SpkCollTypeInfo
         return new SpkTuple(newArr);
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.ToDictionary)]
     internal static SpkObject ToDictionary(SpkTuple self) =>
         new SpkDictionary(self.ConvertToDictionary());
 
     [SpkMethod(BuiltinMethodNames.ToArray)]
     internal static SpkObject[] ToArray(SpkCollection self) => self.ToArray();
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Compact)]
     internal static SpkObject Compact(ExecutionContext ctx, SpkTuple self, SpkFunction? predicate = null)
     {
         var xs = new List<SpkObject>();
@@ -739,7 +739,7 @@ internal sealed partial class SpkTupleTypeInfo : SpkCollTypeInfo
         return new SpkTuple(xs.ToArray());
     }
 
-    [SpkMethod]
+    [SpkMethod(BuiltinMethodNames.Alter)]
     internal static SpkObject Alter(SpkTuple self, [VarArg]SpkTuple values)
     {
         var xs = new List<SpkObject>(self.UnsafeAccess());
@@ -767,11 +767,11 @@ internal sealed partial class SpkTupleTypeInfo : SpkCollTypeInfo
     internal static SpkObject StaticSort(ExecutionContext ctx, SpkTuple value, SpkFunction? comparer = null) =>
         Sort(ctx, value, comparer);
 
-    [SpkStaticMethod]
+    [SpkStaticMethod(BuiltinMethodNames.Pair)]
     internal static SpkObject Pair(SpkObject first, SpkObject second) =>
         new SpkTuple(new[] { first, second });
 
-    [SpkStaticMethod]
+    [SpkStaticMethod(BuiltinMethodNames.Triple)]
     internal static SpkObject Triple(SpkObject first, SpkObject second, SpkObject third) =>
         new SpkTuple(new[] { first, second, third });
 

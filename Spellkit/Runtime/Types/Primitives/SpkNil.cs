@@ -46,6 +46,6 @@ internal sealed partial class SpkNilTypeInfo : SpkTypeInfo
     [SpkStaticMethod(BuiltinMethodNames.Nil)]
     internal static SpkNil GetNil() => Nil;
 
-    [SpkStaticProperty]
+    [SpkStaticProperty(BuiltinMethodNames.Default)]
     internal static SpkNil Default() => Nil;
 }

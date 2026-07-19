@@ -1,4 +1,4 @@
-﻿using Spellkit.Codegen;
+using Spellkit.Codegen;
 using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System;

@@ -463,7 +463,7 @@
         }
         return true
     }
-    let xs = Iterator.Repeat(rnd).Take(20)
+    let xs = Iterator.Repeat(() => 1).Take(20)
     assert(true, all(xs, notNil))
     assert(20, xs.Length())
 #endregion
