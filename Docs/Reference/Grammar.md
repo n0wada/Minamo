@@ -213,7 +213,11 @@ Conversions use `func Source as Target`, and operators place the operator after 
 
 ```swift
 func Point + (other) => Point(this.x + other.x, this.y + other.y)
+func Pipeline << (other) => Pipeline(this.steps + other.steps)
 ```
+
+`<<` and `>>` are overload-only operators. They have no built-in bit-shift behavior; using
+either operator requires an implementation on the left operand's type.
 
 ## Calls and postfix expressions
 
@@ -244,9 +248,10 @@ Binary operators are left-associative. Lowest precedence appears first:
 | 4 | `in`, `is pattern` |
 | 5 | `..`, `..<` |
 | 6 | `==`, `!=`, `<`, `>`, `<=`, `>=` |
-| 7 | `+`, `-` |
-| 8 | `*`, `/`, `%` |
-| 9 | `as Type` |
+| 7 | `<<`, `>>` |
+| 8 | `+`, `-` |
+| 9 | `*`, `/`, `%` |
+| 10 | `as Type` |
 | postfix | access, indexing, calls |
 
 Logical operators use doubled symbols.

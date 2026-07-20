@@ -300,33 +300,35 @@ added when cleanup must run after either success or failure.
 
 ## Embedding in .NET
 
-The application-facing API lives in `Spellkit.Hosting`. Create a host, open an instance, and execute
-either a source string or a selected file:
+The application-facing API lives in `Spellkit.Hosting`. Reference `Spellkit.dll` for the Hosting
+API and runtime, and reference `Spellkit.Generators.dll` as an analyzer to expose attributed C#
+methods as commands.
 
 ```csharp
 using Spellkit.Hosting;
 
-var host = new SpellkitHost();
-using var instance = host.CreateInstance();
+[SpellkitModule("app")]
+public sealed class AppCommands
+{
+    [SpellkitCommand("greet")]
+    public string Greet(string name) => $"Hello, {name}!";
+}
 
-var result = instance.Execute("""
-    func square(value) => value * value
-    square(6)
-    """);
+var host = new SpellkitHost();
+host.AddModule(new AppCommands());
+
+using var instance = host.CreateInstance();
+var result = instance.ExecuteFile("hello.kit");
 
 if (!result.Success)
-{
     Console.Error.WriteLine(result.Failure?.Message);
-    return;
-}
+```
 
-Console.WriteLine(result.GetValue<long>()); // 36
+The `hello.kit` file imports the generated module and calls its command:
 
-var fileResult = instance.ExecuteFile("Scripts/startup.kit");
-if (!fileResult.Success)
-{
-    Console.Error.WriteLine(fileResult.Failure?.Message);
-}
+```swift
+import app
+app.greet("Spellkit")
 ```
 
 Instances are incremental, so definitions from successful executions remain available to later
@@ -338,6 +340,11 @@ When the same script should be shared by many actors, compile it once and create
 instances:
 
 ```csharp
+var source = """
+    import app
+    app.greet("Spellkit")
+    """;
+
 var program = host.Compile(source).GetValueOrThrow();
 
 using var first = host.CreateInstance(program);
