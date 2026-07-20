@@ -1,9 +1,9 @@
 # Spellkit grammar reference
 
 This document describes the grammar accepted by the current handwritten parser. The parser and
-the passing files under [`Spellkit.UnitTests/Tests`](../Spellkit.UnitTests/Tests) remain
-authoritative. See the [overview](Overview.md) for an introduction and the
-[recipes](Recipes.md) for runnable examples.
+the passing files under [`Spellkit.UnitTests/Tests`](../../Spellkit.UnitTests/Tests) remain
+authoritative. See the [overview](../Language/Overview.md) for an introduction and the
+[recipes](../Language/Recipes.md) for runnable examples.
 
 ## Notation
 

@@ -22,7 +22,7 @@ $testProject = Join-Path $repoRoot "Spellkit.UnitTests\Spellkit.UnitTests.csproj
 $resolvedTestPath = Join-Path $repoRoot $TestPath
 $languageTestOutput = Join-Path $repoRoot "bin\tests\language\$Configuration"
 $languageTestEntry = Join-Path $languageTestOutput "spk-language-tests.dll"
-$testReport = Join-Path $repoRoot "Docs\TestResult.md"
+$testReport = Join-Path $repoRoot "Docs\Reports\TestResult.md"
 $runtimeWorkingDirectory = Join-Path $repoRoot "bin"
 
 New-Item -ItemType Directory -Force -Path $dotnetHome | Out-Null

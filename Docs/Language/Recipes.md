@@ -2,7 +2,7 @@
 
 # Spellkit recipes
 
-This page contains small, complete programs that run with the Spellkit console. For a language tour, see the [overview](Overview.md); for syntax details, see the [grammar reference](Grammar.md).
+This page contains small, complete programs that run with the Spellkit console. For a language tour, see the [overview](Overview.md); for syntax details, see the [grammar reference](../Reference/Grammar.md).
 
 Build the Release console once from the repository root:
 
@@ -29,7 +29,7 @@ Run it with:
 .\bin\spk.exe .\Examples\Language\01-collections.kit -nologo
 ```
 
-Source: [01-collections.kit](../Examples/Language/01-collections.kit)
+Source: [01-collections.kit](../../Examples/Language/01-collections.kit)
 
 ## Pattern matching
 
@@ -53,7 +53,7 @@ Run it with:
 .\bin\spk.exe .\Examples\Language\02-patterns.kit -nologo
 ```
 
-Source: [02-patterns.kit](../Examples/Language/02-patterns.kit)
+Source: [02-patterns.kit](../../Examples/Language/02-patterns.kit)
 
 ## Types and traits
 
@@ -80,7 +80,7 @@ Run it with:
 .\bin\spk.exe .\Examples\Language\03-types-and-traits.kit -nologo
 ```
 
-Source: [03-types-and-traits.kit](../Examples/Language/03-types-and-traits.kit)
+Source: [03-types-and-traits.kit](../../Examples/Language/03-types-and-traits.kit)
 
 ## Iterators
 
@@ -104,7 +104,7 @@ Run it with:
 .\bin\spk.exe .\Examples\Language\04-iterators.kit -nologo
 ```
 
-Source: [04-iterators.kit](../Examples/Language/04-iterators.kit)
+Source: [04-iterators.kit](../../Examples/Language/04-iterators.kit)
 
 ## Exceptions
 
@@ -132,7 +132,7 @@ Run it with:
 .\bin\spk.exe .\Examples\Language\05-exceptions.kit -nologo
 ```
 
-Source: [05-exceptions.kit](../Examples/Language/05-exceptions.kit)
+Source: [05-exceptions.kit](../../Examples/Language/05-exceptions.kit)
 
 ## Modules and visibility
 
@@ -155,7 +155,7 @@ Run it with:
 .\bin\spk.exe .\Examples\Language\06-modules.kit -nologo
 ```
 
-Source: [06-modules.kit](../Examples/Language/06-modules.kit)
+Source: [06-modules.kit](../../Examples/Language/06-modules.kit)
 
 ## Enums and state
 
@@ -184,7 +184,7 @@ Run it with:
 .\bin\spk.exe .\Examples\Language\07-enums-and-state.kit -nologo
 ```
 
-Source: [07-enums-and-state.kit](../Examples/Language/07-enums-and-state.kit)
+Source: [07-enums-and-state.kit](../../Examples/Language/07-enums-and-state.kit)
 
 ## Functions and closures
 
@@ -215,7 +215,7 @@ Run it with:
 .\bin\spk.exe .\Examples\Language\08-functions-and-closures.kit -nologo
 ```
 
-Source: [08-functions-and-closures.kit](../Examples/Language/08-functions-and-closures.kit)
+Source: [08-functions-and-closures.kit](../../Examples/Language/08-functions-and-closures.kit)
 
 ## Dictionaries and tuples
 
@@ -242,7 +242,7 @@ Run it with:
 .\bin\spk.exe .\Examples\Language\09-dictionaries-and-tuples.kit -nologo
 ```
 
-Source: [09-dictionaries-and-tuples.kit](../Examples/Language/09-dictionaries-and-tuples.kit)
+Source: [09-dictionaries-and-tuples.kit](../../Examples/Language/09-dictionaries-and-tuples.kit)
 
 ## Cleanup and errors
 
@@ -276,7 +276,7 @@ Run it with:
 .\bin\spk.exe .\Examples\Language\10-cleanup-and-errors.kit -nologo
 ```
 
-Source: [10-cleanup-and-errors.kit](../Examples/Language/10-cleanup-and-errors.kit)
+Source: [10-cleanup-and-errors.kit](../../Examples/Language/10-cleanup-and-errors.kit)
 
 ## Traits as interfaces
 
@@ -320,6 +320,6 @@ Run it with:
 .\bin\spk.exe .\Examples\Language\11-traits-as-interfaces.kit -nologo
 ```
 
-Source: [11-traits-as-interfaces.kit](../Examples/Language/11-traits-as-interfaces.kit)
+Source: [11-traits-as-interfaces.kit](../../Examples/Language/11-traits-as-interfaces.kit)
 
 The Release smoke test executes every listed recipe. Run `scripts/generate-recipes.ps1 -Check` to verify that this page matches the source files.

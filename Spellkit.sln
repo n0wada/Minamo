@@ -9,10 +9,18 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Spellkit.Console", "Spellki
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docs", "Docs", "{CF92CF03-87D2-47AD-BCE7-2AA9A43D8E2D}"
 	ProjectSection(SolutionItems) = preProject
-		Docs\Changes.md = Docs\Changes.md
-		Docs\Compatibility.md = Docs\Compatibility.md
-		Docs\Grammar.md = Docs\Grammar.md
-		Docs\Overview.md = Docs\Overview.md
+		Docs\Language\Overview.md = Docs\Language\Overview.md
+		Docs\Language\Syntax.md = Docs\Language\Syntax.md
+		Docs\Language\Operators.md = Docs\Language\Operators.md
+		Docs\Language\ProgramStructure.md = Docs\Language\ProgramStructure.md
+		Docs\Language\TypesAndTraits.md = Docs\Language\TypesAndTraits.md
+		Docs\Language\FunctionsAndClosures.md = Docs\Language\FunctionsAndClosures.md
+		Docs\Language\Semantics.md = Docs\Language\Semantics.md
+		Docs\Language\Recipes.md = Docs\Language\Recipes.md
+		Docs\Reference\Grammar.md = Docs\Reference\Grammar.md
+		Docs\Hosting\Guide.md = Docs\Hosting\Guide.md
+		Docs\Operations\Compatibility.md = Docs\Operations\Compatibility.md
+		Docs\Developers\PublicApiLayers.md = Docs\Developers\PublicApiLayers.md
 		LICENSE = LICENSE
 		README.md = README.md
 	EndProjectSection

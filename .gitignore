@@ -343,4 +343,4 @@ healthchecksdb
 .appdata/
 .localappdata/
 /tmp-counter.kit
-/Docs/TestResult.md
+/Docs/Reports/

@@ -1,4 +1,4 @@
-# Hosting API
+# Hosting API guide
 
 The Hosting API exposes application commands to Spellkit through ordinary C# APIs and attributes.
 It is part of `Spellkit.dll` and uses the `Spellkit.Hosting` namespace.

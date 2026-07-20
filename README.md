@@ -23,7 +23,7 @@ console, optional standard-library modules, and a C# Hosting API.
 Spellkit began as a fork of [Dyalect](https://github.com/vorov2/dyalect) and is being
 reshaped around small, controllable embedded runtimes.
 
-## A taste of the language
+## Getting started
 
 Spellkit source files use the `.kit` extension.
 
@@ -36,7 +36,7 @@ for n in 1..10 {
 }
 ```
 
-See the [language recipes](Docs/Recipes.md) for small, runnable examples.
+See the [language recipes](Docs/Language/Recipes.md) for small, runnable examples.
 
 ## Build and run
 
@@ -106,7 +106,7 @@ app.greet("Spellkit")
 
 Hosts can expose selected commands and resources, supply capabilities and limits, and keep
 CLR objects behind opaque handles. For the complete lifecycle and API contract, see the
-[Hosting guide](Docs/Hosting.md). The [Public API layers](Docs/ApiLayers.md) guide explains
+[Hosting guide](Docs/Hosting/Guide.md). The [Public API layers](Docs/Developers/PublicApiLayers.md) guide explains
 the application, tooling, and runtime-extension surfaces.
 
 ## Examples
@@ -149,17 +149,53 @@ For focused work, the xUnit project can be run directly:
 dotnet test .\Spellkit.UnitTests\Spellkit.UnitTests.csproj
 ```
 
-See [Compatibility](Docs/Compatibility.md) for the supported framework contract and
+See [Compatibility](Docs/Operations/Compatibility.md) for the supported framework contract and
 validation levels.
 
 ## Documentation
 
-- [Language overview](Docs/Overview.md)
-- [Grammar reference](Docs/Grammar.md)
-- [Language recipes](Docs/Recipes.md)
-- [Hosting API](Docs/Hosting.md)
-- [Public API layers](Docs/ApiLayers.md)
-- [Compatibility](Docs/Compatibility.md)
+The rest of the documentation is organized by the task you are trying to complete.
+
+### Language guide
+
+Use the overview to learn the language by concept, then use recipes for complete, runnable
+programs.
+
+- [Language overview](Docs/Language/Overview.md)
+- [Syntax](Docs/Language/Syntax.md)
+- [Operators](Docs/Language/Operators.md)
+- [Program structure](Docs/Language/ProgramStructure.md)
+- [Types and traits](Docs/Language/TypesAndTraits.md)
+- [Functions and closures](Docs/Language/FunctionsAndClosures.md)
+- [Semantics](Docs/Language/Semantics.md)
+- [Language recipes](Docs/Language/Recipes.md)
+
+### Language reference
+
+- [Grammar reference](Docs/Reference/Grammar.md)
+
+The grammar reference describes the syntax accepted by the current parser. The parser and the
+language test corpus remain authoritative for current behavior.
+
+### Host integration
+
+- [Hosting API guide](Docs/Hosting/Guide.md)
+
+The Hosting guide covers host setup, commands, resources, state, signals, execution limits,
+observability, and security defaults.
+
+### Tools and operations
+
+- [Compatibility](Docs/Operations/Compatibility.md)
+
+Compatibility documents current target frameworks and the repository validation suites.
+
+### For developers
+
+- [Public API layers](Docs/Developers/PublicApiLayers.md)
+
+This guide distinguishes the application-facing Hosting API from tooling and runtime extension
+surfaces.
 
 ## License
 

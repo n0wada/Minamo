@@ -2,7 +2,7 @@
 
 Spellkit is a compact dynamic language for embedded .NET scripting. This page is a map of the
 language rather than a complete specification. See the [recipes](Recipes.md) and the
-[language tests](../Spellkit.UnitTests/Tests) for more examples.
+[language tests](../../Spellkit.UnitTests/Tests) for more examples.
 
 ## Comments
 
@@ -377,13 +377,13 @@ host.State["selected"] = "player"
 host.Signals.On("player.hit", damage => print(damage))
 ```
 
-See the [Hosting API guide](Hosting.md) for capabilities, execution limits, resource lifetime,
+See the [Hosting API guide](../Hosting/Guide.md) for capabilities, execution limits, resource lifetime,
 telemetry, and C# integration.
 
 ## Next steps
 
-- [Detailed grammar reference](Grammar.md)
+- [Detailed grammar reference](../Reference/Grammar.md)
 - [Language recipes](Recipes.md)
-- [Hosting API](Hosting.md)
-- [Compatibility](Compatibility.md)
-- [Runnable Station Console example](../Examples/StationConsole/README.md)
+- [Hosting API](../Hosting/Guide.md)
+- [Compatibility](../Operations/Compatibility.md)
+- [Runnable Station Console example](../../Examples/StationConsole/README.md)
