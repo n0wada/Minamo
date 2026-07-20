@@ -39,6 +39,13 @@
     assert(13, res)
 #endregion
 
+#region "Methods: EnumerateRunes, RuneCount"
+    let text = "A😀B"
+    assert(4, text.Length())
+    assert(3, text.RuneCount())
+    assert(["A", "😀", "B"], text.EnumerateRunes().ToArray())
+#endregion
+
 #region "Methods: IndexOf, LastIndexOf"
     mut str = "Hello, world!"
     assert(4, str.IndexOf("o"))

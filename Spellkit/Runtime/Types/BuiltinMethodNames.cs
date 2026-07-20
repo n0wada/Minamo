@@ -32,6 +32,7 @@ internal static class BuiltinMethodNames
     public const string Upper = "Upper";
     public const string StartsWith = "StartsWith";
     public const string EndsWith = "EndsWith";
+    public const string EnumerateRunes = "EnumerateRunes";
     public const string Substring = "Substring";
     public const string Capitalize = "Capitalize";
     public const string Trim = "Trim";
@@ -48,6 +49,7 @@ internal static class BuiltinMethodNames
     public const string Distinct = "Distinct";
     public const string Join = "Join";
     public const string Repeat = "Repeat";
+    public const string RuneCount = "RuneCount";
     public const string ContainsValue = "ContainsValue";
     public const string Type = "Type";
     public const string Array = "Array";

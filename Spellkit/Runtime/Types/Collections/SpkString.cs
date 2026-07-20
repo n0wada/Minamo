@@ -283,6 +283,28 @@ internal sealed partial class SpkStringTypeInfo : SpkCollTypeInfo
     [SpkMethod(BuiltinMethodNames.EndsWith)]
     internal static bool EndsWith(string self, string value) => self.EndsWith(value);
 
+    [SpkMethod(BuiltinMethodNames.EnumerateRunes)]
+    internal static IEnumerable<SpkObject> EnumerateRunes(string self)
+    {
+        foreach (var rune in self.EnumerateRunes())
+        {
+            yield return SpkString.Get(rune.ToString());
+        }
+    }
+
+    [SpkMethod(BuiltinMethodNames.RuneCount)]
+    internal static int RuneCount(string self)
+    {
+        var count = 0;
+
+        foreach (var _ in self.EnumerateRunes())
+        {
+            count++;
+        }
+
+        return count;
+    }
+
     [SpkMethod(BuiltinMethodNames.Substring)]
     internal static string? Substring(string self, int index, int? count = null)
     {

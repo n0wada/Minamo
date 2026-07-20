@@ -28,14 +28,11 @@ internal static class Builtins
     public const string ToArray = "ToArray";
     public const string Iterate = "Iterate";
     public const string Clone = "Clone";
-    public const string Max = "Max";
-    public const string Min = "Min";
     public const string Has = "Has";
     public const string Type = "GetType";
     public const string Call = "Call";
     public const string Range = "Range";
     public const string Slice = "Slice";
-    public const string Concat = "Concat";
     public const string Dispose = "Dispose";
     public const string In = "In";
     public const string DelMember = "DeleteMember";
@@ -221,10 +218,7 @@ public readonly record struct OpInfo(
     OpCode Code,
     OperandShape Operands,
     int? StackDelta,
-    OpCategory Category)
-{
-    public bool HasDynamicStackEffect => StackDelta is null;
-}
+    OpCategory Category);
 
 public sealed class Op
 {
