@@ -36,6 +36,8 @@ internal static class Builtins
     public const string Dispose = "Dispose";
     public const string In = "In";
     public const string DelMember = "DeleteMember";
+    public const string ShiftLeft = "op_shift_left";
+    public const string ShiftRight = "op_shift_right";
 
     public static string Setter(string name) => $"{SetAccessor}{name}";
 
@@ -68,6 +70,8 @@ internal static class Builtins
             Plus => "+ (unary)",
             Get => "get",
             Set => "set",
+            ShiftLeft => "<<",
+            ShiftRight => ">>",
             _ => op
         };
 
@@ -86,6 +90,8 @@ internal static class Builtins
             ">=" => Builtins.Gte,
             "<=" => Builtins.Lte,
             "!" => Builtins.Not,
+            "<<" => Builtins.ShiftLeft,
+            ">>" => Builtins.ShiftRight,
             _ => name
         };
 }

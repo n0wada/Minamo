@@ -139,6 +139,8 @@ internal static class Extensions
             BinaryOperator.NotEq => "!=",
             BinaryOperator.Or => "||",
             BinaryOperator.Rem => "%",
+            BinaryOperator.ShiftLeft => "<<",
+            BinaryOperator.ShiftRight => ">>",
             BinaryOperator.Sub => "-",
             BinaryOperator.Coalesce => "??",
             BinaryOperator.Is => "is",

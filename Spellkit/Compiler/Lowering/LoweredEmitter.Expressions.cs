@@ -180,6 +180,15 @@ internal sealed partial class LoweredEmitter
                 cw.SetCallArgument(0);
                 cw.InvokePreparedCall(1);
                 break;
+            case BinaryOperator.ShiftLeft:
+            case BinaryOperator.ShiftRight:
+                EmitValue(node.Left, ctx, tailPosition: false);
+                EmitValue(node.Right!, ctx, tailPosition: false);
+                target.AddLinePragma(node.Location);
+                cw.CallMember(
+                    node.Operator == BinaryOperator.ShiftLeft ? Builtins.ShiftLeft : Builtins.ShiftRight,
+                    1);
+                break;
             default:
                 EmitValue(node.Left, ctx, tailPosition: false);
                 EmitValue(node.Right!, ctx, tailPosition: false);

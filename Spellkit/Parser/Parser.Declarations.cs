@@ -525,7 +525,7 @@ internal sealed partial class HandwrittenParser
         or TokenKind.Remainder
         or TokenKind.Bang or TokenKind.EqualEqual or TokenKind.NotEqual
         or TokenKind.Greater or TokenKind.Less or TokenKind.GreaterOrEqual
-        or TokenKind.LessOrEqual;
+        or TokenKind.LessOrEqual or TokenKind.DoubleLess or TokenKind.DoubleGreater;
 }
 
 internal sealed partial class HandwrittenParser

@@ -26,6 +26,16 @@ public sealed class ParserTests
         Assert.False(result.Success);
     }
 
+    [Theory]
+    [InlineData("1 << 2")]
+    [InlineData("4 >> 1")]
+    public void ParsesOverloadableShiftOperators(string source)
+    {
+        var result = SpkParser.Parse(source, "<overloadable-shift-operator>");
+
+        Assert.True(result.Success);
+    }
+
     [Fact]
     public void ParsesSourceStringAndPreservesSourceName()
     {

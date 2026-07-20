@@ -18,6 +18,8 @@ public enum BinaryOperator
     Mul,
     Div,
     Rem,
+    ShiftLeft,
+    ShiftRight,
     Coalesce,
     Is,
     In

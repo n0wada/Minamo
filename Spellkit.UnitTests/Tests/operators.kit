@@ -280,3 +280,25 @@
     let x = +3
     assert(6, x)
 #endregion
+
+#region "Overloadable shift operators"
+    struct Shiftable { value }
+    func Shiftable +(other) => Shiftable(this.value + "+" + other.value)
+    func Shiftable <<(other) => Shiftable("(" + this.value + "<<" + other.value + ")")
+    func Shiftable >>(other) => Shiftable("(" + this.value + ">>" + other.value + ")")
+
+    let left = Shiftable("a")
+    let middle = Shiftable("b")
+    let right = Shiftable("c")
+    assert("(a<<b+c)", (left << middle + right).value)
+    assert("(a>>b+c)", (left >> middle + right).value)
+    assert("((a<<b)<<c)", ((left << middle) << right).value)
+
+    let unsupported = try {
+        1 << 2
+        false
+    } catch e {
+        constructorName(e) == "OperationNotSupported"
+    }
+    assert(true, unsupported)
+#endregion

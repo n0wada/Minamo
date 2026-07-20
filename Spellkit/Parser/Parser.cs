@@ -458,7 +458,7 @@ internal sealed partial class HandwrittenParser
                 continue;
             }
 
-            if (Current.Kind == TokenKind.As && 9 >= minimumPrecedence)
+            if (Current.Kind == TokenKind.As && 10 >= minimumPrecedence)
             {
                 var asToken = Consume();
                 var typeName = ParseTypeName();
@@ -1057,11 +1057,13 @@ internal sealed partial class HandwrittenParser
             TokenKind.Less => (BinaryOperator.Lt, 6),
             TokenKind.GreaterOrEqual => (BinaryOperator.GtEq, 6),
             TokenKind.LessOrEqual => (BinaryOperator.LtEq, 6),
-            TokenKind.Plus => (BinaryOperator.Add, 7),
-            TokenKind.Minus => (BinaryOperator.Sub, 7),
-            TokenKind.Multiply => (BinaryOperator.Mul, 8),
-            TokenKind.Divide => (BinaryOperator.Div, 8),
-            TokenKind.Remainder => (BinaryOperator.Rem, 8),
+            TokenKind.DoubleLess => (BinaryOperator.ShiftLeft, 7),
+            TokenKind.DoubleGreater => (BinaryOperator.ShiftRight, 7),
+            TokenKind.Plus => (BinaryOperator.Add, 8),
+            TokenKind.Minus => (BinaryOperator.Sub, 8),
+            TokenKind.Multiply => (BinaryOperator.Mul, 9),
+            TokenKind.Divide => (BinaryOperator.Div, 9),
+            TokenKind.Remainder => (BinaryOperator.Rem, 9),
             _ => default
         };
         return precedence != 0;

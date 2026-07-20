@@ -109,6 +109,20 @@ partial class Builder
                 }
 
                 return Builtins.Mul;
+            case "<<":
+                if (node.Parameters.Count > 1)
+                {
+                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
+                }
+
+                return Builtins.ShiftLeft;
+            case ">>":
+                if (node.Parameters.Count > 1)
+                {
+                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
+                }
+
+                return Builtins.ShiftRight;
             case "/":
                 if (node.Parameters.Count > 1)
                 {

@@ -97,6 +97,11 @@ internal sealed class Lexer
 
                 return ScanOperator(Peek(1) == '=' ? TokenKind.LessOrEqual : TokenKind.Less, Peek(1) == '=' ? 2 : 1, out kind);
             case '>':
+                if (Peek(1) == '>')
+                {
+                    return ScanOperator(TokenKind.DoubleGreater, 2, out kind);
+                }
+
                 return ScanOperator(Peek(1) == '=' ? TokenKind.GreaterOrEqual : TokenKind.Greater, Peek(1) == '=' ? 2 : 1, out kind);
             case '.':
                 if (Peek(1) == '.' && Peek(2) == '.')
