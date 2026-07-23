@@ -13,7 +13,6 @@ internal sealed class SpkIncrementalLinker : SpkLinker
     private UnitComposition? composition;
     private int? startOffset;
     private Dictionary<Guid, Unit>? backupUnitMap;
-    private Dictionary<string, Dictionary<string, ForeignUnit>>? backupAssemblyMap;
     private List<Unit>? backupUnits;
 
     public SpkIncrementalLinker(FileLookup lookup, SpkTuple? args = null) : base(lookup, args) { }
@@ -21,7 +20,6 @@ internal sealed class SpkIncrementalLinker : SpkLinker
     protected override void Prepare()
     {
         backupUnitMap = new(UnitMap);
-        backupAssemblyMap = new(AssemblyMap);
         backupUnits = new(Units!);
     }
 
@@ -38,11 +36,6 @@ internal sealed class SpkIncrementalLinker : SpkLinker
         if (backupUnitMap is not null)
         {
             UnitMap = backupUnitMap;
-        }
-
-        if (backupAssemblyMap is not null)
-        {
-            AssemblyMap = backupAssemblyMap;
         }
 
         Units.Clear();

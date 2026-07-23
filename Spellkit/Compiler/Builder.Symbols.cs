@@ -387,7 +387,7 @@ partial class Builder
             throw new TerminationException();
         }
 
-        return new Reference(Guid.NewGuid(), node.ModuleName, localPath, null, node.Location, unit.FileName);
+        return new Reference(Guid.NewGuid(), node.ModuleName, localPath, node.Location, unit.FileName);
     }
 
     private int AddUnitReference(Reference reference, Unit linkedUnit)

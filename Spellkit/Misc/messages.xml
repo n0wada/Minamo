@@ -113,19 +113,13 @@
     <message id="DuplicateIndexer">An indexer {0} for type "{1}" is already declared.</message>
   </group>
   <group id="linker">
-    <message id="AssemblyModuleLoadError">An error occured while loading module "{0}" from an assembly "{1}": {2}</message>
-    <message id="AssemblyModuleNotFound">Module "{0}" is not defined in an assembly "{1}".</message>
-    <message id="AssemblyNotFound">Unable to find an assembly "{0}" (for a referenced module "{1}"). </message>
     <message id="ChecksumValidationFailed">Checksum validation of dependency "{0}" failed for module "{1}". </message>
     <message id="CircularModuleReference">Circular module reference detected for "{0}".</message>
-    <message id="DuplicateModuleName">Duplicate name of a module "{1}" in an assembly "{0}".</message>
     <message id="DuplicateVarArgs">Duplicate [VarArgs] attribute for method "{0}".</message>
-    <message id="InvalidAssemblyModule">Unsupported type of a module "{0}" from an assembly "{1}".</message>
     <message id="InvalidForeignModule">Foreign module "{0}" is missing GUID attribute.</message>
     <message id="ModuleNotFound">Unable to find module "{0}".</message>
     <message id="NewerSourceFile">A newer version of source file is available for module "{0}".</message>
     <message id="TooManyParameters">Method "{0}" has too many parameters.</message>
-    <message id="UnableLoadAssembly">An error occured while loading assembly "{0}": {1}</message>
     <message id="UnableReadModule">An error occured while reading module file "{0}": {1}</message>
   </group>
   <group id="runtime">

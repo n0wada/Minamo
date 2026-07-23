@@ -21,9 +21,6 @@ public partial class SpkLinker
 
     private readonly HashSet<string> linkingPaths = new(StringComparer.OrdinalIgnoreCase);
 
-    protected Dictionary<string, Dictionary<string, ForeignUnit>> AssemblyMap { get; set; } = 
-        new Dictionary<string, Dictionary<string, ForeignUnit>>(StringComparer.OrdinalIgnoreCase);
-
     protected FastList<Unit> Units { get; set; } = new();
 
     protected FastList<BuildMessage> Messages { get; } = new();

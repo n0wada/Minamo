@@ -180,10 +180,6 @@ internal partial class SpkInteropTypeInfo : SpkTypeInfo
 
     internal static SpkObject Wrap(SpkObject value) => new SpkInterop(value.GetType(), value);
 
-    internal static void LoadAssembly(string name) => Assembly.Load(name);
-
-    internal static void LoadAssemblyFromFile(string path) => Assembly.LoadFrom(path);
-
     internal static SpkObject ConvertTo(ExecutionContext ctx, SpkInterop type, SpkObject value)
     {
         if (type.Object is not Type typ)

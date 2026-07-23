@@ -8,19 +8,7 @@ public enum LinkerError
 
     UnableReadModule = 401,
 
-    UnableLoadAssembly = 402,
-
-    DuplicateModuleName = 403,
-
-    AssemblyModuleNotFound = 404,
-
-    AssemblyModuleLoadError = 405,
-
-    InvalidAssemblyModule = 406,
-
     ChecksumValidationFailed = 408,
-
-    AssemblyNotFound = 409,
 
     InvalidForeignModule = 410,
 

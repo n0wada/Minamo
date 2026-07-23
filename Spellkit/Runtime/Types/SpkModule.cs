@@ -95,9 +95,7 @@ internal sealed class SpkModuleTypeInfo : SpkTypeInfo
         else if (arg.Unit is Linker.ForeignUnit)
         {
             var type = arg.Unit.GetType();
-            var nam = Attribute.GetCustomAttribute(type,
-                typeof(Linker.SpkUnitAttribute)) is not Linker.SpkUnitAttribute attr ? type.Name : attr.Name;
-            return "foreign." + nam + "," + Path.GetFileNameWithoutExtension(arg.Unit.FileName);
+            return "foreign." + type.Name + "," + Path.GetFileNameWithoutExtension(arg.Unit.FileName);
         }
         else
         {
