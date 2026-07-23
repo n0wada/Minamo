@@ -11,6 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docs", "Docs", "{CF92CF03-8
 	ProjectSection(SolutionItems) = preProject
 		Docs\Language\Overview.md = Docs\Language\Overview.md
 		Docs\Language\Syntax.md = Docs\Language\Syntax.md
+		Docs\Language\Builtins.md = Docs\Language\Builtins.md
 		Docs\Language\Operators.md = Docs\Language\Operators.md
 		Docs\Language\ProgramStructure.md = Docs\Language\ProgramStructure.md
 		Docs\Language\TypesAndTraits.md = Docs\Language\TypesAndTraits.md

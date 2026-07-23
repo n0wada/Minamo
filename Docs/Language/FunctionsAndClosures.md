@@ -40,7 +40,7 @@ func collect(values...) => values
 
 greet()
 greet(name: "Ada")
-collect(1, 2, 3)
+collect(1, 2, 3) // returns (1, 2, 3)
 ```
 
 Type annotations describe intent and are not consistently enforced at compile time or runtime.

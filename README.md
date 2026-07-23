@@ -163,6 +163,7 @@ programs.
 
 - [Language overview](Docs/Language/Overview.md)
 - [Syntax](Docs/Language/Syntax.md)
+- [Built-in types and functions](Docs/Language/Builtins.md)
 - [Operators](Docs/Language/Operators.md)
 - [Program structure](Docs/Language/ProgramStructure.md)
 - [Types and traits](Docs/Language/TypesAndTraits.md)
