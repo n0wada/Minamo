@@ -34,6 +34,8 @@ internal interface ILoweredEmitterTarget
 
     int AddVariable(string name, Location loc, int data, int args);
 
+    void RegisterSelectDefinition(SelectDefinition definition);
+
     void RegisterIndexerDeclaration(LoweredFunctionDeclaration node);
 
     string GetMethodName(string name, LoweredFunctionDeclaration node);
@@ -126,6 +128,12 @@ internal sealed partial class LoweredEmitter
 
     public void Emit(LoweredFunctionDeclaration node, CompilerContext ctx) =>
         EmitFunctionDeclaration(node, ctx);
+
+    public void Emit(LoweredSelectDeclaration node, bool keepResult, CompilerContext ctx) =>
+        EmitSelectDeclaration(node, keepResult, ctx);
+
+    public void Emit(LoweredSelectInvocation node, bool keepResult, CompilerContext ctx) =>
+        EmitSelectInvocation(node, keepResult, ctx);
 
     public void Emit(LoweredNominalDeclaration node, CompilerContext ctx) =>
         EmitNominalDeclaration(node, ctx);
@@ -259,6 +267,12 @@ internal sealed partial class LoweredEmitter
             case LoweredFunctionDeclaration function:
                 EmitFunctionDeclaration(function with { NeedsValue = keepResult }, ctx);
                 break;
+            case LoweredSelectDeclaration select:
+                EmitSelectDeclaration(select, keepResult, ctx);
+                break;
+            case LoweredSelectInvocation selectInvocation:
+                EmitSelectInvocation(selectInvocation, keepResult, ctx);
+                break;
             case LoweredIf @if:
                 EmitIf(@if, keepResult, ctx);
                 break;
@@ -335,6 +349,8 @@ internal sealed partial class LoweredEmitter
             typeof(LoweredExpressionStatement),
             typeof(LoweredFor),
             typeof(LoweredFunctionDeclaration),
+            typeof(LoweredSelectDeclaration),
+            typeof(LoweredSelectInvocation),
             typeof(LoweredIf),
             typeof(LoweredImplDeclaration),
             typeof(LoweredImport),

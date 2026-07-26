@@ -63,6 +63,9 @@ public enum NodeType
     Access,
     
     Function,
+    Select,
+    SelectState,
+    SelectChoice,
     Tuple,
     Array,
     Comprehension,
@@ -94,6 +97,10 @@ public enum NodeType
     CtorPattern,
 
     TryCatch
+
+    ,Goto
+    ,Exit
+    ,SelectInvocation
 }
 
 public interface INamedNode

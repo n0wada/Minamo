@@ -10,6 +10,16 @@ namespace Spellkit.Compiler.Lowering;
 
 internal sealed partial class LoweredEmitter
 {
+    private void EmitSelectInvocation(LoweredSelectInvocation node, bool keepResult, CompilerContext ctx)
+    {
+        var targetName = new LoweredName(node.Location, "__select");
+        var call = new LoweredApplication(
+            node.Location,
+            targetName,
+            [new LoweredLiteral(node.Location, node.Name, LoweredLiteralKind.String)]);
+        EmitApplication(call, keepResult, ctx);
+    }
+
     private void EmitControlTransfer(LoweredControlTransfer node, bool keepResult, CompilerContext ctx)
     {
         switch (node.Kind)

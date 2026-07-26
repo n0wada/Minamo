@@ -167,6 +167,32 @@ public sealed class ReturnSyntax : SyntaxNode
     }
 }
 
+public sealed class GotoSyntax : SyntaxNode
+{
+    public GotoSyntax(Location loc) : base(NodeType.Goto, loc) { }
+
+    public string State { get; set; } = null!;
+
+    internal override void ToString(StringBuilder sb) => sb.Append("goto \"").Append(State).Append('"');
+}
+
+public sealed class ExitSyntax : SyntaxNode
+{
+    public ExitSyntax(Location loc) : base(NodeType.Exit, loc) { }
+
+    public SyntaxNode? Expression { get; set; }
+
+    internal override void ToString(StringBuilder sb)
+    {
+        sb.Append("exit");
+        if (Expression is not null)
+        {
+            sb.Append(' ');
+            Expression.ToString(sb);
+        }
+    }
+}
+
 public sealed class ThrowSyntax : SyntaxNode
 {
     public ThrowSyntax(Location loc) : base(NodeType.Throw, loc) { }
@@ -244,6 +270,15 @@ public sealed class WhileSyntax : SyntaxNode
             Body.ToString(sb);
         }
     }
+}
+
+public sealed class SelectInvocationSyntax : SyntaxNode
+{
+    public SelectInvocationSyntax(Location loc) : base(NodeType.SelectInvocation, loc) { }
+
+    public string Name { get; set; } = string.Empty;
+
+    internal override void ToString(StringBuilder sb) => sb.Append("do ").Append(Name);
 }
 
 public sealed class YieldSyntax : SyntaxNode

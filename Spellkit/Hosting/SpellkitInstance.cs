@@ -227,6 +227,55 @@ public sealed class SpellkitInstance : IDisposable
             SpellkitFailureKind.Input);
     }
 
+    public SpellkitSelectSession OpenSelect(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (runtimeContext is null)
+        {
+            if (program is null)
+            {
+                throw new InvalidOperationException(
+                    "Execute source containing the select before opening a select session.");
+            }
+
+            var initialization = Execute();
+            if (!initialization.Success)
+            {
+                throw new InvalidOperationException(
+                    "The select program could not be initialized.", initialization.Failure?.Exception);
+            }
+        }
+
+        lock (syncRoot)
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            var selectName = SpellkitSelectAliases.Resolve(runtimeContext!, name);
+            var matches = new List<(SelectDefinition Definition, int UnitId)>();
+            for (var unitId = 0; unitId < runtimeContext!.Composition.Units.Length; unitId++)
+            {
+                foreach (var candidate in runtimeContext.Composition.Units[unitId].SelectDefinitions)
+                {
+                    if (string.Equals(candidate.Name, selectName, StringComparison.Ordinal))
+                    {
+                        matches.Add((candidate, unitId));
+                    }
+                }
+            }
+
+            if (matches.Count == 0)
+            {
+                throw new ArgumentException($"No select named '{name}' is available.", nameof(name));
+            }
+            if (matches.Count > 1)
+            {
+                throw new InvalidOperationException($"The select name '{name}' is ambiguous.");
+            }
+
+            var match = matches[0];
+            return new SpellkitSelectSession(this, match.Definition, match.UnitId);
+        }
+    }
+
     public Task<SpellkitExecutionResult> ExecuteFileAsync(
         string fileName,
         CancellationToken cancellationToken = default) =>
@@ -551,6 +600,64 @@ public sealed class SpellkitInstance : IDisposable
         return context;
     }
 
+    internal SpkObject InvokeSelectChoice(int unitId, SelectChoiceDefinition choice, SpkObject[] arguments)
+    {
+        lock (syncRoot)
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            var nested = active;
+            if (!nested)
+            {
+                BeginOperation();
+            }
+            try
+            {
+                var context = CreateExecutionContext(runtimeContext!, control: null);
+                var function = runtimeContext!.Units[unitId][choice.FunctionAddress >> 8] as SpkFunction
+                    ?? throw new InvalidOperationException("The select choice function is unavailable.");
+                var result = function.Call(context, arguments);
+                context.ThrowIf();
+                return result;
+            }
+            finally
+            {
+                if (!nested)
+                {
+                    active = false;
+                }
+            }
+        }
+    }
+
+    internal bool EvaluateSelectGuard(int unitId, int functionAddress)
+    {
+        lock (syncRoot)
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            var nested = active;
+            if (!nested)
+            {
+                BeginOperation();
+            }
+            try
+            {
+                var context = CreateExecutionContext(runtimeContext!, control: null);
+                var function = runtimeContext!.Units[unitId][functionAddress >> 8] as SpkFunction
+                    ?? throw new InvalidOperationException("The select guard function is unavailable.");
+                var result = function.Call(context);
+                context.ThrowIf();
+                return result.IsTrue();
+            }
+            finally
+            {
+                if (!nested)
+                {
+                    active = false;
+                }
+            }
+        }
+    }
+
     private ExecutionContext CreateExecutionContext(
         RuntimeContext context,
         ExecutionControl? control)
@@ -566,6 +673,7 @@ public sealed class SpellkitInstance : IDisposable
         context.SetContextVariable(SpellkitHostEnvironment.ContextKey, Environment);
         context.SetContextVariable(SpellkitHostEnvironment.RootContextKey, Environment.Root);
         context.SetContextVariable(SpellkitEnvironment.ContextKey, SpellkitEnvironment);
+        context.SetContextVariable(SpellkitSelectInvoker.ContextKey, new SpellkitSelectInvoker(this));
 
         if (HostContext is not null)
         {

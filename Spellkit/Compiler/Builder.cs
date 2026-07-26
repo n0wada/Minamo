@@ -217,6 +217,9 @@ internal sealed partial class Builder : ILoweredEmitterTarget
     void ILoweredEmitterTarget.RegisterIndexerDeclaration(LoweredFunctionDeclaration node) =>
         RegisterIndexerDeclaration(node);
 
+    void ILoweredEmitterTarget.RegisterSelectDefinition(SelectDefinition definition) =>
+        unit.SelectDefinitions.Add(definition);
+
     string ILoweredEmitterTarget.GetMethodName(string name, LoweredFunctionDeclaration node) =>
         GetMethodName(name, node);
 

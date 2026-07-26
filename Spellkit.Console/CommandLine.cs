@@ -325,6 +325,9 @@ internal sealed class CommandLineOptions
     [Binding("i", Help = "Enter the REPL after executing files.", Category = General)]
     public bool StayInteractive { get; set; }
 
+    [Binding("do", "-do", Help = "Run a named interactive select after executing files.", Category = General)]
+    public string? SelectName { get; set; }
+
     [Binding("v", "-version", Help = "Display version information and exit.", Category = General)]
     public bool ShowVersion { get; set; }
 

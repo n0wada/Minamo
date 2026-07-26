@@ -48,6 +48,11 @@
     <message id="StaticOnlyMethods">Function "{0}" cannot be declared as static. Only methods can be static.</message>
     <message id="VarArgNoDefaultValue">Default values are not allowed for the argument lists.</message>
     <message id="VarArgOnlyOne">Only one parameter of type argument list is allowed.</message>
+    <message id="SelectRequiresState">A select declaration must contain at least one state.</message>
+    <message id="SelectRequiresOneInitialState">A select declaration must contain exactly one initial state.</message>
+    <message id="SelectDuplicateState">The select state '{0}' is already declared.</message>
+    <message id="SelectDuplicateChoice">The choice '{0}' is already declared in state '{1}'.</message>
+    <message id="SelectOnlyGlobalScope">Select declarations are permitted only at global (module) scope.</message>
     <message id="InvalidDefaultValue">Default parameter value for '{0}' must be of a primitive type (integer, float, character, string or nil).</message>
     <message id="PatternNotSupported">Pattern "{0}" not supported in this context.</message>
     <message id="TypePatternOnlyInIs">Type checks are only supported on the right side of the "is" operator. Bind the value and use a guard instead.</message>

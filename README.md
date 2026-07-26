@@ -58,6 +58,15 @@ Or execute a source file:
 .\bin\spk.exe .\hello.kit
 ```
 
+Start an interactive select declared by the file:
+
+```powershell
+.\bin\spk.exe .\Player.kit --do music.player
+```
+
+Inside the REPL, use `do music.player`. The console displays the currently available choices;
+enter their number or stable choice ID.
+
 Use `--help` or `--version` for command-line information; enter `#help` in the REPL for
 interactive commands.
 
@@ -166,6 +175,7 @@ programs.
 - [Built-in types and functions](Docs/Language/Builtins.md)
 - [Operators](Docs/Language/Operators.md)
 - [Program structure](Docs/Language/ProgramStructure.md)
+- [Interactive selects](Docs/Developers/InteractiveSelect.md)
 - [Types and traits](Docs/Language/TypesAndTraits.md)
 - [Functions and closures](Docs/Language/FunctionsAndClosures.md)
 - [Semantics](Docs/Language/Semantics.md)
@@ -194,9 +204,10 @@ Compatibility documents current target frameworks and the repository validation 
 ### For developers
 
 - [Public API layers](Docs/Developers/PublicApiLayers.md)
+- [Interactive select design](Docs/Developers/InteractiveSelect.md)
 
-This guide distinguishes the application-facing Hosting API from tooling and runtime extension
-surfaces.
+These guides distinguish the application-facing Hosting API from tooling and runtime extension
+surfaces, and record planned language and host integration designs.
 
 ## License
 

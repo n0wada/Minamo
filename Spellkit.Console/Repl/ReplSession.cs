@@ -27,11 +27,11 @@ internal sealed class ReplSession : IDisposable
         var lookup = FileLookup.Create(BuildOptions,
             nofn ? Environment.CurrentDirectory! : Path.GetDirectoryName(options.FileNames![0])!, options.Paths);
         host.UseFileLookup(lookup);
-        session = host.CreateInstance(
-            new SpellkitEnvironment()
+        var spellkitEnvironment = new SpellkitEnvironment()
                 .UseInput(_ => Console.ReadLine())
-                .UseOutput(Console.Write),
-            options.UserArguments);
+                .UseOutput(Console.Write)
+                .UseSelect(RunSelectSession);
+        session = host.CreateInstance(spellkitEnvironment, options.UserArguments);
         CompilationLinker = new SpkIncrementalLinker(lookup, options.UserArguments);
         commands = new ReplCommands(this);
     }
@@ -168,6 +168,102 @@ internal sealed class ReplSession : IDisposable
         return PrintResult(result, measureTime);
     }
 
+    public bool RunSelect(string name)
+    {
+        try
+        {
+            using var select = session.OpenSelect(name);
+            RunSelectSession(select);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ConsoleOutput.Error(ex.Message);
+            return false;
+        }
+    }
+
+    private void RunSelectSession(SpellkitSelectSession select)
+    {
+        while (!select.IsCompleted)
+        {
+            var choices = select.Choices;
+            if (choices.Count == 0)
+            {
+                ConsoleOutput.Output("No choices are currently available.");
+                return;
+            }
+
+            ConsoleOutput.LineFeed();
+            for (var i = 0; i < choices.Count; i++)
+            {
+                var renderedChoice = choices[i];
+                ConsoleOutput.Output($"{i + 1}. {renderedChoice.Label} [{renderedChoice.Id}]");
+                if (!string.IsNullOrEmpty(renderedChoice.Description))
+                {
+                    ConsoleOutput.Output($"   {renderedChoice.Description}");
+                }
+            }
+
+            ConsoleOutput.Prefix("select> ");
+            var input = Console.ReadLine()?.Trim();
+            if (string.IsNullOrEmpty(input))
+            {
+                continue;
+            }
+
+            if (input is "cancel" or "quit")
+            {
+                select.Cancel();
+                return;
+            }
+
+            var separator = input.IndexOf(' ');
+            var choiceName = separator < 0 ? input : input[..separator];
+            var argument = separator < 0 ? null : input[(separator + 1)..].Trim();
+            if (int.TryParse(choiceName, out var number)
+                && number > 0 && number <= choices.Count)
+            {
+                choiceName = choices[number - 1].Id;
+            }
+
+            var choice = choices.FirstOrDefault(candidate => candidate.Id == choiceName);
+            if (choice is null)
+            {
+                ConsoleOutput.Error($"Unknown choice '{choiceName}'.");
+                continue;
+            }
+
+            try
+            {
+                if (choice.ParameterCount == 0)
+                {
+                    if (argument is not null)
+                    {
+                        ConsoleOutput.Error($"Choice '{choice.Id}' does not accept an argument.");
+                        continue;
+                    }
+
+                    select.Choose(choice.Id);
+                }
+                else if (choice.ParameterCount == 1 && argument is not null)
+                {
+                    select.Choose(choice.Id, argument);
+                }
+                else
+                {
+                    ConsoleOutput.Error(
+                        $"Choice '{choice.Id}' requires {choice.ParameterCount} argument(s). "
+                        + "The console supports one string argument: <choice> <value>.");
+                }
+            }
+            catch (Exception ex)
+            {
+                ConsoleOutput.Error(ex.Message);
+            }
+        }
+    }
+
     private bool PrintResult(SpellkitExecutionResult result, bool measureTime)
     {
         if (result.Diagnostics.Count != 0)
@@ -207,6 +303,11 @@ internal sealed class ReplSession : IDisposable
 
     private bool TryRunCommand(string line)
     {
+        if (TryRunSelect(line))
+        {
+            return true;
+        }
+
         if (line.Length < 2 || line[0] != ReplCommands.Prefix[0])
         {
             return false;
@@ -217,6 +318,24 @@ internal sealed class ReplSession : IDisposable
         var command = separator < 0 ? commandLine : commandLine[..separator];
         var argument = separator < 0 ? null : commandLine[(separator + 1)..];
         commands.Dispatch(command, argument);
+        return true;
+    }
+
+    private bool TryRunSelect(string line)
+    {
+        if (!line.StartsWith("do ", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var name = line[3..].Trim();
+        if (name.Length == 0 || name.Any(character =>
+            !char.IsLetterOrDigit(character) && character is not '_' and not '.'))
+        {
+            return false;
+        }
+
+        RunSelect(name);
         return true;
     }
 }

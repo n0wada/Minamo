@@ -51,6 +51,29 @@ internal sealed partial class HandwrittenParser
     private SyntaxNode? ParseDoWhile()
     {
         var keyword = Consume();
+        if (!Check(TokenKind.LeftBrace))
+        {
+            if (!IsIdentifier(Current.Kind))
+            {
+                Report(ParserError.InvalidExpression, Current);
+                return null;
+            }
+
+            var name = Consume().Text;
+            while (Match(TokenKind.Dot))
+            {
+                if (!IsIdentifier(Current.Kind))
+                {
+                    Report(ParserError.InvalidExpression, Current);
+                    return null;
+                }
+
+                name += "." + Consume().Text;
+            }
+
+            return new SelectInvocationSyntax(keyword.Location) { Name = name };
+        }
+
         var body = ParseRequiredBlock();
         if (!Expect(TokenKind.While))
         {

@@ -50,7 +50,8 @@ let many match mut nil not or private return set static throw true try type
 use when while with yield
 ```
 
-`const`, `struct`, `enum`, `trait`, `impl`, `guard`, and `finally` are contextual keywords.
+`const`, `struct`, `enum`, `trait`, `impl`, `guard`, `finally`, `select`, `initial`, `state`,
+`choose`, `goto`, `exit`, `label`, and `description` are contextual keywords.
 
 ## Numeric literals
 
@@ -178,6 +179,72 @@ func collect(values...) => values
 
 The final expression of a block is its value.
 
+## Interactive selects
+
+An interactive select defines a host-driven state machine. It is opened through the Hosting API;
+the host renders its current choices and sends a selected choice back to the session. See
+[Interactive selects](../Developers/InteractiveSelect.md) for the C# protocol.
+
+```text
+select-declaration
+    ::= "select" identifier "{" state-declaration+ "}"
+
+state-declaration
+    ::= [ "initial" ] "state" string "{" choice-declaration* "}"
+
+choice-declaration
+    ::= "choose" string [ "(" identifier { "," identifier } ")" ]
+        [ "label" string ]
+        [ "description" string ]
+        [ "when" expression ]
+        "=>" choice-body
+
+choice-body
+    ::= block | "exit" [ expression ]
+
+goto-statement
+    ::= "goto" string
+
+exit-statement
+    ::= "exit" [ expression ]
+
+select-alias
+    ::= "alias" "(" identifier "," string ")"
+
+select-invocation
+    ::= "do" qualified-name
+```
+
+Select declarations are permitted only at global (module) scope. Exactly one state is marked
+`initial`. `goto` changes the state in which the session next waits; without `goto`, a choice
+remains in its current state. `exit` completes the session. Choice names are unique within a
+state. A choice receives either no argument, one value, or a tuple whose elements bind to its
+parameters. `label` and `description` provide host-facing display text; `when` controls whether a
+choice is currently available. `do qualified-name` invokes a select through the host's configured
+select runner.
+
+```swift
+select player {
+    initial state "stopped" {
+        choose "play" label "Play" when music.HasSelectedTrack() => {
+            music.Play()
+            goto "playing"
+        }
+    }
+
+    state "playing" {
+        choose "stop" => {
+            music.Stop()
+            goto "stopped"
+        }
+
+        choose "exit" => exit "done"
+    }
+}
+
+alias(player, "music.player")
+```
+
 ## Lambdas
 
 ```text
@@ -303,6 +370,7 @@ expressions.
 ```text
 while-loop    ::= "while" expression block
 do-while-loop ::= "do" block "while" expression
+select-invocation ::= "do" qualified-name
 for-loop      ::= "for" pattern "in" expression
                   [ "when" expression ] block [ "else" block ]
 ```

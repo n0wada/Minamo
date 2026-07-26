@@ -576,6 +576,136 @@ internal sealed partial class LoweredEmitter
         }
     }
 
+    private void EmitSelectDeclaration(LoweredSelectDeclaration node, bool keepResult, CompilerContext ctx)
+    {
+        if (!target.IsGlobalScope)
+        {
+            target.AddError(CompilerError.SelectOnlyGlobalScope, node.Location);
+        }
+
+        var selectAddress = target.AddVariable(
+            node.Name,
+            node.Location,
+            VarFlags.Const | VarFlags.Private,
+            args: 0);
+        cw.Push(node.Name);
+        cw.StoreVariable(selectAddress);
+
+        var states = new List<SelectStateDefinition>(node.States.Count);
+        var initialCount = 0;
+
+        for (var i = 0; i < node.States.Count; i++)
+        {
+            var state = node.States[i];
+            if (state.IsInitial)
+            {
+                initialCount++;
+            }
+
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            var choices = new List<SelectChoiceDefinition>(state.Choices.Count);
+            for (var j = 0; j < state.Choices.Count; j++)
+            {
+                var choice = state.Choices[j];
+                if (!names.Add(choice.Name))
+                {
+                    target.AddError(CompilerError.SelectDuplicateChoice, choice.Location, choice.Name, state.Name);
+                }
+
+                var hiddenName = $"$select:{node.Name}:{i}:{j}";
+                int? guardAddress = null;
+                if (choice.Guard is not null)
+                {
+                    var hiddenGuardName = $"$select-guard:{node.Name}:{i}:{j}";
+                    guardAddress = target.AddVariable(
+                        hiddenGuardName,
+                        choice.Location,
+                        VarFlags.Const | VarFlags.Function | VarFlags.Private,
+                        args: 0);
+                    var guard = new LoweredFunctionDeclaration(
+                        choice.Location,
+                        TypeName: null,
+                        TargetTypeName: null,
+                        Name: hiddenGuardName,
+                        IsStatic: false,
+                        IsIndexer: false,
+                        IsConstructor: false,
+                        Getter: false,
+                        Setter: false,
+                        IsIterator: false,
+                        IsImplInitializer: false,
+                        IsPrivate: true,
+                        Parameters: [],
+                        Body: choice.Guard,
+                        NeedsValue: false,
+                        IteratorBody: false,
+                        IsStdCall: !target.NoOptimizations);
+                    EmitFunctionBody(guardAddress.Value, guard, ctx, iteratorBody: false);
+                    cw.StoreVariable(guardAddress.Value);
+                }
+
+                var address = target.AddVariable(
+                    hiddenName,
+                    choice.Location,
+                    VarFlags.Const | VarFlags.Function | VarFlags.Private,
+                    choice.Parameters.Count);
+                var function = new LoweredFunctionDeclaration(
+                    choice.Location,
+                    TypeName: null,
+                    TargetTypeName: null,
+                    Name: hiddenName,
+                    IsStatic: false,
+                    IsIndexer: false,
+                    IsConstructor: false,
+                    Getter: false,
+                    Setter: false,
+                    IsIterator: false,
+                    IsImplInitializer: false,
+                    IsPrivate: true,
+                    Parameters: choice.Parameters,
+                    Body: choice.Body,
+                    NeedsValue: false,
+                    IteratorBody: false,
+                    IsStdCall: !target.NoOptimizations);
+                EmitFunctionBody(address, function, ctx, iteratorBody: false);
+                cw.StoreVariable(address);
+                choices.Add(new(
+                    choice.Name,
+                    choice.Label,
+                    choice.Description,
+                    address,
+                    guardAddress,
+                    choice.Parameters.Count));
+            }
+
+            states.Add(new(state.Name, state.IsInitial, choices));
+        }
+
+        if (node.States.Count == 0)
+        {
+            target.AddError(CompilerError.SelectRequiresState, node.Location);
+        }
+        else if (initialCount != 1)
+        {
+            target.AddError(CompilerError.SelectRequiresOneInitialState, node.Location);
+        }
+
+        var stateNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var state in states)
+        {
+            if (!stateNames.Add(state.Name))
+            {
+                target.AddError(CompilerError.SelectDuplicateState, node.Location, state.Name);
+            }
+        }
+
+        target.RegisterSelectDefinition(new SelectDefinition(node.Name, states));
+        if (keepResult)
+        {
+            cw.LoadNil();
+        }
+    }
+
     private void EmitFunctionBody(int addr, LoweredFunctionDeclaration node, CompilerContext oldctx, bool iteratorBody)
     {
         var args = CompileFunctionParameters(node);

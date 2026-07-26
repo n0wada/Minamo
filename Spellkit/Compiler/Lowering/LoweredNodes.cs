@@ -114,6 +114,30 @@ internal sealed record LoweredFunctionDeclaration(
     }
 }
 
+internal sealed record LoweredSelectDeclaration(
+    Location Location,
+    string Name,
+    IReadOnlyList<LoweredSelectState> States) : LoweredNode(Location);
+
+internal sealed record LoweredSelectInvocation(
+    Location Location,
+    string Name) : LoweredNode(Location);
+
+internal sealed record LoweredSelectState(
+    Location Location,
+    string Name,
+    bool IsInitial,
+    IReadOnlyList<LoweredSelectChoice> Choices);
+
+internal sealed record LoweredSelectChoice(
+    Location Location,
+    string Name,
+    IReadOnlyList<LoweredParameter> Parameters,
+    string Label,
+    string? Description,
+    LoweredNode? Guard,
+    LoweredNode Body);
+
 internal sealed record LoweredParameter(
     Location Location,
     string Name,

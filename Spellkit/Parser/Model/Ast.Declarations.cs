@@ -159,6 +159,107 @@ public sealed class FunctionDeclarationSyntax : SyntaxNode
     }
 }
 
+public sealed class SelectDeclarationSyntax : SyntaxNode
+{
+    public SelectDeclarationSyntax(Location loc) : base(NodeType.Select, loc) { }
+
+    public string Name { get; set; } = null!;
+
+    public List<SelectStateSyntax> States { get; } = new();
+
+    internal override void ToString(StringBuilder sb)
+    {
+        sb.Append("select ");
+        sb.Append(Name);
+        sb.Append(" {");
+        foreach (var state in States)
+        {
+            state.ToString(sb);
+        }
+        sb.Append('}');
+    }
+}
+
+public sealed class SelectStateSyntax : SyntaxNode
+{
+    public SelectStateSyntax(Location loc) : base(NodeType.SelectState, loc) { }
+
+    public string Name { get; set; } = null!;
+
+    public bool IsInitial { get; set; }
+
+    public List<SelectChoiceSyntax> Choices { get; } = new();
+
+    internal override void ToString(StringBuilder sb)
+    {
+        if (IsInitial)
+        {
+            sb.Append("initial ");
+        }
+
+        sb.Append("state \"");
+        sb.Append(Name);
+        sb.Append("\" {");
+        foreach (var choice in Choices)
+        {
+            choice.ToString(sb);
+        }
+        sb.Append('}');
+    }
+}
+
+public sealed class SelectChoiceSyntax : SyntaxNode
+{
+    public SelectChoiceSyntax(Location loc) : base(NodeType.SelectChoice, loc) { }
+
+    public string Name { get; set; } = null!;
+
+    public List<ParameterSyntax> Parameters { get; } = new();
+
+    public string? Label { get; set; }
+
+    public string? Description { get; set; }
+
+    public SyntaxNode? Guard { get; set; }
+
+    public SyntaxNode Body { get; set; } = null!;
+
+    internal override void ToString(StringBuilder sb)
+    {
+        sb.Append("choose \"");
+        sb.Append(Name);
+        sb.Append('"');
+        if (Parameters.Count > 0)
+        {
+            sb.Append('(');
+            Parameters.ToString(sb);
+            sb.Append(')');
+        }
+
+        if (Label is not null)
+        {
+            sb.Append(" label \"");
+            sb.Append(Label);
+            sb.Append('"');
+        }
+
+        if (Description is not null)
+        {
+            sb.Append(" description \"");
+            sb.Append(Description);
+            sb.Append('"');
+        }
+
+        if (Guard is not null)
+        {
+            sb.Append(" when ");
+            Guard.ToString(sb);
+        }
+        sb.Append(" => ");
+        Body.ToString(sb);
+    }
+}
+
 public sealed class ImplDeclarationSyntax : SyntaxNode
 {
     public ImplDeclarationSyntax(Location loc) : base(NodeType.Impl, loc) { }

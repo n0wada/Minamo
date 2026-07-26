@@ -93,6 +93,7 @@ internal sealed partial class HandwrittenParser
             ConstDeclarationSyntax => true,
             TypeDeclarationSyntax => true,
             FunctionDeclarationSyntax { TypeName: null, TargetTypeName: null } => true,
+            SelectDeclarationSyntax => true,
             _ => false
         };
 
@@ -232,6 +233,21 @@ internal sealed partial class HandwrittenParser
         if (Current.Kind is TokenKind.Func or TokenKind.Static)
         {
             return ParseFunctionDeclaration();
+        }
+
+        if (IsContextualKeyword("select"))
+        {
+            return FinishStatement(ParseSelectDeclaration());
+        }
+
+        if (selectDepth > 0 && IsContextualKeyword("goto"))
+        {
+            return FinishStatement(ParseGoto());
+        }
+
+        if (selectDepth > 0 && IsContextualKeyword("exit"))
+        {
+            return FinishStatement(ParseExit());
         }
 
         SyntaxNode? node = Current.Kind switch
@@ -1101,6 +1117,7 @@ internal sealed partial class HandwrittenParser
 
     private static bool IsStatementNode(SyntaxNode node) => node is
         BindingSyntax or ReturnSyntax or YieldSyntax or YieldBreakSyntax or BreakSyntax or ContinueSyntax or ThrowSyntax
+        or GotoSyntax or ExitSyntax or SelectDeclarationSyntax
         or IfSyntax or WhileSyntax or ForSyntax or TryCatchSyntax or MatchSyntax or FunctionDeclarationSyntax
         or TypeDeclarationSyntax or ImplDeclarationSyntax or RegionSyntax or ConstDeclarationSyntax;
 

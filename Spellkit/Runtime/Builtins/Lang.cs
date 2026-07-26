@@ -40,6 +40,18 @@ internal sealed partial class Lang : ForeignUnit
     [SpkStaticMethod("isCallable")]
     public static bool IsCallable(ExecutionContext ctx, SpkObject value) => value.TryGetFunction(ctx, out _);
 
+    [SpkStaticMethod("alias")]
+    public static void Alias(ExecutionContext ctx, string selectName, string name) =>
+        SpellkitSelectAliases.Register(ctx, selectName, name);
+
+    [SpkStaticMethod("__select")]
+    public static SpkObject InvokeSelect(ExecutionContext ctx, string name)
+    {
+        var invoker = ctx.GetContextVariable<SpellkitSelectInvoker>(SpellkitSelectInvoker.ContextKey)
+            ?? throw new InvalidOperationException("Select invocation is unavailable in this execution context.");
+        return invoker.Invoke(name);
+    }
+
     [SpkStaticMethod("print")]
     public static void Print(ExecutionContext ctx, [VarArg]SpkTuple values, [Default(",")]string separator, [Default("\n")]SpkObject terminator)
     {

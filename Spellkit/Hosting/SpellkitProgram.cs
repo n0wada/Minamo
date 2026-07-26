@@ -34,6 +34,7 @@ public sealed class SpellkitEnvironment
     private readonly Dictionary<string, object?> bindings = new(StringComparer.OrdinalIgnoreCase);
     private Func<CancellationToken, string?>? input;
     private Action<string>? output;
+    private Action<SpellkitSelectSession>? selectRunner;
 
     public SpellkitEnvironment(object? hostContext = null) => HostContext = hostContext;
 
@@ -64,6 +65,12 @@ public sealed class SpellkitEnvironment
         return this;
     }
 
+    public SpellkitEnvironment UseSelect(Action<SpellkitSelectSession> run)
+    {
+        selectRunner = run ?? throw new ArgumentNullException(nameof(run));
+        return this;
+    }
+
     public bool TryGet(string name, out object? value) =>
         bindings.TryGetValue(name, out value);
 
@@ -78,6 +85,18 @@ public sealed class SpellkitEnvironment
     {
         var write = output ?? Console.Write;
         write(value);
+    }
+
+    internal void RunSelect(SpellkitSelectSession session)
+    {
+        var run = selectRunner ?? throw new InvalidOperationException(
+            "No select runner is configured for this Spellkit environment.");
+        run(session);
+        if (!session.IsCompleted)
+        {
+            throw new InvalidOperationException(
+                $"The select runner returned before select '{session.Name}' completed or was cancelled.");
+        }
     }
 
     internal bool TryResolve(string name, out SpkObject value)

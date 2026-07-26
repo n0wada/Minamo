@@ -91,6 +91,59 @@ internal sealed class LoweringPass
         };
     }
 
+    public LoweredSelectDeclaration Lower(SelectDeclarationSyntax node, CompilerContext ctx)
+    {
+        var states = new LoweredSelectState[node.States.Count];
+        for (var i = 0; i < node.States.Count; i++)
+        {
+            var state = node.States[i];
+            var choices = new LoweredSelectChoice[state.Choices.Count];
+            for (var j = 0; j < state.Choices.Count; j++)
+            {
+                var choice = state.Choices[j];
+                choices[j] = new(
+                    choice.Location,
+                    choice.Name,
+                    LowerParameters(choice.Parameters),
+                    choice.Label ?? choice.Name,
+                    choice.Description,
+                    choice.Guard is null ? null : LowerNode(choice.Guard, new CompilerContext()),
+                    LowerNode(choice.Body, new CompilerContext()));
+            }
+
+            states[i] = new(state.Location, state.Name, state.IsInitial, choices);
+        }
+
+        return new(node.Location, node.Name, states);
+    }
+
+    public LoweredSelectInvocation Lower(SelectInvocationSyntax node) =>
+        new(node.Location, node.Name);
+
+    public LoweredControlTransfer Lower(GotoSyntax node) =>
+        new(
+            node.Location,
+            new LoweredTuple(
+                node.Location,
+                [
+                    new LoweredLiteral(node.Location, SelectControlSignal.Goto, LoweredLiteralKind.String),
+                    new LoweredLiteral(node.Location, node.State, LoweredLiteralKind.String)
+                ]),
+            LoweredControlTransferKind.Return);
+
+    public LoweredControlTransfer Lower(ExitSyntax node, CompilerContext ctx) =>
+        new(
+            node.Location,
+            new LoweredTuple(
+                node.Location,
+                [
+                    new LoweredLiteral(node.Location, SelectControlSignal.Exit, LoweredLiteralKind.String),
+                    node.Expression is null
+                        ? new LoweredLiteral(node.Location, null, LoweredLiteralKind.Nil)
+                        : LowerNode(node.Expression, ctx)
+                ]),
+            LoweredControlTransferKind.Return);
+
     public LoweredNominalDeclaration Lower(TypeDeclarationSyntax node, bool needsValue)
     {
         var autoMixin = node.Style is TypeDeclarationStyle.Struct or TypeDeclarationStyle.Enum;
@@ -417,6 +470,8 @@ internal sealed class LoweringPass
             NodeType.Float => Lower((FloatLiteralSyntax)node),
             NodeType.For => Lower((ForSyntax)node, ctx),
             NodeType.Function => Lower((FunctionDeclarationSyntax)node, ctx, needsValue, iteratorBody: false),
+            NodeType.Select => Lower((SelectDeclarationSyntax)node, ctx),
+            NodeType.SelectInvocation => Lower((SelectInvocationSyntax)node),
             NodeType.If => Lower((IfSyntax)node, ctx),
             NodeType.Impl => Lower((ImplDeclarationSyntax)node, needsValue),
             NodeType.Index => Lower((IndexerSyntax)node, ctx),
@@ -428,6 +483,8 @@ internal sealed class LoweringPass
             NodeType.Range => Lower((RangeSyntax)node, ctx),
             NodeType.Rebinding => Lower((RebindingSyntax)node, ctx),
             NodeType.Return => Lower((ReturnSyntax)node, ctx),
+            NodeType.Goto => Lower((GotoSyntax)node),
+            NodeType.Exit => Lower((ExitSyntax)node, ctx),
             NodeType.String => Lower((StringLiteralSyntax)node),
             NodeType.Throw => Lower((ThrowSyntax)node, ctx),
             NodeType.TryCatch => Lower((TryCatchSyntax)node, ctx),

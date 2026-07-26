@@ -46,4 +46,13 @@ public sealed class CommandLineTests
         Assert.Contains("-h, --help", help);
         Assert.Contains("-v, --version", help);
     }
+
+    [Fact]
+    public void RecognizesSelectStartupOption()
+    {
+        var options = CommandLine.Read(new[] { "Player.kit", "--do", "music.player" });
+
+        Assert.Equal("music.player", options.SelectName);
+        Assert.Equal(new[] { "Player.kit" }, options.FileNames);
+    }
 }
