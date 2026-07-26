@@ -181,8 +181,9 @@ The final expression of a block is its value.
 
 ## Interactive selects
 
-An interactive select defines a host-driven state machine. It is opened through the Hosting API;
-the host renders its current choices and sends a selected choice back to the session. See
+An interactive select defines a host-driven state machine. A host normally opens it through
+`SpellkitInstance.OpenSelect`; Script may also invoke it with `do qualified-name`. The host renders
+current choices and sends a selected choice back to the session. See
 [Interactive selects](../Developers/InteractiveSelect.md) for the C# protocol.
 
 ```text

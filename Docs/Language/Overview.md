@@ -394,3 +394,4 @@ telemetry, and C# integration.
 - [Hosting API](../Hosting/Guide.md)
 - [Compatibility](../Operations/Compatibility.md)
 - [Runnable Station Console example](../../Examples/StationConsole/README.md)
+- [Interactive Quest Console example](../../Examples/QuestConsole/README.md)

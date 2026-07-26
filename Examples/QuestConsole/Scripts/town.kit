@@ -1,0 +1,50 @@
+import game
+
+select town {
+    initial state "square" {
+        choose "guard"
+            label "Talk to the guard"
+            description "Ask about work near the old bridge" => {
+            goto "guard"
+        }
+
+        choose "board"
+            label "Check the quest board"
+            description "Review the work currently available" => {
+            game.ShowBoard()
+        }
+
+        choose "active-quest"
+            label "Review your active quest"
+            description "Confirm the courier assignment"
+            when game.HasCourierQuest() => {
+            game.ShowBoard()
+        }
+
+        choose "leave" label "Leave the town square" => exit
+    }
+
+    state "guard" {
+        choose "ask"
+            label "Ask about the missing courier"
+            description "Learn why the guard needs help"
+            when !game.CanAcceptCourierQuest() => {
+            game.HearAboutCourier()
+        }
+
+        choose "accept"
+            label "Accept the courier quest"
+            description "Add the search to your active quests"
+            when game.CanAcceptCourierQuest() => {
+            game.AcceptCourierQuest()
+            goto "square"
+        }
+
+        choose "back"
+            label "Return to the town square" => {
+            goto "square"
+        }
+    }
+}
+
+alias(town, "game.town")

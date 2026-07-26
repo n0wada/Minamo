@@ -51,6 +51,16 @@
     assert("[\"x\": 12, \"b\": 'c', \"foo\": \"bar\"]", xs.ToString())
 #endregion
 
+#region "Insertion order"
+    mut map = Dictionary()
+    map.Add("first", 1)
+    map.Add("second", 2)
+    map.Add("third", 3)
+    map.Remove("second")
+    map.Add("fourth", 4)
+    assert("[\"first\": 1, \"third\": 3, \"fourth\": 4]", map.ToString())
+#endregion
+
 #region "Methods: Add"
     mut map = Dictionary()
     map.Add("x", 1)

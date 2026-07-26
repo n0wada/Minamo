@@ -7,7 +7,7 @@ namespace Spellkit.Runtime.Types;
 
 public class SpkDictionary : SpkEnumerable
 {
-    internal readonly Dictionary<SpkObject, SpkObject> Dictionary;
+    internal readonly OrderedDictionary<SpkObject, SpkObject> Dictionary;
 
     public override string TypeName => nameof(Spk.Dictionary);
 
@@ -21,12 +21,16 @@ public class SpkDictionary : SpkEnumerable
 
     internal SpkDictionary() : base(Spk.Dictionary)
     {
-        Dictionary = new Dictionary<SpkObject, SpkObject>();
+        Dictionary = new OrderedDictionary<SpkObject, SpkObject>();
     }
 
-    internal SpkDictionary(Dictionary<SpkObject, SpkObject> dict) : base(Spk.Dictionary)
+    internal SpkDictionary(IEnumerable<KeyValuePair<SpkObject, SpkObject>> values) : base(Spk.Dictionary)
     {
-        Dictionary = dict;
+        Dictionary = new OrderedDictionary<SpkObject, SpkObject>();
+        foreach (var (key, value) in values)
+        {
+            Dictionary.Add(key, value);
+        }
     }
 
     public void Add(SpkObject key, SpkObject value)
@@ -72,7 +76,18 @@ public class SpkDictionary : SpkEnumerable
 
     public bool ContainsKey(SpkObject key) => Dictionary.ContainsKey(key);
 
-    public bool ContainsValue(SpkObject value) => Dictionary.ContainsValue(value);
+    public bool ContainsValue(SpkObject value)
+    {
+        foreach (var candidate in Dictionary.Values)
+        {
+            if (candidate.Equals(value))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public void Clear()
     {

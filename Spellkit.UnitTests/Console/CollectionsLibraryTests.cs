@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Spellkit.UnitTesting.Cli;
 
-public sealed class CollectionsAndDesktopLibraryTests
+public sealed class CollectionsLibraryTests
 {
     [Fact]
     public void SortedDictionaryKeepsKeysOrdered()
@@ -61,33 +61,5 @@ public sealed class CollectionsAndDesktopLibraryTests
 
         Assert.True(result.Success, result.Failure?.Message);
         Assert.Equal("b:2;c:3;|1|99", result.GetValue<string>());
-    }
-
-    [Fact]
-    public void DesktopCommandsAreRegistered()
-    {
-        var source = """
-            import desktop
-
-            host.Commands.Describe("desktop.Open").Name
-                + "|"
-                + host.Commands.Describe("desktop.Clipboard.GetText").Name
-                + "|"
-                + host.Commands.Describe("desktop.Dialog.Confirm").Name
-                + "|"
-                + host.Commands.Describe("desktop.Dialog.OpenFile").Name
-                + "|"
-                + host.Commands.Describe("desktop.Dialog.SaveFile").Name
-                + "|"
-                + host.Commands.Describe("desktop.Dialog.SelectFolder").Name
-                + "|"
-                + host.Commands.Describe("desktop.Notify").Name
-            """;
-
-        using var instance = new SpellkitHost().AddStandardLibrary().CreateInstance();
-        var result = instance.Execute(source);
-
-        Assert.True(result.Success, result.Failure?.Message);
-        Assert.Equal("desktop.Open|desktop.Clipboard.GetText|desktop.Dialog.Confirm|desktop.Dialog.OpenFile|desktop.Dialog.SaveFile|desktop.Dialog.SelectFolder|desktop.Notify", result.GetValue<string>());
     }
 }

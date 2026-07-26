@@ -1023,7 +1023,6 @@ The optional library modules can be enabled explicitly with their generated exte
 ```csharp
 host.AddBinaryModule()
     .AddCollectionsModule()
-    .AddDesktopModule()
     .AddHttpModule()
     .AddTextModule()
     .AddTimeModule()
@@ -1070,29 +1069,3 @@ scores.Add("ada", 98)
 
 print(scores.First().key) // ada
 ```
-
-The `desktop` module exposes light desktop integration for console scripts:
-
-```kit
-import desktop
-
-desktop.Open("https://example.test")
-desktop.Clipboard.SetText("copied from Spellkit")
-
-if desktop.Dialog.Confirm("Continue?") {
-    print("confirmed")
-}
-
-let source = desktop.Dialog.OpenFile(
-    title: "Import data",
-    filter: "CSV files|*.csv|All files|*.*")
-let destination = desktop.Dialog.SaveFile(defaultName: "report.csv")
-let folder = desktop.Dialog.SelectFolder(title: "Choose an output folder")
-
-desktop.Notify("Spellkit", "Export completed")
-```
-
-`OpenFile`, `SaveFile`, and `SelectFolder` return a path, or `nil` when the user cancels. Their
-optional arguments default to `nil`; `filter` accepts the conventional Windows filter string
-(`"CSV files|*.csv|All files|*.*"`) or a plain pattern such as `"*.csv"`. Clipboard, dialog,
-and notification commands are Windows-only. `Open` uses the operating system shell.

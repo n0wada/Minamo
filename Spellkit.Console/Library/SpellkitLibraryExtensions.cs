@@ -2,7 +2,6 @@ using Spellkit.Hosting;
 using Spellkit.Library.Binary;
 using Spellkit.Library.Collections;
 using Spellkit.Library.ConsoleLibrary;
-using Spellkit.Library.Desktop;
 using Spellkit.Library.Http;
 using Spellkit.Library.IO;
 using Spellkit.Library.Mathematics;
@@ -21,7 +20,6 @@ internal static class SpellkitLibraryExtensions
             .AddBinaryModule()
             .AddCollectionsModule()
             .AddConsoleModule()
-            .AddDesktopModule()
             .AddHttpModule()
             .AddMathModule()
             .AddTextModule()

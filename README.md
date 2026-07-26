@@ -133,6 +133,13 @@ the application, tooling, and runtime-extension surfaces.
   dotnet run --project .\Examples\OrderWorkflow\OrderWorkflow.csproj
   ```
 
+- [Quest Console](Examples/QuestConsole/README.md) is a game-style interactive select where C#
+  owns quest data and Spellkit owns dialogue states and choices:
+
+  ```powershell
+  dotnet run --project .\Examples\QuestConsole\QuestConsole.csproj
+  ```
+
 ## Repository layout
 
 | Path | Purpose |

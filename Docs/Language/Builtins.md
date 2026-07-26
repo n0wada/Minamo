@@ -24,9 +24,10 @@ The core runtime includes these commonly used values and types:
 | `Result` | A successful value (`Ok`) or an error value (`Err`) |
 | `Exception` | A tagged error value that can be thrown and caught |
 
-Collections support indexing, iteration, and type-specific methods. The [Syntax](Syntax.md) guide
-introduces collection literals, and [Functions and closures](FunctionsAndClosures.md) covers
-iterators.
+Collections support indexing, iteration, and type-specific methods. `Dictionary` preserves the
+insertion order of its entries, including when it is iterated, formatted, or converted to a tuple.
+The [Syntax](Syntax.md) guide introduces collection literals, and [Functions and closures](FunctionsAndClosures.md)
+covers iterators.
 
 ## Common type operations
 
@@ -171,7 +172,6 @@ print(sqrt(81))
 | `binary` | Byte arrays and binary data helpers. |
 | `collections` | `SortedDictionary` and collection-oriented types. |
 | `console` | `readLine()` and console-oriented helpers. |
-| `desktop` | Clipboard, dialogs, notifications, and desktop integration. |
 | `http` | HTTP requests, responses, and sessions. |
 | `io` | `File`, `Path`, `Directory`, and `Drive` operations. |
 | `math` | `sqrt`, `pow`, `min`, `max`, `abs`, `round`, and `sign`. |
@@ -187,9 +187,8 @@ import * from console
 print(readLine(), terminator: nil)
 ```
 
-The `io`, `http`, and `desktop` modules can access external resources or platform services. Hosts
-that need a restricted scripting surface should omit them, or expose narrower host commands and
-capabilities instead.
+The `io` and `http` modules can access external resources. Hosts that need a restricted scripting
+surface should omit them, or expose narrower host commands and capabilities instead.
 
 ## Next steps
 

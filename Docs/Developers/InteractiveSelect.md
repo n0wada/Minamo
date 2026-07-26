@@ -4,8 +4,9 @@
 > waiting, state entry and exit hooks, and save/load remain deferred.
 
 `select` defines a long-lived, host-driven interaction. It is intended for game consoles,
-dialogue, shops, quests, and similar flows where the host owns the user interface while the script
-owns the available actions and state transitions.
+dialogue, shops, quests, and similar flows where the host owns the user interface while the Script
+owns the available actions and state transitions. The usual entry point is C#:
+`instance.OpenSelect("name")`.
 
 Unlike an ordinary function, a select session does not run to completion for every host call. It
 starts once, stops while it waits for input, and resumes in the state reached by the previous
@@ -130,22 +131,26 @@ hidden by guards remains active, because a later query may make choices availabl
 
 ## Hosting protocol
 
-The host renders choices and obtains input. The script never reads from a console or owns a UI.
-The session API should therefore expose the current choices and accept the selected choice with
-one optional argument.
+The host renders choices and obtains input. Script never reads from a console or owns a UI. The
+host first initializes the Script file, then opens the select by its declared name or alias.
 
 ```csharp
-using var player = instance.OpenSelect("music.player");
+var initialization = instance.ExecuteFile("Scripts/town.kit");
+if (!initialization.Success)
+    throw new InvalidOperationException(initialization.Failure?.Message);
 
-foreach (var choice in player.Choices)
-{
-    console.AddChoice(choice);
-}
+using var town = instance.OpenSelect("game.town");
 
-player.Choose("play");
-player.Choose("set-volume", 80);
-player.Choose("move", (12, 34));
+ui.Show(town.Choices);
+
+var result = town.Choose("guard");
+ui.Show(result.Choices);
 ```
+
+There is no required polling loop in the Hosting API. A desktop or game UI normally calls
+`Choose` from its selection event, then redraws from `SpellkitSelectResult.Choices`. The
+[Quest Console example](../../Examples/QuestConsole/README.md) contains a deliberately simple
+terminal adapter; its loop is console UI code, not a requirement of the select protocol.
 
 The Hosting API is:
 
@@ -186,15 +191,18 @@ one that failed. Calling `Choose` with an identifier absent from `Choices`, with
 argument, or after completion must report a defined error. Concurrent calls to one session are
 not supported.
 
-Host events use the same protocol as user input. For example, when a song ends, C# can call
-`player.Choose("track-ended")`. This keeps user actions and game events inside the same script
-state machine.
+Host events use the same protocol as user input. For example, a game can call
+`town.Choose("day-ended")`. This keeps user actions and game events inside the same Script state
+machine.
 
-## Invoking a select
+## Invoking a select from Script
 
-`do qualified.name` invokes a select from Script. It is a statement, not a function call. The
-host runs the select through its configured select runner, and Script resumes after the runner
-completes or cancels the session.
+`do qualified.name` invokes a select from Script. It is a statement, not a function call. This is
+useful when Script owns the entry point as well as the flow. The host runs the select through a
+configured select runner, and Script resumes after the runner completes or cancels the session.
+
+For applications whose UI opens a menu, dialogue, or console directly, prefer the C# entry point
+shown above. It keeps UI ownership explicit and does not require `UseSelect`.
 
 ```kit
 setupPlayer()
@@ -210,7 +218,7 @@ do {
 } while running
 ```
 
-An embedding host configures the runner when it wants Script to invoke selects. The runner owns
+An embedding host configures a runner only when it wants Script to invoke selects. The runner owns
 the UI and must complete or cancel the supplied session before it returns.
 
 ```csharp
@@ -225,9 +233,6 @@ var environment = new SpellkitEnvironment()
     });
 ```
 
-Hosts that start a select themselves can continue to call `instance.OpenSelect("music.player")`
-directly. This is useful when a host UI, rather than a Script statement, owns the entry point.
-
 The `spk` console supplies its own runner. It supports both direct startup and a REPL entry:
 
 ```text
@@ -239,30 +244,24 @@ kit> do music.player
 The console shows labels and descriptions, accepts either a displayed number or a choice ID, and
 accepts one string argument as `choice-id value`. `cancel` and `quit` cancel the active session.
 
-## Music selection boundary
+## Host data boundary
 
-Song libraries, track pickers, playback queues, and the active track belong to the C# host. A
-select script controls operations such as play, pause, and stop; it does not need to enumerate
-tracks or read input.
+The C# host owns game facts such as inventory, active quests, or the selected track. A select
+script controls the available actions and transitions; it does not enumerate host UI data or read
+input. A `when` guard asks the host whether a choice is currently available.
 
-```csharp
-var selected = trackPicker.Show(musicLibrary.GetTracks());
-if (selected is not null)
-{
-    musicPlayer.SetTrack(selected.Id);
+```kit
+choose "accept"
+    label "Accept the courier quest"
+    when game.CanAcceptCourierQuest() => {
+    game.AcceptCourierQuest()
+    goto "square"
 }
-
-player.Choose("play");
 ```
-
-The script's `music.Play()` command then uses the track selected by the host. Passing a track ID
-through `Choose("play", trackId)` remains available when a script genuinely needs that value, but
-is not required for the normal picker workflow.
 
 ## External names
 
-The script name (`player` in the examples) is not necessarily the name exposed to C#. The planned
-configuration function is:
+The Script name (`player` in the examples) is not necessarily the name exposed to C#. Use:
 
 ```kit
 alias(player, "music.player")
