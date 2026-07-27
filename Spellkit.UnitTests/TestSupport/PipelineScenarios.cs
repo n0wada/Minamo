@@ -45,6 +45,38 @@ internal static class PipelineScenarios
         Assert(iterator.MoveNext(), "set iterator starts");
         Assert(!set.Add(SpkInteger.One), "duplicate set item is not added");
         Assert(iterator.MoveNext(), "duplicate set add does not invalidate iterator");
+
+        var ordered = new SpkSet(SpkInteger.One, SpkInteger.Two, SpkInteger.Three);
+        ordered.Remove(SpkInteger.Two);
+        ordered.Add(SpkInteger.Two);
+        Assert(
+            ordered.ToArray(null!).ToArray().SequenceEqual(
+                new SpkObject[] { SpkInteger.One, SpkInteger.Three, SpkInteger.Two }),
+            "set removal and re-addition appends to the iteration order");
+        Assert(
+            ordered.GetHashCode() == new SpkSet(
+                SpkInteger.Two, SpkInteger.One, SpkInteger.Three).GetHashCode(),
+            "equal sets have the same hash code regardless of insertion order");
+
+        var tuple = SpkTuple.Create(
+            new("first", SpkInteger.One),
+            new("second", SpkInteger.Two));
+        Assert(
+            tuple.ToSpkDictionary().Select(item => ((SpkTuple)item)[0].ToString())
+                .SequenceEqual(new[] { "first", "second" }),
+            "tuple dictionary conversion preserves label order");
+
+        var clrDictionary = new Dictionary<string, int>
+        {
+            ["first"] = 1,
+            ["second"] = 2
+        };
+        var convertedDictionary = (SpkDictionary)TypeConverter.ConvertFrom(clrDictionary);
+        Assert(
+            convertedDictionary.Select(item => ((SpkTuple)item)[0].ToString())
+                .SequenceEqual(new[] { "first", "second" }),
+            "CLR dictionary conversion preserves source enumeration order");
+
         Assert(
             !TypeConverter.TryConvert(new SpkInteger(4_294_967_296), typeof(int), out _),
             "generic conversion rejects integer overflow");

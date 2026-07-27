@@ -7,19 +7,27 @@ namespace Spellkit.Runtime.Types;
 
 public class SpkSet : SpkEnumerable
 {
-    internal readonly HashSet<SpkObject> Set;
+    // An ordered map gives the set stable, insertion-ordered enumeration while
+    // retaining constant-time membership checks.
+    internal readonly OrderedDictionary<SpkObject, byte> Set;
 
     public override string TypeName => nameof(Spk.Set);
     
     public SpkSet() : base(Spk.Set) => Set = new();
 
-    public SpkSet(params SpkObject[] args) : base(Spk.Set) => Set = new(args);
+    public SpkSet(params SpkObject[] args) : this((IEnumerable<SpkObject>)args) { }
 
-    internal SpkSet(HashSet<SpkObject> set) : base(Spk.Set) => Set = set;
+    public SpkSet(IEnumerable<SpkObject> values) : this()
+    {
+        foreach (var value in values)
+        {
+            Set.TryAdd(value, default);
+        }
+    }
     
     public override IEnumerator<SpkObject> GetEnumerator() => new SpkSetEnumerator(this);
 
-    public override object ToObject() => Set;
+    public override object ToObject() => new HashSet<SpkObject>(Set.Keys);
 
     public override int Count => Set.Count;
 
@@ -32,12 +40,12 @@ public class SpkSet : SpkEnumerable
             return false;
         }
 
-        return Set.SetEquals(seq);
+        return SetEquals(seq);
     }
 
     public bool Add(SpkObject value)
     {
-        var added = Set.Add(value);
+        var added = Set.TryAdd(value, default);
         if (added)
         {
             Version++;
@@ -57,7 +65,7 @@ public class SpkSet : SpkEnumerable
         return removed;
     }
 
-    public bool Contains(SpkObject value) => Set.Contains(value);
+    public bool Contains(SpkObject value) => Set.ContainsKey(value);
 
     public void Clear()
     {
@@ -75,7 +83,7 @@ public class SpkSet : SpkEnumerable
         var arr = new SpkObject[Set.Count];
         var count = 0;
         
-        foreach (var v in Set)
+        foreach (var v in Set.Keys)
         {
             arr[count++] = v;
         }
@@ -96,9 +104,20 @@ public class SpkSet : SpkEnumerable
             return;
         }
 
-        var count = Set.Count;
-        Set.IntersectWith(seq);
-        if (Set.Count != count)
+        var values = new HashSet<SpkObject>(seq);
+        var removed = false;
+        foreach (var value in Set.Keys.ToArray())
+        {
+            if (values.Contains(value))
+            {
+                continue;
+            }
+
+            Set.Remove(value);
+            removed = true;
+        }
+
+        if (removed)
         {
             Version++;
         }
@@ -113,9 +132,18 @@ public class SpkSet : SpkEnumerable
             return;
         }
 
-        var count = Set.Count;
-        Set.UnionWith(seq);
-        if (Set.Count != count)
+        var added = false;
+        foreach (var value in seq)
+        {
+            if (!Set.TryAdd(value, default))
+            {
+                continue;
+            }
+
+            added = true;
+        }
+
+        if (added)
         {
             Version++;
         }
@@ -130,9 +158,20 @@ public class SpkSet : SpkEnumerable
             return;
         }
 
-        var count = Set.Count;
-        Set.ExceptWith(seq);
-        if (Set.Count != count)
+        var values = new HashSet<SpkObject>(seq);
+        var removed = false;
+        foreach (var value in Set.Keys.ToArray())
+        {
+            if (!values.Contains(value))
+            {
+                continue;
+            }
+
+            Set.Remove(value);
+            removed = true;
+        }
+
+        if (removed)
         {
             Version++;
         }
@@ -147,7 +186,15 @@ public class SpkSet : SpkEnumerable
             return false;
         }
 
-        return Set.Overlaps(seq);
+        foreach (var value in seq)
+        {
+            if (Set.ContainsKey(value))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public bool IsSubsetOf(ExecutionContext ctx, SpkObject other)
@@ -159,7 +206,8 @@ public class SpkSet : SpkEnumerable
             return false;
         }
 
-        return Set.IsSubsetOf(seq);
+        var values = new HashSet<SpkObject>(seq);
+        return Set.Keys.All(values.Contains);
     }
 
     public bool IsSupersetOf(ExecutionContext ctx, SpkObject other)
@@ -171,21 +219,23 @@ public class SpkSet : SpkEnumerable
             return false;
         }
 
-        return Set.IsSupersetOf(seq);
+        return new HashSet<SpkObject>(Set.Keys).IsSupersetOf(seq);
     }
 
     public override int GetHashCode()
     {
         unchecked
         {
-            var hash = 17;
-
-            foreach (var v in Set)
+            var sum = 0;
+            var xor = 0;
+            foreach (var v in Set.Keys)
             {
-                hash = hash * 31 + v.GetHashCode();
+                var valueHash = v.GetHashCode();
+                sum += valueHash;
+                xor ^= valueHash;
             }
 
-            return hash;
+            return HashCode.Combine(TypeId, Set.Count, sum, xor);
         }
     }
 
@@ -196,8 +246,11 @@ public class SpkSet : SpkEnumerable
             return false;
         }
 
-        return Set.SetEquals(seq);
+        return SetEquals(seq);
     }
+
+    private bool SetEquals(IEnumerable<SpkObject> values) =>
+        new HashSet<SpkObject>(Set.Keys).SetEquals(values);
 }
 
 [SpkType]
@@ -301,7 +354,7 @@ internal sealed class SpkSetEnumerator : IEnumerator<SpkObject>
     {
         this.obj = obj;
         version = obj.Version;
-        enumerator = obj.Set.GetEnumerator();
+        enumerator = obj.Set.Keys.GetEnumerator();
     }
 
     public SpkObject Current => enumerator.Current;

@@ -36,6 +36,16 @@
     assert([6], xs.ToArray())
 #endregion
 
+#region "Insertion order after removal and union"
+    let xs = Set(1, 2, 3)
+    xs.Remove(2)
+    xs.Add(2)
+    assert([1,3,2], xs.ToArray())
+
+    xs.UnionWith([3,4,2,5])
+    assert([1,3,2,4,5], xs.ToArray())
+#endregion
+
 #region "Methods: Add, Clear, Contains"
     let xs = Set()
     xs.Add(5)

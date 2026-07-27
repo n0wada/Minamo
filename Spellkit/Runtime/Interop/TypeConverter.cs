@@ -62,14 +62,14 @@ public static class TypeConverter
                     var genericArguments = dictionaryType?.GetGenericArguments();
                     var keyType = genericArguments?[0] ?? typeof(object);
                     var valueType = genericArguments?[1] ?? typeof(object);
-                    var dict = new Dictionary<SpkObject, SpkObject>();
+                    var dict = new SpkDictionary();
                     foreach (DictionaryEntry kv in map)
                     {
-                        dict[ConvertNested(kv.Key, keyType, runtimeInterop)] =
+                        dict.Dictionary[ConvertNested(kv.Key, keyType, runtimeInterop)] =
                             ConvertNested(kv.Value, valueType, runtimeInterop);
                     }
 
-                    return new SpkDictionary(dict);
+                    return dict;
                 }
                 else if (type.IsArray)
                 {

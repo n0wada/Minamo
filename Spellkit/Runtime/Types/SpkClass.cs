@@ -113,7 +113,7 @@ internal sealed class SpkClassInfo : SpkTypeInfo
     protected override SpkObject CastOp(ExecutionContext ctx, SpkObject self, SpkTypeInfo targetType) =>
         targetType.ReflectedTypeId switch
         {
-            Spk.Dictionary => new SpkDictionary(((SpkClass)self).Fields.ConvertToDictionary()),
+            Spk.Dictionary => ((SpkClass)self).Fields.ToSpkDictionary(),
             Spk.Tuple => ((SpkClass)self).Fields,
             Spk.Array => new SpkArray(((SpkClass)self).Fields.ToArray()),
             _ => base.CastOp(ctx, self, targetType)

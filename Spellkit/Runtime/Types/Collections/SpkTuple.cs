@@ -112,6 +112,20 @@ public class SpkTuple : SpkCollection
         return dict;
     }
 
+    internal SpkDictionary ToSpkDictionary()
+    {
+        var dictionary = new SpkDictionary();
+
+        for (var i = 0; i < Count; i++)
+        {
+            var keyInfo = GetKeyInfo(i);
+            var key = new SpkString(keyInfo is null ? DefaultKey() : keyInfo.Label);
+            dictionary.Dictionary[key] = this[i];
+        }
+
+        return dictionary;
+    }
+
     internal bool TryGetItem(string name, out SpkObject item)
     {
         item = null!;
@@ -704,7 +718,7 @@ internal sealed partial class SpkTupleTypeInfo : SpkCollTypeInfo
 
     [SpkMethod(BuiltinMethodNames.ToDictionary)]
     internal static SpkObject ToDictionary(SpkTuple self) =>
-        new SpkDictionary(self.ConvertToDictionary());
+        self.ToSpkDictionary();
 
     [SpkMethod(BuiltinMethodNames.ToArray)]
     internal static SpkObject[] ToArray(SpkCollection self) => self.ToArray();

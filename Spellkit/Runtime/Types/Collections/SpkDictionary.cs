@@ -305,11 +305,11 @@ internal sealed partial class SpkDictionaryTypeInfo : SpkTypeInfo
 
             if (el is SpkTuple t)
             {
-                return new SpkDictionary(t.ConvertToDictionary());
+                return t.ToSpkDictionary();
             }
         }
 
-        return new SpkDictionary(values.ConvertToDictionary());
+        return values.ToSpkDictionary();
     }
 
     [SpkStaticMethod(BuiltinMethodNames.FromTuple)]
