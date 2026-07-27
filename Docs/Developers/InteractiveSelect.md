@@ -1,7 +1,7 @@
 # Interactive selects
 
-> Status: implemented initial feature. Dynamic choice generation, nested selects, asynchronous
-> waiting, state entry and exit hooks, and save/load remain deferred.
+> Status: implemented initial feature. Dynamic choice generation, state entry and exit hooks, and
+> save/load remain deferred.
 
 `select` defines a long-lived, host-driven interaction. It is intended for game consoles,
 dialogue, shops, quests, and similar flows where the host owns the user interface while the Script
@@ -246,6 +246,17 @@ run.Choose("play");
 the next choices or resumes the VM after `exit`. A suspended run owns the instance until it
 completes or is disposed.
 
+A choice may invoke another select with `do`. The inner select is presented while it is active;
+when it exits, the choice resumes at the following statement and can continue its outer state
+transition.
+
+```kit
+choose "shop" => {
+    do town.shop
+    goto "square"
+}
+```
+
 The legacy synchronous adapter is still available:
 
 ```csharp
@@ -306,8 +317,8 @@ and duplicate aliases are rejected.
 
 ## Deferred features
 
-The first implementation intentionally excludes dynamic choice generation, nested selects,
-automatic asynchronous waiting, state entry and exit hooks, and save/load of suspended sessions.
+The first implementation intentionally excludes dynamic choice generation, automatic asynchronous
+waiting, state entry and exit hooks, and save/load of suspended sessions.
 Those features require additional rules for suspension, errors, cleanup, and serialization.
 
 The design should nevertheless preserve the host boundary: UI and external input remain in C#,

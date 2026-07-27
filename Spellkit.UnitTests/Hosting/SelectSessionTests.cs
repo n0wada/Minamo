@@ -204,6 +204,43 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
+    public void NestedDoResumesTheOuterChoiceAfterInnerExit()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            select shop {
+                initial state "open" {
+                    choose "leave" => exit
+                }
+            }
+
+            select town {
+                initial state "square" {
+                    choose "shop" => {
+                        do shop
+                        goto "square"
+                    }
+
+                    choose "exit" => exit
+                }
+            }
+
+            do town
+            """);
+
+        Assert.Equal(new[] { "shop", "exit" }, run.Choices.Select(choice => choice.Id));
+
+        var inShop = run.Choose("shop");
+        Assert.Equal(new[] { "leave" }, inShop.Choices.Select(choice => choice.Id));
+
+        var backInTown = run.Choose("leave");
+        Assert.Equal(new[] { "shop", "exit" }, backInTown.Choices.Select(choice => choice.Id));
+
+        Assert.True(run.Choose("exit").IsCompleted);
+        Assert.True(run.IsCompleted);
+    }
+
+    [Fact]
     public void DoWhileRemainsDistinctFromSelectInvocation()
     {
         using var instance = new SpellkitHost().CreateInstance();

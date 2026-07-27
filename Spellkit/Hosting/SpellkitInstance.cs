@@ -731,7 +731,7 @@ public sealed class SpellkitInstance : IDisposable
         }
     }
 
-    internal SpkObject InvokeSelectChoice(int unitId, SelectChoiceDefinition choice, SpkObject[] arguments)
+    internal ExecutionResult InvokeSelectChoice(int unitId, SelectChoiceDefinition choice, SpkObject[] arguments)
     {
         lock (syncRoot)
         {
@@ -744,11 +744,9 @@ public sealed class SpellkitInstance : IDisposable
             try
             {
                 var context = CreateExecutionContext(runtimeContext!, control: null);
-                var function = runtimeContext!.Units[unitId][choice.FunctionAddress >> 8] as SpkFunction
+                var function = runtimeContext!.Units[unitId][choice.FunctionAddress >> 8] as SpkNativeFunction
                     ?? throw new InvalidOperationException("The select choice function is unavailable.");
-                var result = function.Call(context, arguments);
-                context.ThrowIf();
-                return result;
+                return SpkMachine.ExecuteWithArguments(function, arguments, context);
             }
             finally
             {

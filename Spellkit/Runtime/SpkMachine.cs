@@ -88,7 +88,17 @@ internal static partial class SpkMachine
         return result.Value ?? SpkNil.Instance;
     }
 
-    private static ExecutionResult ExecuteWithDataResult(
+    internal static ExecutionResult ExecuteWithArguments(
+        SpkNativeFunction function,
+        SpkObject[] arguments,
+        ExecutionContext ctx)
+    {
+        var locals = function.CreateLocals(ctx);
+        Array.Copy(arguments, locals, arguments.Length);
+        return ExecuteWithDataResult(function, locals, ctx);
+    }
+
+    internal static ExecutionResult ExecuteWithDataResult(
         SpkNativeFunction function,
         SpkObject[] locals,
         ExecutionContext ctx)

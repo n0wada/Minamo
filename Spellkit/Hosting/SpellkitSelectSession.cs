@@ -129,6 +129,8 @@ public sealed class SpellkitSelectSession : IDisposable
     private readonly SpellkitInstance instance;
     private readonly int unitId;
     private readonly SelectFrame frame;
+    private SpellkitSelectSession? nested;
+    private SpkMachine.VmContinuation? choiceContinuation;
     private bool disposed;
 
     internal SpellkitSelectSession(SpellkitInstance instance, SelectDefinition definition, int unitId)
@@ -147,7 +149,7 @@ public sealed class SpellkitSelectSession : IDisposable
             lock (syncRoot)
             {
                 ThrowIfDisposed();
-                return GetChoices();
+                return nested?.Choices ?? GetChoices();
             }
         }
     }
@@ -172,6 +174,7 @@ public sealed class SpellkitSelectSession : IDisposable
         lock (syncRoot)
         {
             ThrowIfDisposed();
+            nested?.Cancel();
             frame.Cancel();
         }
     }
@@ -185,6 +188,9 @@ public sealed class SpellkitSelectSession : IDisposable
                 return;
             }
 
+            nested?.Dispose();
+            nested = null;
+            choiceContinuation = null;
             frame.Cancel();
             disposed = true;
         }
@@ -199,6 +205,11 @@ public sealed class SpellkitSelectSession : IDisposable
             if (frame.IsCompleted)
             {
                 throw new InvalidOperationException($"Select session '{Name}' has already completed.");
+            }
+
+            if (nested is not null)
+            {
+                return ResumeNested(choiceId, argument, hasArgument);
             }
 
             var choice = frame.State.Choices.SingleOrDefault(candidate =>
@@ -219,14 +230,55 @@ public sealed class SpellkitSelectSession : IDisposable
 
             var arguments = ConvertArguments(choice, argument, hasArgument);
             var result = instance.InvokeSelectChoice(unitId, choice, arguments);
-            var outcome = frame.Apply(result);
+            return ApplyChoiceExecution(result);
+        }
+    }
+
+    private SpellkitSelectResult ResumeNested(string choiceId, object? argument, bool hasArgument)
+    {
+        var nestedResult = hasArgument
+            ? nested!.Choose(choiceId, argument)
+            : nested!.Choose(choiceId);
+        if (!nestedResult.IsCompleted)
+        {
+            return nestedResult;
+        }
+
+        nested.Dispose();
+        nested = null;
+        var continuation = choiceContinuation
+            ?? throw new InvalidOperationException("The nested select has no parent continuation.");
+        choiceContinuation = null;
+        return ApplyChoiceExecution(SpkMachine.Resume(continuation));
+    }
+
+    private SpellkitSelectResult ApplyChoiceExecution(ExecutionResult result)
+    {
+        if (result.Reason is TerminationReason.Suspended)
+        {
+            if (result.Continuation is null
+                || result.Suspension is not { SelectName.Length: > 0 } suspension)
+            {
+                throw new InvalidOperationException("A select choice suspended without a select request.");
+            }
+
+            choiceContinuation = result.Continuation;
+            nested = instance.CreateSelectSession(suspension.SelectName);
+            return new(nested.Choices, isCompleted: false);
+        }
+
+        if (result.Reason is not TerminationReason.Complete)
+        {
+            throw new InvalidOperationException("The select choice did not complete successfully.");
+        }
+
+        var outcome = frame.Apply(result.Value ?? SpkNil.Instance);
             if (outcome.IsCompleted)
             {
                 return new(Array.Empty<SpellkitChoice>(), isCompleted: true, outcome.Value);
             }
 
             return new(GetChoices(), isCompleted: false);
-        }
     }
 
     private IReadOnlyList<SpellkitChoice> GetChoices() => frame.IsCompleted
