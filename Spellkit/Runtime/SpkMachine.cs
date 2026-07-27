@@ -19,14 +19,24 @@ internal static partial class SpkMachine
 
     public static ExecutionContext CreateExecutionContext(RuntimeContext rtx) => new(new(), rtx);
 
-    public static ExecutionResult Execute(ExecutionContext ctx)
+    public static ExecutionResult Execute(ExecutionContext ctx) => ExecuteModule(0, ctx);
+
+    internal static ExecutionResult Resume(VmContinuation continuation)
     {
-        var res = ExecuteModule(0, ctx);
-        var retval = ExecutionResult.Fetch(0, res, ctx);
-        return retval;
+        ArgumentNullException.ThrowIfNull(continuation);
+        var state = continuation.Take();
+        try
+        {
+            return Run(state, continuation);
+        }
+        catch
+        {
+            continuation.Complete();
+            throw;
+        }
     }
 
-    private static SpkObject ExecuteModule(int unitId, ExecutionContext ctx)
+    private static ExecutionResult ExecuteModule(int unitId, ExecutionContext ctx)
     {
         var unit = ctx.RuntimeContext.Composition.Units[unitId];
 
@@ -39,7 +49,7 @@ internal static partial class SpkMachine
                 ctx.RuntimeContext.Units[unitId] = foreign.Values.ToArray();
             }
 
-            return SpkNil.Instance;
+            return ExecutionResult.Fetch(0, SpkNil.Instance, ctx);
         }
 
         var lay0 = unit.Layouts[0];
@@ -58,15 +68,30 @@ internal static partial class SpkMachine
         //and should execute it one more time.
         if (unitId is not 0 && ctx.RuntimeContext.Units[unitId] is not null)
         {
-            return SpkNil.Instance;
+            return ExecutionResult.Fetch(0, SpkNil.Instance, ctx);
         }
 
         ctx.CatchMarks.Push(null!);
         ctx.RuntimeContext.Units[unitId] = ctx.RuntimeContext.Units[unitId] ?? new SpkObject[lay0.Size];
-        return ExecuteWithData(Global(unitId), Array.Empty<SpkObject>(), ctx);
+        return ExecuteWithDataResult(Global(unitId), Array.Empty<SpkObject>(), ctx);
     }
 
     internal static SpkObject ExecuteWithData(SpkNativeFunction function, SpkObject[] locals, ExecutionContext ctx)
+    {
+        var result = ExecuteWithDataResult(function, locals, ctx);
+        if (result.Reason is TerminationReason.Suspended)
+        {
+            throw new InvalidOperationException(
+                "A VM continuation cannot suspend through a synchronous function invocation.");
+        }
+
+        return result.Value ?? SpkNil.Instance;
+    }
+
+    private static ExecutionResult ExecuteWithDataResult(
+        SpkNativeFunction function,
+        SpkObject[] locals,
+        ExecutionContext ctx)
     {
         ctx.CallCnt++;
 
@@ -84,10 +109,14 @@ internal static partial class SpkMachine
         }
         var state = new VmState(function, locals, ctx);
         EnterCurrentFunction(state);
+        return Run(state);
+    }
 
+    private static ExecutionResult Run(VmState state, VmContinuation? continuation = null)
+    {
         while (true)
         {
-            ctx.Control?.OnInstruction();
+            state.Context.Control?.OnInstruction();
             var op = state.Ops[state.Offset++];
             var result = Dispatch(op, state);
 
@@ -99,11 +128,11 @@ internal static partial class SpkMachine
                     EnterCurrentFunction(state);
                     break;
                 case VmStep.ReloadProgram:
-                    LoadProgram(state.Function, ctx, out state.Unit, out state.Ops);
+                    LoadProgram(state.Function, state.Context, out state.Unit, out state.Ops);
                     break;
                 case VmStep.HandleCallback:
                     state.EvalStack.Pop();
-                    if (TryCall(ctx, state.Offset, ref state.Second, ref state.Third,
+                    if (TryCall(state.Context, state.Offset, ref state.Second, ref state.Third,
                         ref state.Function, ref state.Locals, ref state.EvalStack))
                     {
                         EnterCurrentFunction(state);
@@ -116,7 +145,19 @@ internal static partial class SpkMachine
                     HandleError(state);
                     break;
                 case VmStep.Return:
-                    return result.Value!;
+                    continuation?.Complete();
+                    return ExecutionResult.Fetch(0, result.Value, state.Context);
+                case VmStep.Suspend:
+                    var saved = continuation;
+                    if (saved is null)
+                    {
+                        saved = new VmContinuation(state);
+                    }
+                    else
+                    {
+                        saved.Suspend(state);
+                    }
+                    return ExecutionResult.Suspend(state.Context, saved);
                 default:
                     throw new InvalidOperationException($"Unsupported VM step: {result.Step}.");
             }
@@ -130,7 +171,8 @@ internal static partial class SpkMachine
         ReloadProgram,
         HandleCallback,
         Throw,
-        Return
+        Return,
+        Suspend
     }
 
     private readonly record struct VmDispatchResult(VmStep Step, SpkObject? Value = null)
@@ -138,7 +180,7 @@ internal static partial class SpkMachine
         public static readonly VmDispatchResult Continue = new(VmStep.Continue);
     }
 
-    private sealed class VmState
+    internal sealed class VmState
     {
         public VmState(SpkNativeFunction function, SpkObject[] locals, ExecutionContext context)
         {
@@ -162,6 +204,52 @@ internal static partial class SpkMachine
         public SpkObject? First;
         public SpkObject? Second;
         public SpkObject? Third;
+    }
+
+    internal sealed class VmContinuation
+    {
+        private readonly object syncRoot = new();
+        private VmState? state;
+        private bool completed;
+
+        internal VmContinuation(VmState state) => this.state = state;
+
+        internal VmState Take()
+        {
+            lock (syncRoot)
+            {
+                if (completed || state is null)
+                {
+                    throw new InvalidOperationException("The VM continuation is not waiting to be resumed.");
+                }
+
+                var result = state;
+                state = null;
+                return result;
+            }
+        }
+
+        internal void Suspend(VmState next)
+        {
+            lock (syncRoot)
+            {
+                if (completed || state is not null)
+                {
+                    throw new InvalidOperationException("The VM continuation is already completed or suspended.");
+                }
+
+                state = next;
+            }
+        }
+
+        internal void Complete()
+        {
+            lock (syncRoot)
+            {
+                completed = true;
+                state = null;
+            }
+        }
     }
 
     private static void EnterCurrentFunction(VmState state)

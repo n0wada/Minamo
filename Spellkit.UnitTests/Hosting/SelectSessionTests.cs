@@ -32,6 +32,17 @@ public sealed class SelectSessionTests
         Assert.False(duplicateChoice.Success);
         Assert.Contains(duplicateChoice.Errors, error =>
             error.Code == (int)Spellkit.Compiler.CompilerError.SelectDuplicateChoice);
+
+        var unknownState = host.Compile("""
+            select player {
+                initial state "stopped" {
+                    choose "play" => goto "missing"
+                }
+            }
+            """);
+        Assert.False(unknownState.Success);
+        Assert.Contains(unknownState.Errors, error =>
+            error.Code == (int)Spellkit.Compiler.CompilerError.SelectStateNotFound);
     }
 
     [Fact]
@@ -62,10 +73,7 @@ public sealed class SelectSessionTests
 
             select player {
                 initial state "stopped" {
-                    choose "play" => {
-                        music.Play()
-                        goto "playing"
-                    }
+                    choose "play" => goto "playing"
 
                     choose "set-volume" (value) => {
                         music.SetVolume(value)
@@ -83,10 +91,7 @@ public sealed class SelectSessionTests
                 }
 
                 state "playing" {
-                    choose "pause" => {
-                        music.Pause()
-                        goto "paused"
-                    }
+                    choose "pause" => goto "paused"
                 }
 
             state "paused" {

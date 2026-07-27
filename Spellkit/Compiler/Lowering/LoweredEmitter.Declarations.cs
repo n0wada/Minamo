@@ -593,6 +593,16 @@ internal sealed partial class LoweredEmitter
 
         var states = new List<SelectStateDefinition>(node.States.Count);
         var initialCount = 0;
+        var stateNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var state in node.States)
+        {
+            if (!stateNames.Add(state.Name))
+            {
+                target.AddError(CompilerError.SelectDuplicateState, node.Location, state.Name);
+            }
+        }
+
+        var selectContext = ctx.WithSelectStates(node.Name, stateNames);
 
         for (var i = 0; i < node.States.Count; i++)
         {
@@ -640,7 +650,7 @@ internal sealed partial class LoweredEmitter
                         NeedsValue: false,
                         IteratorBody: false,
                         IsStdCall: !target.NoOptimizations);
-                    EmitFunctionBody(guardAddress.Value, guard, ctx, iteratorBody: false);
+                    EmitFunctionBody(guardAddress.Value, guard, selectContext, iteratorBody: false);
                     cw.StoreVariable(guardAddress.Value);
                 }
 
@@ -667,7 +677,7 @@ internal sealed partial class LoweredEmitter
                     NeedsValue: false,
                     IteratorBody: false,
                     IsStdCall: !target.NoOptimizations);
-                EmitFunctionBody(address, function, ctx, iteratorBody: false);
+                EmitFunctionBody(address, function, selectContext, iteratorBody: false);
                 cw.StoreVariable(address);
                 choices.Add(new(
                     choice.Name,
@@ -688,15 +698,6 @@ internal sealed partial class LoweredEmitter
         else if (initialCount != 1)
         {
             target.AddError(CompilerError.SelectRequiresOneInitialState, node.Location);
-        }
-
-        var stateNames = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var state in states)
-        {
-            if (!stateNames.Add(state.Name))
-            {
-                target.AddError(CompilerError.SelectDuplicateState, node.Location, state.Name);
-            }
         }
 
         target.RegisterSelectDefinition(new SelectDefinition(node.Name, states));

@@ -36,6 +36,11 @@ internal static partial class SpkMachine
 
     private static VmDispatchResult ExecuteInfrastructure(Op op, VmState state)
     {
+        if (op.Code is OpCode.Suspend)
+        {
+            return new(VmStep.Suspend);
+        }
+
         if (op.Code is not (OpCode.NoOperation or OpCode.Debug))
         {
             throw UnexpectedOpcode(op);

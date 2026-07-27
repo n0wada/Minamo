@@ -4,9 +4,7 @@ select town {
     initial state "square" {
         choose "guard"
             label "Talk to the guard"
-            description "Ask about work near the old bridge" => {
-            goto "guard"
-        }
+            description "Ask about work near the old bridge" => goto "guard"
 
         choose "board"
             label "Check the quest board"
@@ -41,9 +39,7 @@ select town {
         }
 
         choose "back"
-            label "Return to the town square" => {
-            goto "square"
-        }
+            label "Return to the town square" => goto "square"
     }
 }
 

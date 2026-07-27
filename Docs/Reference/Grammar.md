@@ -201,7 +201,7 @@ choice-declaration
         "=>" choice-body
 
 choice-body
-    ::= block | "exit" [ expression ]
+    ::= block | "goto" string | "exit" [ expression ]
 
 goto-statement
     ::= "goto" string
@@ -221,8 +221,8 @@ Select declarations are permitted only at global (module) scope. Exactly one sta
 remains in its current state. `exit` completes the session. Choice names are unique within a
 state. A choice receives either no argument, one value, or a tuple whose elements bind to its
 parameters. `label` and `description` provide host-facing display text; `when` controls whether a
-choice is currently available. `do qualified-name` invokes a select through the host's configured
-select runner.
+choice is currently available. `goto` targets must name a state declared by the same select.
+`do qualified-name` invokes a select through the host's configured select runner.
 
 ```swift
 select player {

@@ -156,6 +156,8 @@ internal sealed class CompilerContext
         MatchExit = old.MatchExit;
         IsIteratorBody = old.IsIteratorBody;
         IsTailPosition = old.IsTailPosition;
+        SelectName = old.SelectName;
+        SelectStates = old.SelectStates;
     }
 
     public Stack<int> Errors { get; }
@@ -179,6 +181,10 @@ internal sealed class CompilerContext
     public bool IsIteratorBody { get; set; }
 
     public bool IsTailPosition { get; set; }
+
+    public string? SelectName { get; set; }
+
+    public IReadOnlySet<string>? SelectStates { get; set; }
 
     public bool HasFunctionExit => !FunctionExit.IsEmpty();
 
@@ -224,6 +230,16 @@ internal sealed class CompilerContext
         var ctx = new CompilerContext(this)
         {
             IsTailPosition = isTailPosition
+        };
+        return ctx;
+    }
+
+    public CompilerContext WithSelectStates(string name, IReadOnlySet<string> states)
+    {
+        var ctx = new CompilerContext(this)
+        {
+            SelectName = name,
+            SelectStates = states
         };
         return ctx;
     }

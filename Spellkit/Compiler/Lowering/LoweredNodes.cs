@@ -262,13 +262,15 @@ internal sealed record LoweredApplication(
 internal sealed record LoweredControlTransfer(
     Location Location,
     LoweredNode? Expression,
-    LoweredControlTransferKind Kind) : LoweredNode(Location);
+    LoweredControlTransferKind Kind,
+    string? SelectState = null) : LoweredNode(Location);
 
 internal enum LoweredControlTransferKind
 {
     Break,
     Continue,
     Return,
+    Goto,
     Throw,
     Yield,
     YieldBreak

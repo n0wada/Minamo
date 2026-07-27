@@ -129,7 +129,8 @@ internal sealed class LoweringPass
                     new LoweredLiteral(node.Location, SelectControlSignal.Goto, LoweredLiteralKind.String),
                     new LoweredLiteral(node.Location, node.State, LoweredLiteralKind.String)
                 ]),
-            LoweredControlTransferKind.Return);
+            LoweredControlTransferKind.Goto,
+            node.State);
 
     public LoweredControlTransfer Lower(ExitSyntax node, CompilerContext ctx) =>
         new(

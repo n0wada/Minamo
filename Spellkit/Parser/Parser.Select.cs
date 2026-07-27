@@ -170,6 +170,13 @@ internal sealed partial class HandwrittenParser
             return choice;
         }
 
+        if (IsContextualKeyword("goto"))
+        {
+            choice.Body = ParseGoto();
+            ExpectSeparator();
+            return choice;
+        }
+
         ReportExpected(TokenKind.LeftBrace);
         return null;
     }

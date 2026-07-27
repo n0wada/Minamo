@@ -316,7 +316,9 @@ internal enum TerminationReason
 
     Abort = 1,
 
-    Exception = 2
+    Exception = 2,
+
+    Suspended = 3
 }
 
 internal sealed class ExecutionResult
@@ -329,12 +331,24 @@ internal sealed class ExecutionResult
 
     public TerminationReason Reason { get; }
 
-    private ExecutionResult(long ticks, SpkObject? value, ExecutionContext ctx, TerminationReason reason) =>
-        (Ticks, Value, Context, Reason) = (ticks, value, ctx, reason);
+    internal SpkMachine.VmContinuation? Continuation { get; }
+
+    private ExecutionResult(
+        long ticks,
+        SpkObject? value,
+        ExecutionContext ctx,
+        TerminationReason reason,
+        SpkMachine.VmContinuation? continuation = null) =>
+        (Ticks, Value, Context, Reason, Continuation) = (ticks, value, ctx, reason, continuation);
 
     internal static ExecutionResult Fetch(long ticks, SpkObject? value, ExecutionContext ctx) =>
         new(ticks, value, ctx, TerminationReason.Complete);
 
     internal static ExecutionResult Abort(long ticks, ExecutionContext ctx) =>
         new(ticks, null, ctx, TerminationReason.Abort);
+
+    internal static ExecutionResult Suspend(
+        ExecutionContext ctx,
+        SpkMachine.VmContinuation continuation) =>
+        new(0, null, ctx, TerminationReason.Suspended, continuation);
 }

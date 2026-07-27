@@ -33,6 +33,9 @@ internal sealed partial class LoweredEmitter
             case LoweredControlTransferKind.Return:
                 EmitReturn(node, ctx);
                 break;
+            case LoweredControlTransferKind.Goto:
+                EmitGoto(node, ctx);
+                break;
             case LoweredControlTransferKind.Throw:
                 EmitThrow(node, ctx);
                 break;
@@ -106,6 +109,21 @@ internal sealed partial class LoweredEmitter
         target.CallAutosForKind(ScopeKind.Function);
         target.AddLinePragma(node.Location);
         cw.Jump(ctx.FunctionExit);
+    }
+
+    private void EmitGoto(LoweredControlTransfer node, CompilerContext ctx)
+    {
+        if (node.SelectState is not null
+            && (ctx.SelectStates is null || !ctx.SelectStates.Contains(node.SelectState)))
+        {
+            target.AddError(
+                CompilerError.SelectStateNotFound,
+                node.Location,
+                node.SelectState,
+                ctx.SelectName ?? string.Empty);
+        }
+
+        EmitReturn(node, ctx);
     }
 
     private void EmitThrow(LoweredControlTransfer node, CompilerContext ctx)

@@ -89,7 +89,7 @@ parameters
     ::= "(" identifier ("," identifier)* ")"
 
 choice-body
-    ::= block | "exit" expression?
+    ::= block | "goto" string-literal | "exit" expression?
 ```
 
 Select declarations are permitted only at global (module) scope. Exactly one state is marked
@@ -99,7 +99,14 @@ to the session.
 
 `goto "name"` changes the state in which the session next waits for input. If a choice body does
 not execute `goto`, the session remains in its current state. `exit` completes the session. A
-state with no choices also completes the session.
+state with no choices also completes the session. A transition-only choice may use the short form:
+
+```kit
+choose "guard" label "Talk to the guard" => goto "guard"
+choose "leave" label "Leave the town square" => exit
+```
+
+Each `goto` target must name a state declared by the same select; otherwise compilation fails.
 
 Within one state, choice identifiers must be unique. A choice may bind zero, one, or several
 values supplied by the host. The implementation must diagnose an unknown state, a duplicate
