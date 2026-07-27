@@ -191,6 +191,7 @@ public enum OpCode
     LoadPrivateMember, //0
     StorePrivateMember, //-1
     Suspend, //0
+    SuspendSelect, //0
 }
 
 public enum OperandShape
@@ -282,6 +283,7 @@ public sealed class Op
     public static readonly Op ApplyMixin = new(OpCode.ApplyMixin);
     public static readonly Op Debug = new(OpCode.Debug);
     public static readonly Op Suspend = new(OpCode.Suspend);
+    public static readonly Op SuspendSelect = new(OpCode.SuspendSelect);
 
     internal static readonly OpInfo[] Infos =
     {
@@ -377,7 +379,8 @@ public sealed class Op
         new(OpCode.CreateDictionary, OperandShape.One, null, OpCategory.Collection),
         new(OpCode.LoadPrivateMember, OperandShape.One, 0, OpCategory.Member),
         new(OpCode.StorePrivateMember, OperandShape.One, -1, OpCategory.Member),
-        new(OpCode.Suspend, OperandShape.None, 0, OpCategory.Infrastructure)
+        new(OpCode.Suspend, OperandShape.None, 0, OpCategory.Infrastructure),
+        new(OpCode.SuspendSelect, OperandShape.One, 0, OpCategory.Infrastructure)
     };
 
     public readonly OpCode Code;

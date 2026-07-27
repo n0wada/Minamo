@@ -204,9 +204,9 @@ machine.
 
 ## Invoking a select from Script
 
-`do qualified.name` invokes a select from Script. It is a statement, not a function call. This is
-useful when Script owns the entry point as well as the flow. The host runs the select through a
-configured select runner, and Script resumes after the runner completes or cancels the session.
+`do qualified.name` invokes a select from Script. It is a statement, not a function call. It
+suspends the Script VM at that point; `exit` resumes the same call stack from the following
+statement. This is useful when Script owns the entry point as well as the flow.
 
 For applications whose UI opens a menu, dialogue, or console directly, prefer the C# entry point
 shown above. It keeps UI ownership explicit and does not require `UseSelect`.
@@ -226,7 +226,27 @@ do {
 ```
 
 An embedding host configures a runner only when it wants Script to invoke selects. The runner owns
-the UI and must complete or cancel the supplied session before it returns.
+the UI and must complete or cancel the supplied session before it returns. This remains compatible
+with `Execute`, but event-driven hosts should prefer `Start` instead:
+
+```csharp
+using var run = instance.Start("""
+    setupPlayer()
+    do music.player
+    showSummary()
+    """);
+
+ui.Show(run.Choices);
+
+// Later, from a UI event:
+run.Choose("play");
+```
+
+`Start` returns while the VM is waiting at `do`. `Choose` executes the choice and either exposes
+the next choices or resumes the VM after `exit`. A suspended run owns the instance until it
+completes or is disposed.
+
+The legacy synchronous adapter is still available:
 
 ```csharp
 var environment = new SpellkitEnvironment()

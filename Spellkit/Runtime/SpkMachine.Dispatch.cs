@@ -41,6 +41,11 @@ internal static partial class SpkMachine
             return new(VmStep.Suspend);
         }
 
+        if (op.Code is OpCode.SuspendSelect)
+        {
+            return new(VmStep.Suspend, Suspension: new((string)state.Unit.Strings[op.Data]));
+        }
+
         if (op.Code is not (OpCode.NoOperation or OpCode.Debug))
         {
             throw UnexpectedOpcode(op);

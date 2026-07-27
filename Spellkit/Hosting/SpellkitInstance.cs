@@ -142,6 +142,7 @@ public sealed class SpellkitInstance : IDisposable
     private int submission;
     private bool disposed;
     private bool active;
+    private SpellkitRunSession? suspendedRun;
 
     internal SpellkitInstance(
         FileLookup lookup,
@@ -181,6 +182,14 @@ public sealed class SpellkitInstance : IDisposable
     {
         ArgumentNullException.ThrowIfNull(source);
         return ExecuteSource(source, null, "Execute", cancellationToken);
+    }
+
+    public SpellkitRunSession Start(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        return StartCore(() => linker.Make(SourceBuffer.FromString(
+            source,
+            $"<host:{++submission}>")));
     }
 
     public Task<SpellkitExecutionResult> ExecuteAsync(
@@ -249,30 +258,12 @@ public sealed class SpellkitInstance : IDisposable
         lock (syncRoot)
         {
             ObjectDisposedException.ThrowIf(disposed, this);
-            var selectName = SpellkitSelectAliases.Resolve(runtimeContext!, name);
-            var matches = new List<(SelectDefinition Definition, int UnitId)>();
-            for (var unitId = 0; unitId < runtimeContext!.Composition.Units.Length; unitId++)
+            if (suspendedRun is not null)
             {
-                foreach (var candidate in runtimeContext.Composition.Units[unitId].SelectDefinitions)
-                {
-                    if (string.Equals(candidate.Name, selectName, StringComparison.Ordinal))
-                    {
-                        matches.Add((candidate, unitId));
-                    }
-                }
+                throw new InvalidOperationException("A script run is already waiting for a select.");
             }
 
-            if (matches.Count == 0)
-            {
-                throw new ArgumentException($"No select named '{name}' is available.", nameof(name));
-            }
-            if (matches.Count > 1)
-            {
-                throw new InvalidOperationException($"The select name '{name}' is ambiguous.");
-            }
-
-            var match = matches[0];
-            return new SpellkitSelectSession(this, match.Definition, match.UnitId);
+            return CreateSelectSession(name);
         }
     }
 
@@ -359,6 +350,18 @@ public sealed class SpellkitInstance : IDisposable
                 try
                 {
                     result = SpkMachine.Execute(context);
+                    while (result.Reason is TerminationReason.Suspended)
+                    {
+                        if (result.Continuation is null
+                            || result.Suspension is not { SelectName.Length: > 0 } suspension)
+                        {
+                            throw new InvalidOperationException("The VM suspended without a select request.");
+                        }
+
+                        using var select = CreateSelectSession(suspension.SelectName);
+                        SpellkitEnvironment.RunSelect(select);
+                        result = SpkMachine.Resume(result.Continuation);
+                    }
                 }
                 finally
                 {
@@ -556,9 +559,92 @@ public sealed class SpellkitInstance : IDisposable
         }
     }
 
-    private void BeginOperation()
+    internal SpellkitSelectSession CreateSelectSession(string name)
     {
-        if (active)
+        var selectName = SpellkitSelectAliases.Resolve(runtimeContext!, name);
+        var matches = new List<(SelectDefinition Definition, int UnitId)>();
+        for (var unitId = 0; unitId < runtimeContext!.Composition.Units.Length; unitId++)
+        {
+            foreach (var candidate in runtimeContext.Composition.Units[unitId].SelectDefinitions)
+            {
+                if (string.Equals(candidate.Name, selectName, StringComparison.Ordinal))
+                {
+                    matches.Add((candidate, unitId));
+                }
+            }
+        }
+
+        if (matches.Count == 0)
+        {
+            throw new ArgumentException($"No select named '{name}' is available.", nameof(name));
+        }
+        if (matches.Count > 1)
+        {
+            throw new InvalidOperationException($"The select name '{name}' is ambiguous.");
+        }
+
+        var match = matches[0];
+        return new SpellkitSelectSession(this, match.Definition, match.UnitId);
+    }
+
+    internal SpellkitSelectResult Choose(
+        SpellkitRunSession run,
+        string choiceId,
+        object? argument,
+        bool hasArgument)
+    {
+        lock (syncRoot)
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            BeginOperation(run);
+            try
+            {
+                var choiceResult = hasArgument
+                    ? run.GetSelect().Choose(choiceId, argument)
+                    : run.GetSelect().Choose(choiceId);
+                if (!choiceResult.IsCompleted)
+                {
+                    return choiceResult;
+                }
+
+                run.Advance(SpkMachine.Resume(run.GetContinuation()));
+                if (run.IsCompleted)
+                {
+                    suspendedRun = null;
+                    return new SpellkitSelectResult(Array.Empty<SpellkitChoice>(), isCompleted: true);
+                }
+
+                return new SpellkitSelectResult(run.Choices, isCompleted: false);
+            }
+            catch (Exception ex)
+            {
+                run.Fail(ex);
+                suspendedRun = null;
+                throw;
+            }
+            finally
+            {
+                active = false;
+            }
+        }
+    }
+
+    internal void Cancel(SpellkitRunSession run)
+    {
+        lock (syncRoot)
+        {
+            if (ReferenceEquals(suspendedRun, run))
+            {
+                suspendedRun = null;
+            }
+
+            run.Cancel();
+        }
+    }
+
+    private void BeginOperation(SpellkitRunSession? resumingRun = null)
+    {
+        if (active || (suspendedRun is not null && !ReferenceEquals(suspendedRun, resumingRun)))
         {
             throw new InvalidOperationException("A host instance cannot be entered recursively.");
         }
@@ -598,6 +684,51 @@ public sealed class SpellkitInstance : IDisposable
         SetHostVariables(context, control);
 
         return context;
+    }
+
+    private SpellkitRunSession StartCore(Func<Result<UnitComposition>> compile)
+    {
+        lock (syncRoot)
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            BeginOperation();
+            var linkerTouched = false;
+            try
+            {
+                linkerTouched = true;
+                var made = compile();
+                if (!made.Success || made.Value is null)
+                {
+                    TryRollback();
+                    return new SpellkitRunSession(this, new InvalidOperationException(
+                        string.Join(System.Environment.NewLine, made.Messages)));
+                }
+
+                var result = SpkMachine.Execute(CreateExecutionContext(made.Value, control: null));
+                linker.Commit();
+                var run = new SpellkitRunSession(this, result);
+                run.Advance(result);
+                if (!run.IsCompleted)
+                {
+                    suspendedRun = run;
+                }
+
+                return run;
+            }
+            catch (Exception ex)
+            {
+                if (linkerTouched)
+                {
+                    TryRollback();
+                }
+
+                return new SpellkitRunSession(this, ex);
+            }
+            finally
+            {
+                active = false;
+            }
+        }
     }
 
     internal SpkObject InvokeSelectChoice(int unitId, SelectChoiceDefinition choice, SpkObject[] arguments)

@@ -321,6 +321,8 @@ internal enum TerminationReason
     Suspended = 3
 }
 
+internal sealed record VmSuspension(string SelectName);
+
 internal sealed class ExecutionResult
 {
     public long Ticks { get; }
@@ -333,13 +335,17 @@ internal sealed class ExecutionResult
 
     internal SpkMachine.VmContinuation? Continuation { get; }
 
+    internal VmSuspension? Suspension { get; }
+
     private ExecutionResult(
         long ticks,
         SpkObject? value,
         ExecutionContext ctx,
         TerminationReason reason,
-        SpkMachine.VmContinuation? continuation = null) =>
-        (Ticks, Value, Context, Reason, Continuation) = (ticks, value, ctx, reason, continuation);
+        SpkMachine.VmContinuation? continuation = null,
+        VmSuspension? suspension = null) =>
+        (Ticks, Value, Context, Reason, Continuation, Suspension) =
+        (ticks, value, ctx, reason, continuation, suspension);
 
     internal static ExecutionResult Fetch(long ticks, SpkObject? value, ExecutionContext ctx) =>
         new(ticks, value, ctx, TerminationReason.Complete);
@@ -349,6 +355,7 @@ internal sealed class ExecutionResult
 
     internal static ExecutionResult Suspend(
         ExecutionContext ctx,
-        SpkMachine.VmContinuation continuation) =>
-        new(0, null, ctx, TerminationReason.Suspended, continuation);
+        SpkMachine.VmContinuation continuation,
+        VmSuspension suspension) =>
+        new(0, null, ctx, TerminationReason.Suspended, continuation, suspension);
 }

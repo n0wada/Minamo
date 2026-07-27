@@ -170,6 +170,40 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
+    public void StartSuspendsAtDoAndResumesAfterExit()
+    {
+        var output = new StringBuilder();
+        using var instance = new SpellkitHost().CreateInstance(
+            new SpellkitEnvironment().UseOutput(value => output.Append(value)));
+
+        using var run = instance.Start("""
+            select player {
+                initial state "stopped" {
+                    choose "exit" => exit
+                }
+            }
+
+            func game() {
+                let score = 40
+                do player
+                print(score + 2, terminator: nil)
+            }
+
+            game()
+            """);
+
+        Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
+        Assert.Single(run.Choices);
+        Assert.Equal("exit", run.Choices[0].Id);
+
+        var result = run.Choose("exit");
+
+        Assert.True(result.IsCompleted);
+        Assert.True(run.IsCompleted);
+        Assert.Equal("42", output.ToString());
+    }
+
+    [Fact]
     public void DoWhileRemainsDistinctFromSelectInvocation()
     {
         using var instance = new SpellkitHost().CreateInstance();

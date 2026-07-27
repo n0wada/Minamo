@@ -157,7 +157,10 @@ internal static partial class SpkMachine
                     {
                         saved.Suspend(state);
                     }
-                    return ExecutionResult.Suspend(state.Context, saved);
+                    return ExecutionResult.Suspend(
+                        state.Context,
+                        saved,
+                        result.Suspension ?? new VmSuspension(string.Empty));
                 default:
                     throw new InvalidOperationException($"Unsupported VM step: {result.Step}.");
             }
@@ -175,7 +178,10 @@ internal static partial class SpkMachine
         Suspend
     }
 
-    private readonly record struct VmDispatchResult(VmStep Step, SpkObject? Value = null)
+    private readonly record struct VmDispatchResult(
+        VmStep Step,
+        SpkObject? Value = null,
+        VmSuspension? Suspension = null)
     {
         public static readonly VmDispatchResult Continue = new(VmStep.Continue);
     }

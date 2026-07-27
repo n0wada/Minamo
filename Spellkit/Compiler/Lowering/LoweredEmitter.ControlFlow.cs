@@ -12,12 +12,11 @@ internal sealed partial class LoweredEmitter
 {
     private void EmitSelectInvocation(LoweredSelectInvocation node, bool keepResult, CompilerContext ctx)
     {
-        var targetName = new LoweredName(node.Location, "__select");
-        var call = new LoweredApplication(
-            node.Location,
-            targetName,
-            [new LoweredLiteral(node.Location, node.Name, LoweredLiteralKind.String)]);
-        EmitApplication(call, keepResult, ctx);
+        cw.SuspendSelect(node.Name);
+        if (keepResult)
+        {
+            cw.LoadNil();
+        }
     }
 
     private void EmitControlTransfer(LoweredControlTransfer node, bool keepResult, CompilerContext ctx)

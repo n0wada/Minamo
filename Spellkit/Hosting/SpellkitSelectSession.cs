@@ -260,3 +260,108 @@ public sealed class SpellkitSelectSession : IDisposable
         ObjectDisposedException.ThrowIf(disposed, this);
     }
 }
+
+public sealed class SpellkitRunSession : IDisposable
+{
+    private readonly SpellkitInstance instance;
+    private SpellkitSelectSession? select;
+    private SpkMachine.VmContinuation? continuation;
+    private SpkObject? value;
+    private Exception? failure;
+    private bool completed;
+    private bool disposed;
+
+    internal SpellkitRunSession(SpellkitInstance instance, ExecutionResult result) =>
+        (this.instance, continuation) = (instance, result.Continuation);
+
+    internal SpellkitRunSession(SpellkitInstance instance, Exception failure) =>
+        (this.instance, this.failure, completed) = (instance, failure, true);
+
+    public bool IsCompleted => completed;
+
+    public bool IsWaitingForSelect => select is not null && !completed;
+
+    public Exception? Failure => failure;
+
+    public IReadOnlyList<SpellkitChoice> Choices
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return select?.Choices ?? Array.Empty<SpellkitChoice>();
+        }
+    }
+
+    public SpellkitSelectResult Choose(string choiceId) =>
+        instance.Choose(this, choiceId, null, hasArgument: false);
+
+    public SpellkitSelectResult Choose(string choiceId, object? argument) =>
+        instance.Choose(this, choiceId, argument, hasArgument: true);
+
+    public T? GetValue<T>() => SpellkitHostValueConverter.Convert<T>(value, "Run result");
+
+    public void Dispose()
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        instance.Cancel(this);
+        disposed = true;
+    }
+
+    internal SpellkitSelectSession GetSelect()
+    {
+        ThrowIfDisposed();
+        return select ?? throw new InvalidOperationException("The script is not waiting for a select.");
+    }
+
+    internal SpkMachine.VmContinuation GetContinuation() =>
+        continuation ?? throw new InvalidOperationException("The script has no suspended VM continuation.");
+
+    internal void Advance(ExecutionResult result)
+    {
+        if (result.Reason is TerminationReason.Complete)
+        {
+            completed = true;
+            continuation = null;
+            select = null;
+            value = result.Value;
+            return;
+        }
+
+        if (result.Reason is TerminationReason.Suspended
+            && result.Continuation is not null
+            && result.Suspension is { SelectName.Length: > 0 } suspension)
+        {
+            continuation = result.Continuation;
+            select = instance.CreateSelectSession(suspension.SelectName);
+            return;
+        }
+
+        throw new InvalidOperationException("The VM suspended without a select request.");
+    }
+
+    internal void Fail(Exception exception)
+    {
+        failure = exception;
+        completed = true;
+        continuation = null;
+        select?.Dispose();
+        select = null;
+    }
+
+    internal void Cancel()
+    {
+        completed = true;
+        continuation = null;
+        select?.Dispose();
+        select = null;
+    }
+
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+    }
+}
