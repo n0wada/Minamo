@@ -105,6 +105,7 @@ public sealed class SelectSessionTests
         using var instance = host.CreateInstance(program);
         using var session = instance.OpenSelect("music.player");
 
+        Assert.Equal("stopped", session.State);
         Assert.Collection(session.Choices,
             choice => Assert.Equal("play", choice.Id),
             choice => Assert.Equal("set-volume", choice.Id),
@@ -125,10 +126,12 @@ public sealed class SelectSessionTests
         Assert.Equal((12L, 34L), position);
 
         var afterPlay = session.Select("play");
+        Assert.Equal("playing", session.State);
         Assert.Single(afterPlay.Choices);
         Assert.Equal("pause", afterPlay.Choices[0].Id);
 
         var afterPause = session.Select("pause");
+        Assert.Equal("paused", session.State);
         Assert.Single(afterPause.Choices);
         Assert.Equal("exit", afterPause.Choices[0].Id);
 

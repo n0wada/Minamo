@@ -195,6 +195,7 @@ The session API is:
 public sealed class SpellkitSelectSession : IDisposable
 {
     public string Name { get; }
+    public string State { get; }
     public IReadOnlyList<SpellkitChoice> Choices { get; }
     public bool IsCompleted { get; }
 
@@ -204,8 +205,8 @@ public sealed class SpellkitSelectSession : IDisposable
 }
 ```
 
-`SpellkitChoice` exposes `Id`, `Label`, `Description`, and `ParameterCount`. `Select` returns the
-next available choices or an `IsCompleted` result. It reports an error for unavailable IDs,
+`State` is the current state name. `SpellkitChoice` exposes `Id`, `Label`, `Description`, and
+`ParameterCount`. `Select` returns the next available choices or an `IsCompleted` result. It reports an error for unavailable IDs,
 invalid argument shapes, or a completed session. Calls on one session are serialized; do not issue
 concurrent `Select` calls.
 

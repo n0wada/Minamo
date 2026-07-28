@@ -71,6 +71,19 @@ public sealed class SpellkitSelectSession : IDisposable
 
     public string Name => selectInstance.Name;
 
+    /// <summary>Gets the name of the current state.</summary>
+    public string State
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                ThrowIfDisposed();
+                return selectInstance.State.Name;
+            }
+        }
+    }
+
     public IReadOnlyList<SpellkitChoice> Choices
     {
         get
