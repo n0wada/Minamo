@@ -163,14 +163,18 @@ public sealed class SelectDeclarationSyntax : SyntaxNode
 {
     public SelectDeclarationSyntax(Location loc) : base(NodeType.Select, loc) { }
 
-    public string Name { get; set; } = null!;
+    public string? Name { get; set; }
 
     public List<SelectStateSyntax> States { get; } = new();
 
     internal override void ToString(StringBuilder sb)
     {
         sb.Append("select ");
-        sb.Append(Name);
+        if (Name is not null)
+        {
+            sb.Append(Name);
+            sb.Append(' ');
+        }
         sb.Append(" {");
         foreach (var state in States)
         {

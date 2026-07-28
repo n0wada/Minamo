@@ -88,7 +88,6 @@ public class Unit
 
     public Dictionary<HashString, ScopeVar> ExportList { get; }
 
-    internal List<SelectDefinition> SelectDefinitions { get; private set; } = new();
 
     internal Unit()
     {
@@ -118,7 +117,6 @@ public class Unit
         References = unit.References;
         Strings = unit.Strings;
         Objects = unit.Objects;
-        SelectDefinitions = unit.SelectDefinitions;
     }
 
     internal Unit Clone(DebugInfo di) => new(this, di);

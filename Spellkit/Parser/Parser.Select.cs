@@ -9,12 +9,11 @@ internal sealed partial class HandwrittenParser
     private SelectDeclarationSyntax? ParseSelectDeclaration()
     {
         var keyword = Consume();
-        if (!Expect(TokenKind.LowerIdentifier))
+        var declaration = new SelectDeclarationSyntax(keyword.Location);
+        if (Check(TokenKind.LowerIdentifier))
         {
-            return null;
+            declaration.Name = Consume().Text;
         }
-
-        var declaration = new SelectDeclarationSyntax(keyword.Location) { Name = Previous.Text };
         if (!Expect(TokenKind.LeftBrace))
         {
             return null;

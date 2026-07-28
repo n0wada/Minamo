@@ -54,93 +54,22 @@ public sealed class SpellkitSelectResult
         SpellkitHostValueConverter.TryConvert(value, out result);
 }
 
-internal readonly record struct SelectFrameOutcome(bool IsCompleted, SpkObject? Value);
-
-internal sealed class SelectFrame
-{
-    private readonly SelectDefinition definition;
-    private SelectStateDefinition state;
-    private bool completed;
-
-    internal SelectFrame(SelectDefinition definition)
-    {
-        this.definition = definition;
-        state = definition.States.Single(candidate => candidate.IsInitial);
-        completed = state.Choices.Count == 0;
-    }
-
-    internal string Name => definition.Name;
-
-    internal SelectStateDefinition State => state;
-
-    internal bool IsCompleted => completed;
-
-    internal void Cancel() => completed = true;
-
-    internal SelectFrameOutcome Apply(SpkObject result)
-    {
-        if (TryReadControlSignal(result, out var signal, out var signalValue))
-        {
-            if (signal == SelectControlSignal.Exit)
-            {
-                completed = true;
-                return new(true, signalValue);
-            }
-
-            if (signalValue is not SpkString target)
-            {
-                throw new InvalidOperationException("A select goto must target a string state name.");
-            }
-
-            state = definition.States.SingleOrDefault(candidate =>
-                string.Equals(candidate.Name, target.Value, StringComparison.Ordinal))
-                ?? throw new InvalidOperationException(
-                    $"Select '{Name}' has no state named '{target.Value}'.");
-        }
-
-        if (state.Choices.Count == 0)
-        {
-            completed = true;
-            return new(true, null);
-        }
-
-        return new(false, null);
-    }
-
-    private static bool TryReadControlSignal(SpkObject value, out string signal, out SpkObject payload)
-    {
-        if (value is SpkTuple { Count: 2 } tuple && tuple[0] is SpkString marker
-            && (marker.Value == SelectControlSignal.Goto || marker.Value == SelectControlSignal.Exit))
-        {
-            signal = marker.Value;
-            payload = tuple[1];
-            return true;
-        }
-
-        signal = string.Empty;
-        payload = SpkNil.Instance;
-        return false;
-    }
-}
-
 public sealed class SpellkitSelectSession : IDisposable
 {
     private readonly object syncRoot = new();
     private readonly SpellkitInstance instance;
-    private readonly int unitId;
-    private readonly SelectFrame frame;
+    private readonly SelectInstance selectInstance;
     private SpellkitSelectSession? nested;
     private SpkMachine.VmContinuation? choiceContinuation;
     private bool disposed;
 
-    internal SpellkitSelectSession(SpellkitInstance instance, SelectDefinition definition, int unitId)
+    internal SpellkitSelectSession(SpellkitInstance instance, SelectInstance selectInstance)
     {
         this.instance = instance;
-        this.unitId = unitId;
-        frame = new(definition);
+        this.selectInstance = selectInstance;
     }
 
-    public string Name => frame.Name;
+    public string Name => selectInstance.Name;
 
     public IReadOnlyList<SpellkitChoice> Choices
     {
@@ -160,7 +89,7 @@ public sealed class SpellkitSelectSession : IDisposable
         {
             lock (syncRoot)
             {
-                return frame.IsCompleted;
+                return selectInstance.IsCompleted;
             }
         }
     }
@@ -175,7 +104,7 @@ public sealed class SpellkitSelectSession : IDisposable
         {
             ThrowIfDisposed();
             nested?.Cancel();
-            frame.Cancel();
+            selectInstance.Cancel();
         }
     }
 
@@ -191,7 +120,7 @@ public sealed class SpellkitSelectSession : IDisposable
             nested?.Dispose();
             nested = null;
             choiceContinuation = null;
-            frame.Cancel();
+            selectInstance.Cancel();
             disposed = true;
         }
     }
@@ -202,7 +131,7 @@ public sealed class SpellkitSelectSession : IDisposable
         lock (syncRoot)
         {
             ThrowIfDisposed();
-            if (frame.IsCompleted)
+            if (selectInstance.IsCompleted)
             {
                 throw new InvalidOperationException($"Select session '{Name}' has already completed.");
             }
@@ -212,24 +141,24 @@ public sealed class SpellkitSelectSession : IDisposable
                 return ResumeNested(choiceId, argument, hasArgument);
             }
 
-            var choice = frame.State.Choices.SingleOrDefault(candidate =>
+            var choice = selectInstance.State.Choices.SingleOrDefault(candidate =>
                 string.Equals(candidate.Name, choiceId, StringComparison.Ordinal));
             if (choice is null)
             {
                 throw new ArgumentException(
-                    $"Choice '{choiceId}' is not available in select state '{frame.State.Name}'.",
+                    $"Choice '{choiceId}' is not available in select state '{selectInstance.State.Name}'.",
                     nameof(choiceId));
             }
 
             if (!IsAvailable(choice))
             {
                 throw new ArgumentException(
-                    $"Choice '{choiceId}' is not currently available in select state '{frame.State.Name}'.",
+                    $"Choice '{choiceId}' is not currently available in select state '{selectInstance.State.Name}'.",
                     nameof(choiceId));
             }
 
             var arguments = ConvertArguments(choice, argument, hasArgument);
-            var result = instance.InvokeSelectChoice(unitId, choice, arguments);
+            var result = instance.InvokeSelectChoice(selectInstance.Choice(choice), arguments);
             return ApplyChoiceExecution(result);
         }
     }
@@ -272,7 +201,7 @@ public sealed class SpellkitSelectSession : IDisposable
             throw new InvalidOperationException("The select choice did not complete successfully.");
         }
 
-        var outcome = frame.Apply(result.Value ?? SpkNil.Instance);
+        var outcome = selectInstance.Apply(result.Value ?? SpkNil.Instance);
             if (outcome.IsCompleted)
             {
                 return new(Array.Empty<SpellkitChoice>(), isCompleted: true, outcome.Value);
@@ -281,9 +210,9 @@ public sealed class SpellkitSelectSession : IDisposable
             return new(GetChoices(), isCompleted: false);
     }
 
-    private IReadOnlyList<SpellkitChoice> GetChoices() => frame.IsCompleted
+    private IReadOnlyList<SpellkitChoice> GetChoices() => selectInstance.IsCompleted
         ? Array.Empty<SpellkitChoice>()
-        : frame.State.Choices
+        : selectInstance.State.Choices
             .Where(IsAvailable)
             .Select(choice => new SpellkitChoice(
                 choice.Name,
@@ -293,7 +222,7 @@ public sealed class SpellkitSelectSession : IDisposable
             .ToArray();
 
     private bool IsAvailable(SelectChoiceDefinition choice) =>
-        choice.GuardFunctionAddress is null || instance.EvaluateSelectGuard(unitId, choice.GuardFunctionAddress.Value);
+        selectInstance.Guard(choice) is not { } guard || instance.EvaluateSelectGuard(guard);
 
     private static SpkObject[] ConvertArguments(
         SelectChoiceDefinition choice,

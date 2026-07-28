@@ -237,6 +237,11 @@ internal sealed partial class HandwrittenParser
 
         if (IsContextualKeyword("select"))
         {
+            return ParseSelectDeclaration();
+        }
+
+        if (IsContextualKeyword("select"))
+        {
             return FinishStatement(ParseSelectDeclaration());
         }
 

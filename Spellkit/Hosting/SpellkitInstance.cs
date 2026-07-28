@@ -562,15 +562,21 @@ public sealed class SpellkitInstance : IDisposable
     internal SpellkitSelectSession CreateSelectSession(string name)
     {
         var selectName = SpellkitSelectAliases.Resolve(runtimeContext!, name);
-        var matches = new List<(SelectDefinition Definition, int UnitId)>();
+        var matches = new List<SpkSelectFactory>();
         for (var unitId = 0; unitId < runtimeContext!.Composition.Units.Length; unitId++)
         {
-            foreach (var candidate in runtimeContext.Composition.Units[unitId].SelectDefinitions)
+            var scope = runtimeContext.Composition.Units[unitId].GlobalScope;
+            if (scope is null)
             {
-                if (string.Equals(candidate.Name, selectName, StringComparison.Ordinal))
-                {
-                    matches.Add((candidate, unitId));
-                }
+                continue;
+            }
+
+            var symbol = scope.GetVariable(selectName);
+            if (!symbol.IsEmpty()
+                && runtimeContext.Units[unitId] is { } values
+                && values[symbol.Address] is SpkSelectFactory factory)
+            {
+                matches.Add(factory);
             }
         }
 
@@ -583,8 +589,7 @@ public sealed class SpellkitInstance : IDisposable
             throw new InvalidOperationException($"The select name '{name}' is ambiguous.");
         }
 
-        var match = matches[0];
-        return new SpellkitSelectSession(this, match.Definition, match.UnitId);
+        return new SpellkitSelectSession(this, matches[0].Create());
     }
 
     internal SpellkitSelectResult Choose(
@@ -731,7 +736,7 @@ public sealed class SpellkitInstance : IDisposable
         }
     }
 
-    internal ExecutionResult InvokeSelectChoice(int unitId, SelectChoiceDefinition choice, SpkObject[] arguments)
+    internal ExecutionResult InvokeSelectChoice(SpkFunction choice, SpkObject[] arguments)
     {
         lock (syncRoot)
         {
@@ -744,8 +749,10 @@ public sealed class SpellkitInstance : IDisposable
             try
             {
                 var context = CreateExecutionContext(runtimeContext!, control: null);
-                var function = runtimeContext!.Units[unitId][choice.FunctionAddress >> 8] as SpkNativeFunction
-                    ?? throw new InvalidOperationException("The select choice function is unavailable.");
+                if (choice is not SpkNativeFunction function)
+                {
+                    throw new InvalidOperationException("The select choice function is unavailable.");
+                }
                 return SpkMachine.ExecuteWithArguments(function, arguments, context);
             }
             finally
@@ -758,7 +765,7 @@ public sealed class SpellkitInstance : IDisposable
         }
     }
 
-    internal bool EvaluateSelectGuard(int unitId, int functionAddress)
+    internal bool EvaluateSelectGuard(SpkFunction guard)
     {
         lock (syncRoot)
         {
@@ -771,9 +778,7 @@ public sealed class SpellkitInstance : IDisposable
             try
             {
                 var context = CreateExecutionContext(runtimeContext!, control: null);
-                var function = runtimeContext!.Units[unitId][functionAddress >> 8] as SpkFunction
-                    ?? throw new InvalidOperationException("The select guard function is unavailable.");
-                var result = function.Call(context);
+                var result = guard.Call(context);
                 context.ThrowIf();
                 return result.IsTrue();
             }

@@ -34,8 +34,6 @@ internal interface ILoweredEmitterTarget
 
     int AddVariable(string name, Location loc, int data, int args);
 
-    void RegisterSelectDefinition(SelectDefinition definition);
-
     void RegisterIndexerDeclaration(LoweredFunctionDeclaration node);
 
     string GetMethodName(string name, LoweredFunctionDeclaration node);

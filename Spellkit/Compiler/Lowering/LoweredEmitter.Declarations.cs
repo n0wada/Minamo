@@ -578,18 +578,16 @@ internal sealed partial class LoweredEmitter
 
     private void EmitSelectDeclaration(LoweredSelectDeclaration node, bool keepResult, CompilerContext ctx)
     {
-        if (!target.IsGlobalScope)
+        if (node.Name is not null && !target.IsGlobalScope)
         {
             target.AddError(CompilerError.SelectOnlyGlobalScope, node.Location);
         }
 
-        var selectAddress = target.AddVariable(
+        var selectAddress = node.Name is null ? -1 : target.AddVariable(
             node.Name,
             node.Location,
             VarFlags.Const | VarFlags.Private,
             args: 0);
-        cw.Push(node.Name);
-        cw.StoreVariable(selectAddress);
 
         var states = new List<SelectStateDefinition>(node.States.Count);
         var initialCount = 0;
@@ -602,7 +600,8 @@ internal sealed partial class LoweredEmitter
             }
         }
 
-        var selectContext = ctx.WithSelectStates(node.Name, stateNames);
+        var selectContext = ctx.WithSelectStates(node.Name ?? "<anonymous>", stateNames);
+        var closureCount = 0;
 
         for (var i = 0; i < node.States.Count; i++)
         {
@@ -622,16 +621,11 @@ internal sealed partial class LoweredEmitter
                     target.AddError(CompilerError.SelectDuplicateChoice, choice.Location, choice.Name, state.Name);
                 }
 
-                var hiddenName = $"$select:{node.Name}:{i}:{j}";
-                int? guardAddress = null;
+                var hiddenName = $"$select:{node.Name ?? "anonymous"}:{i}:{j}";
+                int? guardSlot = null;
                 if (choice.Guard is not null)
                 {
                     var hiddenGuardName = $"$select-guard:{node.Name}:{i}:{j}";
-                    guardAddress = target.AddVariable(
-                        hiddenGuardName,
-                        choice.Location,
-                        VarFlags.Const | VarFlags.Function | VarFlags.Private,
-                        args: 0);
                     var guard = new LoweredFunctionDeclaration(
                         choice.Location,
                         TypeName: null,
@@ -650,15 +644,10 @@ internal sealed partial class LoweredEmitter
                         NeedsValue: false,
                         IteratorBody: false,
                         IsStdCall: !target.NoOptimizations);
-                    EmitFunctionBody(guardAddress.Value, guard, selectContext, iteratorBody: false);
-                    cw.StoreVariable(guardAddress.Value);
+                    EmitFunctionBody(-1, guard, selectContext, iteratorBody: false);
+                    guardSlot = closureCount++;
                 }
 
-                var address = target.AddVariable(
-                    hiddenName,
-                    choice.Location,
-                    VarFlags.Const | VarFlags.Function | VarFlags.Private,
-                    choice.Parameters.Count);
                 var function = new LoweredFunctionDeclaration(
                     choice.Location,
                     TypeName: null,
@@ -677,14 +666,14 @@ internal sealed partial class LoweredEmitter
                     NeedsValue: false,
                     IteratorBody: false,
                     IsStdCall: !target.NoOptimizations);
-                EmitFunctionBody(address, function, selectContext, iteratorBody: false);
-                cw.StoreVariable(address);
+                EmitFunctionBody(-1, function, selectContext, iteratorBody: false);
+                var functionSlot = closureCount++;
                 choices.Add(new(
                     choice.Name,
                     choice.Label,
                     choice.Description,
-                    address,
-                    guardAddress,
+                    functionSlot,
+                    guardSlot,
                     choice.Parameters.Count));
             }
 
@@ -700,10 +689,19 @@ internal sealed partial class LoweredEmitter
             target.AddError(CompilerError.SelectRequiresOneInitialState, node.Location);
         }
 
-        target.RegisterSelectDefinition(new SelectDefinition(node.Name, states));
-        if (keepResult)
+        cw.CreateSelectFactory(new SpkSelectDefinitionValue(new SelectDefinition(node.Name, states), closureCount), closureCount);
+        if (node.Name is not null)
         {
-            cw.LoadNil();
+            if (keepResult)
+            {
+                cw.Duplicate();
+            }
+
+            cw.StoreVariable(selectAddress);
+        }
+        else if (!keepResult)
+        {
+            cw.Drop();
         }
     }
 

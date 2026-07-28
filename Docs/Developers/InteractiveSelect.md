@@ -92,8 +92,9 @@ choice-body
     ::= block | "goto" string-literal | "exit" expression?
 ```
 
-Select declarations are permitted only at global (module) scope. Exactly one state is marked
-`initial`. State names and choice identifiers are string literals.
+`select` is an expression that creates a reusable factory value. A named form at module scope is
+syntax sugar for binding that factory globally; it is the form exposed through `OpenSelect`.
+Exactly one state is marked `initial`. State names and choice identifiers are string literals.
 State names are private implementation details; choice identifiers are the values the host sends
 to the session.
 
@@ -135,6 +136,25 @@ effects.
 
 A state declared with no choices completes the session. A state whose choices are temporarily
 hidden by guards remains active, because a later query may make choices available.
+
+## Factory values
+
+An anonymous select can be captured or returned like a function value. Its choice and guard bodies
+are ordinary closures, so they can capture surrounding locals. The captured values belong to the
+factory; every host `OpenSelect` call creates a fresh interaction state from that factory.
+
+```kit
+func createShop(items) {
+    select {
+        initial state "open" {
+            choose "leave" => exit
+        }
+    }
+}
+```
+
+Select-local declarations are not supported yet. Use an enclosing function when state shared by
+the factory's choices is needed.
 
 ## Hosting protocol
 

@@ -256,4 +256,52 @@ public sealed class SelectSessionTests
         Assert.True(result.Success, result.Failure?.Message);
         Assert.Equal(2L, result.GetValue<long>());
     }
+
+    [Fact]
+    public void AnonymousSelectIsAClosureBackedFactoryValue()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+
+        var result = instance.Execute("""
+            func createPlayer(volume) {
+                select {
+                    initial state "stopped" {
+                        choose "louder" => {
+                            print(volume)
+                        }
+                    }
+                }
+            }
+
+            let player = createPlayer(50)
+            """);
+
+        Assert.True(result.Success, result.Failure?.Message);
+    }
+
+    [Fact]
+    public void NamedSelectFactoryCreatesIndependentSessions()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = instance.Execute("""
+            select player {
+                initial state "stopped" {
+                    choose "play" => goto "playing"
+                }
+
+                state "playing" {
+                    choose "exit" => exit
+                }
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        using var first = instance.OpenSelect("player");
+        using var second = instance.OpenSelect("player");
+
+        first.Choose("play");
+
+        Assert.Equal("exit", first.Choices.Single().Id);
+        Assert.Equal("play", second.Choices.Single().Id);
+    }
 }

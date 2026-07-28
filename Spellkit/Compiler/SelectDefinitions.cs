@@ -8,7 +8,7 @@ internal static class SelectControlSignal
     internal const string Exit = "\u0001spellkit.select.exit";
 }
 
-internal sealed record SelectDefinition(string Name, IReadOnlyList<SelectStateDefinition> States);
+internal sealed record SelectDefinition(string? Name, IReadOnlyList<SelectStateDefinition> States);
 
 internal sealed record SelectStateDefinition(
     string Name,
@@ -19,6 +19,6 @@ internal sealed record SelectChoiceDefinition(
     string Name,
     string Label,
     string? Description,
-    int FunctionAddress,
-    int? GuardFunctionAddress,
+    int FunctionSlot,
+    int? GuardFunctionSlot,
     int ParameterCount);

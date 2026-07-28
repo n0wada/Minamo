@@ -198,6 +198,17 @@ internal static partial class SpkMachine
             case OpCode.SetFunctionAttribute:
                 ((SpkFunction)state.EvalStack.Peek()).Attr |= op.Data;
                 break;
+            case OpCode.CreateSelectFactory:
+                var definition = state.Unit.Objects[op.Data] as SpkSelectDefinitionValue
+                    ?? throw new InvalidOperationException("The select definition is unavailable.");
+                var closures = new SpkFunction[op.Data2];
+                for (var i = closures.Length - 1; i >= 0; i--)
+                {
+                    closures[i] = state.EvalStack.Pop() as SpkFunction
+                        ?? throw new InvalidOperationException("A select closure is unavailable.");
+                }
+                state.EvalStack.Push(new SpkSelectFactory(definition, closures));
+                break;
             default:
                 throw UnexpectedOpcode(op);
         }
