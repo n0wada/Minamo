@@ -353,12 +353,12 @@ public sealed class SpellkitInstance : IDisposable
                     while (result.Reason is TerminationReason.Suspended)
                     {
                         if (result.Continuation is null
-                            || result.Suspension is not { SelectName.Length: > 0 } suspension)
+                            || result.Suspension is not { Select: not null } suspension)
                         {
                             throw new InvalidOperationException("The VM suspended without a select request.");
                         }
 
-                        using var select = CreateSelectSession(suspension.SelectName);
+                        using var select = CreateSelectSession(suspension.Select);
                         SpellkitEnvironment.RunSelect(select);
                         result = SpkMachine.Resume(result.Continuation);
                     }
@@ -561,7 +561,19 @@ public sealed class SpellkitInstance : IDisposable
 
     internal SpellkitSelectSession CreateSelectSession(string name)
     {
-        var selectName = SpellkitSelectAliases.Resolve(runtimeContext!, name);
+        var factory = ResolveSelectFactory(name)
+            ?? throw new ArgumentException($"No select named '{name}' is available.", nameof(name));
+        return new SpellkitSelectSession(this, factory.Create());
+    }
+
+    internal SpkSelectFactory? ResolveSelectFactory(string name)
+    {
+        if (SpellkitSelectAliases.ResolveFactory(runtimeContext!, name) is { } aliasedFactory)
+        {
+            return aliasedFactory;
+        }
+
+        var selectName = SpellkitSelectAliases.ResolveName(runtimeContext!, name);
         var matches = new List<SpkSelectFactory>();
         for (var unitId = 0; unitId < runtimeContext!.Composition.Units.Length; unitId++)
         {
@@ -582,17 +594,19 @@ public sealed class SpellkitInstance : IDisposable
 
         if (matches.Count == 0)
         {
-            throw new ArgumentException($"No select named '{name}' is available.", nameof(name));
+            return null;
         }
         if (matches.Count > 1)
         {
             throw new InvalidOperationException($"The select name '{name}' is ambiguous.");
         }
 
-        return new SpellkitSelectSession(this, matches[0].Create());
+        return matches[0];
     }
 
-    internal SpellkitSelectResult Choose(
+    internal SpellkitSelectSession CreateSelectSession(SelectInstance select) => new(this, select);
+
+    internal SpellkitSelectResult Select(
         SpellkitRunSession run,
         string choiceId,
         object? argument,
@@ -605,8 +619,8 @@ public sealed class SpellkitInstance : IDisposable
             try
             {
                 var choiceResult = hasArgument
-                    ? run.GetSelect().Choose(choiceId, argument)
-                    : run.GetSelect().Choose(choiceId);
+                    ? run.GetSelect().Select(choiceId, argument)
+                    : run.GetSelect().Select(choiceId);
                 if (!choiceResult.IsCompleted)
                 {
                     return choiceResult;
@@ -773,7 +787,16 @@ public sealed class SpellkitInstance : IDisposable
             var nested = active;
             if (!nested)
             {
-                BeginOperation();
+                // Reading Choices for the one suspended run is safe: the continuation stays
+                // suspended while this short, serialized guard evaluation executes.
+                if (suspendedRun is null)
+                {
+                    BeginOperation();
+                }
+                else
+                {
+                    active = true;
+                }
             }
             try
             {
@@ -807,7 +830,9 @@ public sealed class SpellkitInstance : IDisposable
         context.SetContextVariable(SpellkitHostEnvironment.ContextKey, Environment);
         context.SetContextVariable(SpellkitHostEnvironment.RootContextKey, Environment.Root);
         context.SetContextVariable(SpellkitEnvironment.ContextKey, SpellkitEnvironment);
-        context.SetContextVariable(SpellkitSelectInvoker.ContextKey, new SpellkitSelectInvoker(this));
+        context.SetContextVariable(
+            SpellkitSelectFactoryResolver.ContextKey,
+            new SpellkitSelectFactoryResolver(this));
 
         if (HostContext is not null)
         {

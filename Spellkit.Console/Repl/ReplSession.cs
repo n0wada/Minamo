@@ -244,11 +244,11 @@ internal sealed class ReplSession : IDisposable
                         continue;
                     }
 
-                    select.Choose(choice.Id);
+                    select.Select(choice.Id);
                 }
                 else if (choice.ParameterCount == 1 && argument is not null)
                 {
-                    select.Choose(choice.Id, argument);
+                    select.Select(choice.Id, argument);
                 }
                 else
                 {

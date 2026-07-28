@@ -94,9 +94,9 @@ public sealed class SpellkitSelectSession : IDisposable
         }
     }
 
-    public SpellkitSelectResult Choose(string choiceId) => ChooseCore(choiceId, null, hasArgument: false);
+    public SpellkitSelectResult Select(string choiceId) => SelectCore(choiceId, null, hasArgument: false);
 
-    public SpellkitSelectResult Choose(string choiceId, object? argument) => ChooseCore(choiceId, argument, hasArgument: true);
+    public SpellkitSelectResult Select(string choiceId, object? argument) => SelectCore(choiceId, argument, hasArgument: true);
 
     public void Cancel()
     {
@@ -125,7 +125,7 @@ public sealed class SpellkitSelectSession : IDisposable
         }
     }
 
-    private SpellkitSelectResult ChooseCore(string choiceId, object? argument, bool hasArgument)
+    private SpellkitSelectResult SelectCore(string choiceId, object? argument, bool hasArgument)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(choiceId);
         lock (syncRoot)
@@ -166,8 +166,8 @@ public sealed class SpellkitSelectSession : IDisposable
     private SpellkitSelectResult ResumeNested(string choiceId, object? argument, bool hasArgument)
     {
         var nestedResult = hasArgument
-            ? nested!.Choose(choiceId, argument)
-            : nested!.Choose(choiceId);
+            ? nested!.Select(choiceId, argument)
+            : nested!.Select(choiceId);
         if (!nestedResult.IsCompleted)
         {
             return nestedResult;
@@ -186,13 +186,13 @@ public sealed class SpellkitSelectSession : IDisposable
         if (result.Reason is TerminationReason.Suspended)
         {
             if (result.Continuation is null
-                || result.Suspension is not { SelectName.Length: > 0 } suspension)
+                || result.Suspension is not { Select: not null } suspension)
             {
                 throw new InvalidOperationException("A select choice suspended without a select request.");
             }
 
             choiceContinuation = result.Continuation;
-            nested = instance.CreateSelectSession(suspension.SelectName);
+            nested = instance.CreateSelectSession(suspension.Select);
             return new(nested.Choices, isCompleted: false);
         }
 
@@ -301,11 +301,11 @@ public sealed class SpellkitRunSession : IDisposable
         }
     }
 
-    public SpellkitSelectResult Choose(string choiceId) =>
-        instance.Choose(this, choiceId, null, hasArgument: false);
+    public SpellkitSelectResult Select(string choiceId) =>
+        instance.Select(this, choiceId, null, hasArgument: false);
 
-    public SpellkitSelectResult Choose(string choiceId, object? argument) =>
-        instance.Choose(this, choiceId, argument, hasArgument: true);
+    public SpellkitSelectResult Select(string choiceId, object? argument) =>
+        instance.Select(this, choiceId, argument, hasArgument: true);
 
     public T? GetValue<T>() => SpellkitHostValueConverter.Convert<T>(value, "Run result");
 
@@ -342,10 +342,10 @@ public sealed class SpellkitRunSession : IDisposable
 
         if (result.Reason is TerminationReason.Suspended
             && result.Continuation is not null
-            && result.Suspension is { SelectName.Length: > 0 } suspension)
+            && result.Suspension is { Select: not null } suspension)
         {
             continuation = result.Continuation;
-            select = instance.CreateSelectSession(suspension.SelectName);
+            select = instance.CreateSelectSession(suspension.Select);
             return;
         }
 

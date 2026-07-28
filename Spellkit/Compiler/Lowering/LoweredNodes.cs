@@ -121,7 +121,7 @@ internal sealed record LoweredSelectDeclaration(
 
 internal sealed record LoweredSelectInvocation(
     Location Location,
-    string Name) : LoweredNode(Location);
+    LoweredNode Target) : LoweredNode(Location);
 
 internal sealed record LoweredSelectState(
     Location Location,

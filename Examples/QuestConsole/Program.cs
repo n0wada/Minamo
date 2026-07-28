@@ -6,8 +6,7 @@ internal static class Program
 {
     private static int Main()
     {
-        var game = new QuestGame();
-        var host = new SpellkitHost().AddModule(new QuestCommands(game));
+        var host = new SpellkitHost();
         var environment = new SpellkitEnvironment()
             .UseOutput(Console.Write);
 
@@ -15,7 +14,7 @@ internal static class Program
         var scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "town.kit");
 
         Console.WriteLine("Quest Console");
-        Console.WriteLine("A small example of a host-owned game state and a Script-owned conversation flow.");
+        Console.WriteLine("A Script-owned quest state driven by a C# interactive-select host.");
 
         var initialization = instance.ExecuteFile(scriptPath);
         if (!initialization.Success)
@@ -24,14 +23,15 @@ internal static class Program
             return 1;
         }
 
-        Console.WriteLine("\nYou arrive at the town square.");
-        using (var town = instance.OpenSelect("game.town"))
+        using var town = instance.OpenSelect("quest.town");
+        RunSelect(town);
+        if (!town.IsCompleted)
         {
-            RunSelect(town);
+            Console.WriteLine("\nThe town console was cancelled.");
+            return 0;
         }
-        Console.WriteLine("\nThe town console closes.");
 
-        Console.WriteLine($"\nFinal game state: {game.Status()}");
+        Console.WriteLine("\nThe town console closes.");
         return 0;
     }
 
@@ -41,7 +41,7 @@ internal static class Program
         {
             var choices = select.Choices;
             Console.WriteLine();
-            Console.WriteLine($"[{select.Name}]");
+            Console.WriteLine("[town]");
             for (var i = 0; i < choices.Count; i++)
             {
                 var choice = choices[i];
@@ -60,7 +60,7 @@ internal static class Program
                 return;
             }
 
-            var choiceId = int.TryParse(input, out var index) && index is > 0 and <= int.MaxValue
+            string choiceId = int.TryParse(input, out var index) && index is > 0 and <= int.MaxValue
                 && index <= choices.Count
                 ? choices[index - 1].Id
                 : input;
@@ -70,7 +70,7 @@ internal static class Program
                 continue;
             }
 
-            select.Choose(choiceId);
+            select.Select(choiceId);
         }
     }
 }

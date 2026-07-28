@@ -338,7 +338,7 @@ internal sealed class StackMachineEmitter
     public void LoadTerminator() => Emit(Op.LoadTerminator);
     public void NoOperation() => Emit(Op.NoOperation);
     public void Suspend() => Emit(Op.Suspend);
-    public void SuspendSelect(string name) => Emit(new(OpCode.SuspendSelect, IndexString(name)));
+    public void SuspendSelect() => Emit(Op.SuspendSelect);
     public void Drop() => Emit(Op.Drop);
     public void Add() => Emit(Op.Add);
     public void Sub() => Emit(Op.Sub);

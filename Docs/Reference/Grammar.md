@@ -182,7 +182,7 @@ The final expression of a block is its value.
 ## Interactive selects
 
 An interactive select defines a host-driven state machine. A host normally opens it through
-`SpellkitInstance.OpenSelect`; Script may also invoke it with `do qualified-name`. The host renders
+`SpellkitInstance.OpenSelect`; Script may also invoke a factory with `do expression`. The host renders
 current choices and sends a selected choice back to the session. See
 [Interactive selects](../Developers/InteractiveSelect.md) for the C# protocol.
 
@@ -213,7 +213,7 @@ select-alias
     ::= "alias" "(" identifier "," string ")"
 
 select-invocation
-    ::= "do" qualified-name
+    ::= "do" expression
 ```
 
 Select declarations are permitted only at global (module) scope. Exactly one state is marked
@@ -222,7 +222,7 @@ remains in its current state. `exit` completes the session. Choice names are uni
 state. A choice receives either no argument, one value, or a tuple whose elements bind to its
 parameters. `label` and `description` provide host-facing display text; `when` controls whether a
 choice is currently available. `goto` targets must name a state declared by the same select.
-`do qualified-name` invokes a select through the host's configured select runner.
+`do expression` evaluates a select factory and invokes its new instance through the host's configured select runner.
 
 ```swift
 select player {
@@ -371,7 +371,7 @@ expressions.
 ```text
 while-loop    ::= "while" expression block
 do-while-loop ::= "do" block "while" expression
-select-invocation ::= "do" qualified-name
+select-invocation ::= "do" expression
 for-loop      ::= "for" pattern "in" expression
                   [ "when" expression ] block [ "else" block ]
 ```

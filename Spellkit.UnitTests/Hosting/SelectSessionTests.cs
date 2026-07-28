@@ -115,24 +115,24 @@ public sealed class SelectSessionTests
                 Assert.Equal("Show status", choice.Label);
                 Assert.Equal("Display player status", choice.Description);
             });
-        Assert.Throws<ArgumentException>(() => session.Choose("hidden"));
+        Assert.Throws<ArgumentException>(() => session.Select("hidden"));
 
-        var afterVolume = session.Choose("set-volume", 80);
+        var afterVolume = session.Select("set-volume", 80);
         Assert.False(afterVolume.IsCompleted);
         Assert.Equal(80, volume);
 
-        session.Choose("move", (12, 34));
+        session.Select("move", (12, 34));
         Assert.Equal((12L, 34L), position);
 
-        var afterPlay = session.Choose("play");
+        var afterPlay = session.Select("play");
         Assert.Single(afterPlay.Choices);
         Assert.Equal("pause", afterPlay.Choices[0].Id);
 
-        var afterPause = session.Choose("pause");
+        var afterPause = session.Select("pause");
         Assert.Single(afterPause.Choices);
         Assert.Equal("exit", afterPause.Choices[0].Id);
 
-        var completed = session.Choose("exit");
+        var completed = session.Select("exit");
         Assert.True(completed.IsCompleted);
         Assert.Equal("done", completed.GetValue<string>());
     }
@@ -149,7 +149,7 @@ public sealed class SelectSessionTests
                 {
                     invoked++;
                     Assert.Equal("player", select.Name);
-                    select.Choose("exit");
+                    select.Select("exit");
                 }));
 
         var result = instance.Execute("""
@@ -196,7 +196,7 @@ public sealed class SelectSessionTests
         Assert.Single(run.Choices);
         Assert.Equal("exit", run.Choices[0].Id);
 
-        var result = run.Choose("exit");
+        var result = run.Select("exit");
 
         Assert.True(result.IsCompleted);
         Assert.True(run.IsCompleted);
@@ -230,13 +230,13 @@ public sealed class SelectSessionTests
 
         Assert.Equal(new[] { "shop", "exit" }, run.Choices.Select(choice => choice.Id));
 
-        var inShop = run.Choose("shop");
+        var inShop = run.Select("shop");
         Assert.Equal(new[] { "leave" }, inShop.Choices.Select(choice => choice.Id));
 
-        var backInTown = run.Choose("leave");
+        var backInTown = run.Select("leave");
         Assert.Equal(new[] { "shop", "exit" }, backInTown.Choices.Select(choice => choice.Id));
 
-        Assert.True(run.Choose("exit").IsCompleted);
+        Assert.True(run.Select("exit").IsCompleted);
         Assert.True(run.IsCompleted);
     }
 
@@ -280,6 +280,37 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
+    public void AliasCanExposeAFunctionProducedSelectFactory()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = instance.Execute("""
+            func questGame() {
+                mut known = false
+
+                select {
+                    initial state "square" {
+                        choose "learn" when !known => {
+                            known = true
+                        }
+
+                        choose "continue" when known => exit
+                    }
+                }
+            }
+
+            alias(questGame(), "quest.town")
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        using var first = instance.OpenSelect("quest.town");
+        Assert.Equal("learn", Assert.Single(first.Choices).Id);
+        first.Select("learn");
+
+        using var second = instance.OpenSelect("quest.town");
+        Assert.Equal("continue", Assert.Single(second.Choices).Id);
+    }
+
+    [Fact]
     public void NamedSelectFactoryCreatesIndependentSessions()
     {
         using var instance = new SpellkitHost().CreateInstance();
@@ -299,9 +330,141 @@ public sealed class SelectSessionTests
         using var first = instance.OpenSelect("player");
         using var second = instance.OpenSelect("player");
 
-        first.Choose("play");
+        first.Select("play");
 
         Assert.Equal("exit", first.Choices.Single().Id);
         Assert.Equal("play", second.Choices.Single().Id);
+    }
+
+    [Fact]
+    public void DoEvaluatesAnAnonymousSelectFactoryExpression()
+    {
+        var output = new StringBuilder();
+        using var instance = new SpellkitHost().CreateInstance(
+            new SpellkitEnvironment().UseOutput(value => output.Append(value)));
+        using var run = instance.Start("""
+            func createShop(name) {
+                select {
+                    initial state "open" {
+                        choose "leave" => {
+                            print(name, terminator: nil)
+                            exit
+                        }
+                    }
+                }
+            }
+
+            do createShop("weapons")
+            print(" done", terminator: nil)
+            """);
+
+        Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
+        Assert.Equal("leave", Assert.Single(run.Choices).Id);
+
+        var result = run.Select("leave");
+
+        Assert.True(result.IsCompleted);
+        Assert.True(run.IsCompleted);
+        Assert.Equal("weapons done", output.ToString());
+    }
+
+    [Fact]
+    public void DoCanUseAFactoryVariable()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            let player = select {
+                initial state "stopped" {
+                    choose "exit" => exit
+                }
+            }
+
+            do player
+            """);
+
+        Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
+        Assert.True(run.Select("exit").IsCompleted);
+    }
+
+    [Fact]
+    public void SuspendedRunCanEvaluateGuardsWhenChoicesAreRead()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            let available = true
+            let player = select {
+                initial state "stopped" {
+                    choose "exit" when available => exit
+                }
+            }
+
+            do player
+            """);
+
+        Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
+        Assert.Equal("exit", Assert.Single(run.Choices).Id);
+    }
+
+    [Fact]
+    public void DoImmediatelyContinuesPastAnEmptyInitialState()
+    {
+        var output = new StringBuilder();
+        using var instance = new SpellkitHost().CreateInstance(
+            new SpellkitEnvironment().UseOutput(value => output.Append(value)));
+        using var run = instance.Start("""
+            let empty = select {
+                initial state "empty" {
+                }
+            }
+
+            do empty
+            print("after", terminator: nil)
+            """);
+
+        Assert.True(run.IsCompleted, run.Failure?.ToString());
+        Assert.False(run.IsWaitingForSelect);
+        Assert.Equal("after", output.ToString());
+    }
+
+    [Fact]
+    public void NestedDoCanUseAnAnonymousFactoryVariable()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            let shop = select {
+                initial state "open" {
+                    choose "leave" => exit
+                }
+            }
+
+            select town {
+                initial state "square" {
+                    choose "shop" => {
+                        do shop
+                        goto "square"
+                    }
+
+                    choose "exit" => exit
+                }
+            }
+
+            do town
+            """);
+
+        Assert.Equal(new[] { "shop", "exit" }, run.Choices.Select(choice => choice.Id));
+        Assert.Equal("leave", Assert.Single(run.Select("shop").Choices).Id);
+        Assert.Equal(new[] { "shop", "exit" }, run.Select("leave").Choices.Select(choice => choice.Id));
+        Assert.True(run.Select("exit").IsCompleted);
+    }
+
+    [Fact]
+    public void DoRejectsValuesThatAreNotSelectFactories()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("do 42");
+
+        Assert.True(run.IsCompleted);
+        Assert.NotNull(run.Failure);
+        Assert.Contains("select factory", run.Failure!.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -1,16 +1,18 @@
 # Quest Console example
 
-This example is a small game-style console. C# owns the quest facts and renders the terminal UI;
-Spellkit owns the conversation states, available actions, conditions, and transitions.
+This example is a small game-style console. The Script keeps its quest flags in a closure and
+defines the conversation states, available actions, conditions, and transitions. C# renders the
+terminal UI and drives the interaction.
 
 It demonstrates:
 
 - `select`, `initial state`, `choose`, `goto`, and `exit`;
 - `label` and `description` for host-facing presentation;
-- `when` guards that react to host-owned game state;
-- an external select name through `alias(town, "game.town")`;
-- host-driven startup with `instance.OpenSelect("game.town")`;
-- a small C# terminal adapter that displays `SpellkitSelectSession.Choices` and calls `Choose`.
+- `when` guards that read Script-owned, closure-captured quest flags;
+- a `questGame` function that returns a select factory with its own state;
+- `alias(questGame(), "quest.town")` to expose that factory to the host;
+- a small C# terminal adapter that opens `quest.town`, displays `SpellkitSelectSession.Choices`,
+  and calls `Select`.
 
 Run it from the repository root:
 
@@ -19,8 +21,10 @@ dotnet run --project .\Examples\QuestConsole\QuestConsole.csproj
 ```
 
 Talk to the guard, ask about the courier, accept the quest, return to the square, and leave. The
-`accept` choice is hidden until the host reports that the quest is available.
+`accept` choice is hidden until the Script has recorded that the courier quest is known.
 
-`Program.cs` contains the minimal terminal runner. A game can replace it with its own UI while
-keeping the same `SpellkitSelectSession` protocol. The host initializes the Script definitions,
-then opens the alias explicitly with `instance.OpenSelect("game.town")`.
+During initialization, `alias(questGame(), "quest.town")` calls `questGame` once and registers its
+factory. The factory's choice and guard closures retain the two quest flags. `Program.cs` opens a
+fresh `SpellkitSelectSession` with `instance.OpenSelect("quest.town")` and drives it by calling
+`Select`. This example intentionally shows the C#-initiated API rather than `do` and a suspended
+Script continuation.

@@ -53,25 +53,28 @@ internal sealed partial class HandwrittenParser
         var keyword = Consume();
         if (!Check(TokenKind.LeftBrace))
         {
-            if (!IsIdentifier(Current.Kind))
+            if (IsIdentifier(Current.Kind) && Peek(1).Kind == TokenKind.Dot)
             {
-                Report(ParserError.InvalidExpression, Current);
-                return null;
-            }
-
-            var name = Consume().Text;
-            while (Match(TokenKind.Dot))
-            {
-                if (!IsIdentifier(Current.Kind))
+                var name = Consume().Text;
+                while (Match(TokenKind.Dot))
                 {
-                    Report(ParserError.InvalidExpression, Current);
-                    return null;
+                    if (!IsIdentifier(Current.Kind))
+                    {
+                        Report(ParserError.InvalidExpression, Current);
+                        return null;
+                    }
+
+                    name += "." + Consume().Text;
                 }
 
-                name += "." + Consume().Text;
+                return new SelectInvocationSyntax(keyword.Location)
+                {
+                    Target = new StringLiteralSyntax(keyword.Location) { Value = name }
+                };
             }
 
-            return new SelectInvocationSyntax(keyword.Location) { Name = name };
+            var target = ParseExpression();
+            return target is null ? null : new SelectInvocationSyntax(keyword.Location) { Target = target };
         }
 
         var body = ParseRequiredBlock();
@@ -211,7 +214,7 @@ internal sealed partial class HandwrittenParser
         SyntaxNode? guard = null;
         if (Match(TokenKind.When))
         {
-            guard = ParseMatchGuard();
+                guard = ParseGuardExpression();
         }
 
         if (!Expect(TokenKind.Arrow))
@@ -228,7 +231,7 @@ internal sealed partial class HandwrittenParser
         return new MatchEntrySyntax(location) { Pattern = pattern, Guard = guard, Expression = expression };
     }
 
-    private SyntaxNode? ParseMatchGuard()
+    private SyntaxNode? ParseGuardExpression()
     {
         var previous = allowLambda;
         allowLambda = false;

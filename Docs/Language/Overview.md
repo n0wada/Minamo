@@ -151,6 +151,40 @@ for item in items when item.Enabled {
 
 `break` may provide the value of a loop expression.
 
+## Interactive selects
+
+`select` defines a host-driven interaction with named states and choices, suitable for menus,
+dialogue, and quests. A select expression produces a reusable factory; each invocation creates a
+new interaction instance.
+
+```swift
+let shop = select {
+    initial state "open" {
+        choose "browse" => {
+            print("You browse the shelves.")
+            goto "browsing"
+        }
+
+        choose "leave" => exit
+    }
+
+    state "browsing" {
+        choose "back" => goto "open"
+        choose "leave" => exit
+    }
+}
+
+do shop
+print("The shop is closed.")
+```
+
+`do shop` suspends the script while the host presents choices. Selecting `"browse"` runs its
+choice body and moves the same interaction instance to `"browsing"`; selecting `"leave"` exits
+and resumes execution after `do`. Named selects can also be opened from C#.
+
+See [Interactive selects](../Developers/InteractiveSelect.md) for factory lifetime, guards,
+nesting, aliases, and the C# session API.
+
 ## Collections
 
 The main collection forms are arrays, tuples, labeled tuples, dictionaries, sets, ranges, and
@@ -391,6 +425,7 @@ telemetry, and C# integration.
 
 - [Detailed grammar reference](../Reference/Grammar.md)
 - [Language recipes](Recipes.md)
+- [Interactive selects](../Developers/InteractiveSelect.md)
 - [Hosting API](../Hosting/Guide.md)
 - [Compatibility](../Operations/Compatibility.md)
 - [Runnable Station Console example](../../Examples/StationConsole/README.md)

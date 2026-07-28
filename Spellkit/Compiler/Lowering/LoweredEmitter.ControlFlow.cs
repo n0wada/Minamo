@@ -12,7 +12,8 @@ internal sealed partial class LoweredEmitter
 {
     private void EmitSelectInvocation(LoweredSelectInvocation node, bool keepResult, CompilerContext ctx)
     {
-        cw.SuspendSelect(node.Name);
+        EmitValue(node.Target, ctx);
+        cw.SuspendSelect();
         if (keepResult)
         {
             cw.LoadNil();

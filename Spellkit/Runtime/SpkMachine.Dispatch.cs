@@ -43,7 +43,22 @@ internal static partial class SpkMachine
 
         if (op.Code is OpCode.SuspendSelect)
         {
-            return new(VmStep.Suspend, Suspension: new((string)state.Unit.Strings[op.Data]));
+            var target = state.EvalStack.Pop();
+            var factory = target as SpkSelectFactory;
+            if (factory is null && target is SpkString name)
+            {
+                factory = state.Context.GetContextVariable<SpellkitSelectFactoryResolver>(
+                    SpellkitSelectFactoryResolver.ContextKey)?.Resolve(name.Value);
+            }
+
+            if (factory is null)
+            {
+                throw new InvalidOperationException("A select factory is required after 'do'.");
+            }
+            var select = factory.Create();
+            return select.IsCompleted
+                ? VmDispatchResult.Continue
+                : new(VmStep.Suspend, Suspension: new(select));
         }
 
         if (op.Code is not (OpCode.NoOperation or OpCode.Debug))

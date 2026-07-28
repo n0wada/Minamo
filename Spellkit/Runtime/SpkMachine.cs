@@ -170,7 +170,7 @@ internal static partial class SpkMachine
                     return ExecutionResult.Suspend(
                         state.Context,
                         saved,
-                        result.Suspension ?? new VmSuspension(string.Empty));
+                        result.Suspension ?? new VmSuspension(null));
                 default:
                     throw new InvalidOperationException($"Unsupported VM step: {result.Step}.");
             }

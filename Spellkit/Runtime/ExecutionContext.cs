@@ -321,7 +321,7 @@ internal enum TerminationReason
     Suspended = 3
 }
 
-internal sealed record VmSuspension(string SelectName);
+internal sealed record VmSuspension(SelectInstance? Select);
 
 internal sealed class ExecutionResult
 {

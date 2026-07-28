@@ -276,9 +276,13 @@ public sealed class SelectInvocationSyntax : SyntaxNode
 {
     public SelectInvocationSyntax(Location loc) : base(NodeType.SelectInvocation, loc) { }
 
-    public string Name { get; set; } = string.Empty;
+    public SyntaxNode Target { get; set; } = null!;
 
-    internal override void ToString(StringBuilder sb) => sb.Append("do ").Append(Name);
+    internal override void ToString(StringBuilder sb)
+    {
+        sb.Append("do ");
+        Target.ToString(sb);
+    }
 }
 
 public sealed class YieldSyntax : SyntaxNode

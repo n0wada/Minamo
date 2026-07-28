@@ -43,21 +43,7 @@ internal sealed partial class Lang : ForeignUnit
     [SpkStaticMethod("alias")]
     public static void Alias(ExecutionContext ctx, SpkObject select, string name)
     {
-        var selectName = select switch
-        {
-            SpkSelectFactory factory => factory.Name,
-            SpkString text => text.Value,
-            _ => throw new InvalidOperationException("Alias expects a select factory.")
-        };
-        SpellkitSelectAliases.Register(ctx, selectName, name);
-    }
-
-    [SpkStaticMethod("__select")]
-    public static SpkObject InvokeSelect(ExecutionContext ctx, string name)
-    {
-        var invoker = ctx.GetContextVariable<SpellkitSelectInvoker>(SpellkitSelectInvoker.ContextKey)
-            ?? throw new InvalidOperationException("Select invocation is unavailable in this execution context.");
-        return invoker.Invoke(name);
+        SpellkitSelectAliases.Register(ctx, select, name);
     }
 
     [SpkStaticMethod("print")]

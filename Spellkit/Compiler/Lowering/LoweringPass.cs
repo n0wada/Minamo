@@ -117,8 +117,8 @@ internal sealed class LoweringPass
         return new(node.Location, node.Name, states);
     }
 
-    public LoweredSelectInvocation Lower(SelectInvocationSyntax node) =>
-        new(node.Location, node.Name);
+    public LoweredSelectInvocation Lower(SelectInvocationSyntax node, CompilerContext ctx) =>
+        new(node.Location, LowerNode(node.Target, ctx));
 
     public LoweredControlTransfer Lower(GotoSyntax node) =>
         new(
@@ -472,7 +472,7 @@ internal sealed class LoweringPass
             NodeType.For => Lower((ForSyntax)node, ctx),
             NodeType.Function => Lower((FunctionDeclarationSyntax)node, ctx, needsValue, iteratorBody: false),
             NodeType.Select => Lower((SelectDeclarationSyntax)node, ctx),
-            NodeType.SelectInvocation => Lower((SelectInvocationSyntax)node),
+            NodeType.SelectInvocation => Lower((SelectInvocationSyntax)node, ctx),
             NodeType.If => Lower((IfSyntax)node, ctx),
             NodeType.Impl => Lower((ImplDeclarationSyntax)node, needsValue),
             NodeType.Index => Lower((IndexerSyntax)node, ctx),

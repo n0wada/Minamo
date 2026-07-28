@@ -140,7 +140,7 @@ internal sealed partial class HandwrittenParser
 
             if (Match(TokenKind.When))
             {
-                choice.Guard = ParseExpression();
+                choice.Guard = ParseGuardExpression();
                 if (choice.Guard is null)
                 {
                     return null;
