@@ -5,15 +5,15 @@ namespace Spellkit.Generators;
 internal static class GeneratorSupport
 {
     private static readonly DiagnosticDescriptor ErrorDescriptor = new(
-        "Spk0001",
+        "Spellkit0001",
         "Spellkit.Generator",
         "{0}",
         "Spellkit.Generator",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    public static bool IsSpkObject(ITypeSymbol type) =>
-        CheckBaseType(type, Types.SpkObject);
+    public static bool IsSpellkitObject(ITypeSymbol type) =>
+        CheckBaseType(type, Types.SpellkitObject);
 
     public static bool Error(SourceProductionContext context, string text)
     {

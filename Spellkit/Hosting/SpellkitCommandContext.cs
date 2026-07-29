@@ -13,13 +13,13 @@ public sealed class SpellkitCommandContext
     internal const string HostContextKey = "Spellkit.Hosting.HostContext";
 
     private readonly SpellkitCommandDescriptor command;
-    private readonly SpkObject[] arguments;
+    private readonly SpellkitObject[] arguments;
     private readonly SpellkitCallbackScope callbackScope;
 
     internal SpellkitCommandContext(
         ExecutionContext executionContext,
         SpellkitCommandDescriptor command,
-        SpkObject[] arguments,
+        SpellkitObject[] arguments,
         SpellkitCallbackScope callbackScope) =>
         (ExecutionContext, this.command, this.arguments, this.callbackScope) =
         (executionContext, command, arguments, callbackScope);
@@ -48,7 +48,7 @@ public sealed class SpellkitCommandContext
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public SpkObject RawArgument(int index) => arguments[index];
+    public SpellkitObject RawArgument(int index) => arguments[index];
 
     public SpellkitCallback Callback(int index)
     {
@@ -57,12 +57,12 @@ public sealed class SpellkitCommandContext
             throw new ArgumentOutOfRangeException(nameof(index));
         }
 
-        if (arguments[index] is SpkFunction function)
+        if (arguments[index] is SpellkitFunction function)
         {
             return new SpellkitCallback(ExecutionContext, function, callbackScope);
         }
 
-        ExecutionContext.InvalidCast(arguments[index].TypeName, nameof(Spk.Function));
+        ExecutionContext.InvalidCast(arguments[index].TypeName, nameof(SpellkitTypeCodes.Function));
         return null!;
     }
 
@@ -183,7 +183,7 @@ public sealed class SpellkitCommandContext
         throw new ArgumentException($"Command '{command.Name}' has no parameter named '{name}'.", nameof(name));
     }
 
-    public SpkObject Resource(SpellkitResource resource) =>
+    public SpellkitObject Resource(SpellkitResource resource) =>
         Environment.CreateResource(resource);
 
     public void Log(

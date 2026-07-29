@@ -59,14 +59,14 @@ internal sealed class HostForeignUnit : ForeignUnit
         typeInfo.DeclaringUnit = this;
     }
 
-    private void AddForeignType(SpkForeignTypeInfo typeInfo)
+    private void AddForeignType(SpellkitForeignTypeInfo typeInfo)
     {
         Types.Add(typeInfo);
         typeInfo.DeclaringUnit = this;
     }
 }
 
-internal sealed class HostTypeInfo : SpkForeignTypeInfo
+internal sealed class HostTypeInfo : SpellkitForeignTypeInfo
 {
     private readonly HostTypeDefinition type;
 
@@ -74,7 +74,7 @@ internal sealed class HostTypeInfo : SpkForeignTypeInfo
 
     public override string ReflectedTypeName => type.Name;
 
-    protected override SpkFunction? InitializeStaticMember(string name, ExecutionContext ctx)
+    protected override SpellkitFunction? InitializeStaticMember(string name, ExecutionContext ctx)
     {
         for (var i = 0; i < type.Commands.Count; i++)
         {
@@ -88,7 +88,7 @@ internal sealed class HostTypeInfo : SpkForeignTypeInfo
     }
 }
 
-internal sealed class HostCommandFunction : SpkForeignFunction
+internal sealed class HostCommandFunction : SpellkitForeignFunction
 {
     private const string HostFailureMessage = "The host command failed.";
     private readonly SpellkitCommandDescriptor command;
@@ -103,12 +103,12 @@ internal sealed class HostCommandFunction : SpkForeignFunction
         }
     }
 
-    public override SpkObject Clone() => new HostCommandFunction(command);
+    public override SpellkitObject Clone() => new HostCommandFunction(command);
 
-    protected override SpkObject BindOrRun(ExecutionContext ctx, SpkObject arg) =>
-        Auto ? CallWithMemoryLayout(ctx, Array.Empty<SpkObject>()) : base.BindOrRun(ctx, arg);
+    protected override SpellkitObject BindOrRun(ExecutionContext ctx, SpellkitObject arg) =>
+        Auto ? CallWithMemoryLayout(ctx, Array.Empty<SpellkitObject>()) : base.BindOrRun(ctx, arg);
 
-    protected override SpkObject CallWithMemoryLayout(ExecutionContext ctx, SpkObject[] args)
+    protected override SpellkitObject CallWithMemoryLayout(ExecutionContext ctx, SpellkitObject[] args)
     {
         var environment = ctx.GetContextVariable<SpellkitHostEnvironment>(SpellkitHostEnvironment.ContextKey);
         var traceStarted = 0L;
@@ -127,12 +127,12 @@ internal sealed class HostCommandFunction : SpkForeignFunction
             ctx.Control?.Checkpoint();
             if (ctx.HasErrors)
             {
-                return SpkNil.Instance;
+                return SpellkitNil.Instance;
             }
 
             return SpellkitHostRootTypeInfo.Wrap(ctx, value);
         }
-        catch (SpkExecutionLimitException)
+        catch (SpellkitExecutionLimitException)
         {
             throw;
         }
@@ -158,7 +158,7 @@ internal sealed class HostCommandFunction : SpkForeignFunction
         }
     }
 
-    protected override bool Equals(SpkFunction func) =>
+    protected override bool Equals(SpellkitFunction func) =>
         func is HostCommandFunction other && ReferenceEquals(command, other.command);
 
     private void ReportFailure(SpellkitHostEnvironment? environment, Exception exception)

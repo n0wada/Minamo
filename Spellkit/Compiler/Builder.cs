@@ -21,7 +21,7 @@ internal sealed partial class Builder : ILoweredEmitterTarget
     private readonly Unit unit; //Unit (file) that is beign compiler
     private Scope currentScope; //Current lexical scope
     private readonly Label programEnd; //Label that marks an end of program
-    private readonly SpkLinker linker; //Linker
+    private readonly SpellkitLinker linker; //Linker
     private readonly Dictionary<string, UnitInfo> referencedUnits;
     private readonly Dictionary<string, ImportedSymbol> importedSymbols;
     private readonly HashSet<string> indexerDeclarations;
@@ -31,7 +31,7 @@ internal sealed partial class Builder : ILoweredEmitterTarget
     private readonly LoweringPass lowering;
     private readonly LoweredEmitter loweredEmitter;
 
-    public Builder(BuilderOptions options, SpkLinker linker)
+    public Builder(BuilderOptions options, SpellkitLinker linker)
     {
         referencedUnits = new();
         importedSymbols = new();
@@ -82,7 +82,7 @@ internal sealed partial class Builder : ILoweredEmitterTarget
         loweredEmitter = CreateLoweredEmitter();
     }
 
-    public Unit? Build(SpkCodeModel codeModel)
+    public Unit? Build(SpellkitCodeModel codeModel)
     {
         diagnostics.Clear();
         unit.FileName = codeModel.FileName;
@@ -110,7 +110,7 @@ internal sealed partial class Builder : ILoweredEmitterTarget
     }
 
     //Main build cycle with error handling logic
-    private bool TryBuild(SpkCodeModel codeModel)
+    private bool TryBuild(SpellkitCodeModel codeModel)
     {
         try
         {
@@ -163,7 +163,7 @@ internal sealed partial class Builder : ILoweredEmitterTarget
         }
     }
 
-    private SpkBuildException Ice(Exception? ex = null) => new($"Internal compiler error: {ex?.Message}", ex);
+    private SpellkitBuildException Ice(Exception? ex = null) => new($"Internal compiler error: {ex?.Message}", ex);
 
     internal List<BuildMessage> Messages => diagnostics.Messages;
 
@@ -350,7 +350,7 @@ internal sealed partial class Builder : ILoweredEmitterTarget
         };
     }
 
-    void ILoweredEmitterTarget.ThrowError(SpkError code) =>
+    void ILoweredEmitterTarget.ThrowError(SpellkitError code) =>
         ThrowError(code);
 
     void ILoweredEmitterTarget.CallAutos(bool cls) =>
@@ -509,14 +509,14 @@ partial class Builder
         }
     }
 
-    private void ThrowErrorProlog(SpkError code, int parameters)
+    private void ThrowErrorProlog(SpellkitError code, int parameters)
     {
-        cw.LoadType(Spk.Exception);
+        cw.LoadType(SpellkitTypeCodes.Exception);
         cw.LoadMember(code.ToString());
         cw.PrepareCall(parameters);
     }
 
-    private void ThrowError(SpkError code)
+    private void ThrowError(SpellkitError code)
     {
         ThrowErrorProlog(code, 0);
         cw.InvokePreparedCall(0);

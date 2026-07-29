@@ -1,10 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>$(SpellkitRuntimeTargetFramework)</TargetFramework>
-    <ApplicationIcon>spk.ico</ApplicationIcon>
+    <ApplicationIcon>spell.ico</ApplicationIcon>
     <OutputType>Exe</OutputType>
-    <AssemblyName>spk</AssemblyName>
+    <AssemblyName>spell</AssemblyName>
     <RootNamespace>Spellkit</RootNamespace>
     <Title>$(SpellkitProductName).Console</Title>
     <Description>Spellkit, a dynamic language for .NET</Description>

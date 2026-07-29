@@ -12,15 +12,15 @@ internal interface IModuleProvider
 
 public abstract class ForeignUnit : Unit
 {
-    protected static readonly SpkObject Nil = SpkNil.Instance;
+    protected static readonly SpellkitObject Nil = SpellkitNil.Instance;
 
     private bool initialized;
     private RuntimeContext? initializedTypesContext;
-    private readonly Dictionary<Type, SpkForeignTypeInfo> typeInfos = new();
+    private readonly Dictionary<Type, SpellkitForeignTypeInfo> typeInfos = new();
 
-    internal List<SpkForeignTypeInfo> Types { get; }
+    internal List<SpellkitForeignTypeInfo> Types { get; }
 
-    internal List<SpkObject> Values { get; } = new();
+    internal List<SpellkitObject> Values { get; } = new();
 
     protected RuntimeContext RuntimeContext { get; private set; }
 
@@ -33,15 +33,15 @@ public abstract class ForeignUnit : Unit
         UnitIds.Add(0); //Self reference, to mimic the behavior of regular units
     }
 
-    internal T GetTypeInfo<T>() where T : SpkForeignTypeInfo => (T)typeInfos[typeof(T)];
+    internal T GetTypeInfo<T>() where T : SpellkitForeignTypeInfo => (T)typeInfos[typeof(T)];
 
-    protected void Add(string name, SpkObject obj)
+    protected void Add(string name, SpellkitObject obj)
     {
         ExportList.Add(name, new ScopeVar(0 | ExportList.Count << 8, VarFlags.Foreign));
         Values.Add(obj);
     }
 
-    protected T AddType<T>() where T : SpkForeignTypeInfo, new()
+    protected T AddType<T>() where T : SpellkitForeignTypeInfo, new()
     {
         var t = new T();
         typeInfos.Add(typeof(T), t);

@@ -104,7 +104,7 @@ internal sealed class TestRunner
 
         foreach (var file in files)
         {
-            var res = SpkParser.Parse(SourceBuffer.FromFile(file));
+            var res = SpellkitParser.Parse(SourceBuffer.FromFile(file));
 
             if (!res.Success)
             {
@@ -147,7 +147,7 @@ internal sealed class TestRunner
             return;
         }
 
-        Dictionary<string, SpkCodeModel> inits;
+        Dictionary<string, SpellkitCodeModel> inits;
 
         try
         {
@@ -208,7 +208,7 @@ internal sealed class TestRunner
                 var root = new BlockSyntax(init.Root.Location);
                 root.Nodes.AddRange(init.Root.Nodes);
                 root.Nodes.AddRange(ast.Root.Nodes);
-                ast = new SpkCodeModel(root, imports, ast.FileName);
+                ast = new SpellkitCodeModel(root, imports, ast.FileName);
             }
 
             var buildOptions = new BuilderOptions();
@@ -256,7 +256,7 @@ internal sealed class TestRunner
                     TimedOut = execution.Failure is
                     {
                         Kind: SpellkitFailureKind.Limit,
-                        Limit: SpkExecutionLimitKind.Time
+                        Limit: SpellkitExecutionLimitKind.Time
                     },
                     ReproductionCommand = CreateReproductionCommand(fileName, bi.Block.Name)
                 });

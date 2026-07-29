@@ -26,7 +26,7 @@ internal sealed class StackMachineEmitter
     private readonly FastList<int> labels;
     private readonly FastList<int> fixups;
     private readonly Dictionary<string, int> strings;
-    private readonly Dictionary<SpkObject, int> objects;
+    private readonly Dictionary<SpellkitObject, int> objects;
 
     private sealed class StackSize
     {
@@ -130,7 +130,7 @@ internal sealed class StackMachineEmitter
         return idx;
     }
 
-    private int IndexObject(SpkObject val)
+    private int IndexObject(SpellkitObject val)
     {
         if (!objects.TryGetValue(val, out var idx))
         {
@@ -152,7 +152,7 @@ internal sealed class StackMachineEmitter
         }
         else
         {
-            Push(new SpkFloat(val));
+            Push(new SpellkitFloat(val));
         }
     }
 
@@ -166,7 +166,7 @@ internal sealed class StackMachineEmitter
         }
         else
         {
-            Push(new SpkInteger(val));
+            Push(new SpellkitInteger(val));
         }
     }
 
@@ -194,11 +194,11 @@ internal sealed class StackMachineEmitter
     private static Op SelectInlineBooleanInstruction(bool value) =>
         value ? Op.LoadTrue : Op.LoadFalse;
 
-    public void Push(string val) => Push(new SpkString(val));
+    public void Push(string val) => Push(new SpellkitString(val));
 
-    public void Push(char val) => Push(new SpkChar(val));
+    public void Push(char val) => Push(new SpellkitChar(val));
 
-    public void Push(SpkObject val) => Emit(new(OpCode.LoadConst, IndexObject(val)));
+    public void Push(SpellkitObject val) => Emit(new(OpCode.LoadConst, IndexObject(val)));
 
     public void LoadVariable(ScopeVar sv)
     {
@@ -263,7 +263,7 @@ internal sealed class StackMachineEmitter
     public void LoadPrivateMember(string name) => Emit(new(OpCode.LoadPrivateMember, IndexString(name)));
     public void StorePrivateMember(string name) => Emit(new(OpCode.StorePrivateMember, IndexString(name)));
 
-    public void CheckContains(string field) => Emit(new(OpCode.CheckContains, IndexObject(new SpkString(field))));
+    public void CheckContains(string field) => Emit(new(OpCode.CheckContains, IndexObject(new SpellkitString(field))));
 
     public void StoreMember(string member) => Emit(new(OpCode.StoreMember, IndexString(member)));
     public void StoreStaticMember(string member) => Emit(new(OpCode.StoreStaticMember, IndexString(member)));
@@ -309,9 +309,9 @@ internal sealed class StackMachineEmitter
         Emit(new(OpCode.CreateVariadicFunction, funHandle, variadicIndex));
     public void SetFunctionAttribute(int attr) => Emit(new(OpCode.SetFunctionAttribute, attr));
     public void CreateIterator(int funHandle) => Emit(new(OpCode.CreateIterator, funHandle));
-    public void CreateSelectFactory(SpkObject definition, int closureCount) =>
+    public void CreateSelectFactory(SpellkitObject definition, int closureCount) =>
         Emit(new(OpCode.CreateSelectFactory, IndexObject(definition), closureCount), -closureCount + 1);
-    public void CreateSelectFactoryTemplate(SpkObject name) =>
+    public void CreateSelectFactoryTemplate(SpellkitObject name) =>
         Emit(new(OpCode.CreateSelectFactoryTemplate, IndexObject(name)));
     public void Jump(Label lab) => Emit(OpCode.Jump, lab);
     public void JumpIfTrue(Label lab) => Emit(OpCode.JumpIfTrue, lab);

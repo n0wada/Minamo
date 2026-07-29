@@ -7,12 +7,12 @@ namespace Spellkit.Hosting;
 public sealed class SpellkitCallback
 {
     private readonly ExecutionContext context;
-    private readonly SpkFunction function;
+    private readonly SpellkitFunction function;
     private readonly SpellkitCallbackScope scope;
 
     internal SpellkitCallback(
         ExecutionContext context,
-        SpkFunction function,
+        SpellkitFunction function,
         SpellkitCallbackScope scope) =>
         (this.context, this.function, this.scope) = (context, function, scope);
 
@@ -24,7 +24,7 @@ public sealed class SpellkitCallback
         ArgumentNullException.ThrowIfNull(arguments);
         scope.ThrowIfInactive();
 
-        var converted = new SpkObject[arguments.Length];
+        var converted = new SpellkitObject[arguments.Length];
         for (var i = 0; i < arguments.Length; i++)
         {
             converted[i] = SpellkitCommandConvert.FromObject(arguments[i]);

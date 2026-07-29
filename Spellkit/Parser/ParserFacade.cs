@@ -3,23 +3,23 @@ using System;
 
 namespace Spellkit.Parser;
 
-public static class SpkParser
+public static class SpellkitParser
 {
     private const string DefaultBuffer = "<stdin>";
 
-    public static Result<SpkCodeModel> Parse(string source, string? sourceName = null)
+    public static Result<SpellkitCodeModel> Parse(string source, string? sourceName = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         return Parse(SourceBuffer.FromString(source, sourceName));
     }
 
-    public static Result<SpkCodeModel> ParseFile(string path)
+    public static Result<SpellkitCodeModel> ParseFile(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         return Parse(SourceBuffer.FromFile(path));
     }
 
-    public static Result<SpkCodeModel> Parse(SourceBuffer buffer)
+    public static Result<SpellkitCodeModel> Parse(SourceBuffer buffer)
     {
         ArgumentNullException.ThrowIfNull(buffer);
 #if DEBUG
@@ -120,7 +120,7 @@ internal static class ParserSelfTest
     private static HandwrittenParser CreateParser(string source) =>
         new("<parser-self-test>", new Lexer(SourceBuffer.FromString(source)));
 
-    private static Result<SpkCodeModel> Parse(string source) => CreateParser(source).Parse();
+    private static Result<SpellkitCodeModel> Parse(string source) => CreateParser(source).Parse();
 
     private static void Require(bool condition, string message)
     {

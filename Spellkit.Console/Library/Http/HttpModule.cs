@@ -4,92 +4,92 @@ using Spellkit.Runtime.Types;
 namespace Spellkit.Library.Http;
 
 [SpellkitModule("http")]
-[SpellkitForeignType(typeof(SpkHttpResponseTypeInfo))]
-[SpellkitForeignType(typeof(SpkHttpSessionTypeInfo))]
+[SpellkitForeignType(typeof(SpellkitHttpResponseTypeInfo))]
+[SpellkitForeignType(typeof(SpellkitHttpSessionTypeInfo))]
 public static class HttpModule
 {
     [SpellkitCommand("Request")]
-    internal static SpkObject Request(
+    internal static SpellkitObject Request(
         SpellkitCommandContext host,
         string method,
         string url,
-        SpkObject @params = null!,
-        SpkObject headers = null!,
-        SpkObject json = null!,
-        SpkObject data = null!,
+        SpellkitObject @params = null!,
+        SpellkitObject headers = null!,
+        SpellkitObject json = null!,
+        SpellkitObject data = null!,
         double? timeout = null,
-        SpkObject auth = null!,
+        SpellkitObject auth = null!,
         bool? allowRedirects = null) =>
-        SpkHttp.Request(host.ExecutionContext, method, url, @params, headers, json, data, timeout, auth, allowRedirects);
+        SpellkitHttp.Request(host.ExecutionContext, method, url, @params, headers, json, data, timeout, auth, allowRedirects);
 
     [SpellkitCommand("Get")]
-    internal static SpkObject Get(
+    internal static SpellkitObject Get(
         SpellkitCommandContext host,
         string url,
-        SpkObject @params = null!,
-        SpkObject headers = null!,
+        SpellkitObject @params = null!,
+        SpellkitObject headers = null!,
         double? timeout = null,
-        SpkObject auth = null!,
+        SpellkitObject auth = null!,
         bool? allowRedirects = null) =>
-        SpkHttp.Request(host.ExecutionContext, "GET", url, @params, headers, null, null, timeout, auth, allowRedirects);
+        SpellkitHttp.Request(host.ExecutionContext, "GET", url, @params, headers, null, null, timeout, auth, allowRedirects);
 
     [SpellkitCommand("Post")]
-    internal static SpkObject Post(
+    internal static SpellkitObject Post(
         SpellkitCommandContext host,
         string url,
-        SpkObject @params = null!,
-        SpkObject headers = null!,
-        SpkObject json = null!,
-        SpkObject data = null!,
+        SpellkitObject @params = null!,
+        SpellkitObject headers = null!,
+        SpellkitObject json = null!,
+        SpellkitObject data = null!,
         double? timeout = null,
-        SpkObject auth = null!,
+        SpellkitObject auth = null!,
         bool? allowRedirects = null) =>
-        SpkHttp.Request(host.ExecutionContext, "POST", url, @params, headers, json, data, timeout, auth, allowRedirects);
+        SpellkitHttp.Request(host.ExecutionContext, "POST", url, @params, headers, json, data, timeout, auth, allowRedirects);
 
     [SpellkitCommand("Put")]
-    internal static SpkObject Put(
+    internal static SpellkitObject Put(
         SpellkitCommandContext host,
         string url,
-        SpkObject @params = null!,
-        SpkObject headers = null!,
-        SpkObject json = null!,
-        SpkObject data = null!,
+        SpellkitObject @params = null!,
+        SpellkitObject headers = null!,
+        SpellkitObject json = null!,
+        SpellkitObject data = null!,
         double? timeout = null,
-        SpkObject auth = null!,
+        SpellkitObject auth = null!,
         bool? allowRedirects = null) =>
-        SpkHttp.Request(host.ExecutionContext, "PUT", url, @params, headers, json, data, timeout, auth, allowRedirects);
+        SpellkitHttp.Request(host.ExecutionContext, "PUT", url, @params, headers, json, data, timeout, auth, allowRedirects);
 
     [SpellkitCommand("Patch")]
-    internal static SpkObject Patch(
+    internal static SpellkitObject Patch(
         SpellkitCommandContext host,
         string url,
-        SpkObject @params = null!,
-        SpkObject headers = null!,
-        SpkObject json = null!,
-        SpkObject data = null!,
+        SpellkitObject @params = null!,
+        SpellkitObject headers = null!,
+        SpellkitObject json = null!,
+        SpellkitObject data = null!,
         double? timeout = null,
-        SpkObject auth = null!,
+        SpellkitObject auth = null!,
         bool? allowRedirects = null) =>
-        SpkHttp.Request(host.ExecutionContext, "PATCH", url, @params, headers, json, data, timeout, auth, allowRedirects);
+        SpellkitHttp.Request(host.ExecutionContext, "PATCH", url, @params, headers, json, data, timeout, auth, allowRedirects);
 
     [SpellkitCommand("Delete")]
-    internal static SpkObject Delete(
+    internal static SpellkitObject Delete(
         SpellkitCommandContext host,
         string url,
-        SpkObject @params = null!,
-        SpkObject headers = null!,
+        SpellkitObject @params = null!,
+        SpellkitObject headers = null!,
         double? timeout = null,
-        SpkObject auth = null!,
+        SpellkitObject auth = null!,
         bool? allowRedirects = null) =>
-        SpkHttp.Request(host.ExecutionContext, "DELETE", url, @params, headers, null, null, timeout, auth, allowRedirects);
+        SpellkitHttp.Request(host.ExecutionContext, "DELETE", url, @params, headers, null, null, timeout, auth, allowRedirects);
 
     [SpellkitCommand("Session")]
-    internal static SpkObject Session(
+    internal static SpellkitObject Session(
         SpellkitCommandContext host,
         string? baseUrl = null,
-        SpkObject headers = null!,
-        SpkObject auth = null!,
+        SpellkitObject headers = null!,
+        SpellkitObject auth = null!,
         double? timeout = null,
         bool? allowRedirects = null) =>
-        SpkHttp.CreateSession(host.ExecutionContext, baseUrl, headers, auth, timeout, allowRedirects);
+        SpellkitHttp.CreateSession(host.ExecutionContext, baseUrl, headers, auth, timeout, allowRedirects);
 }

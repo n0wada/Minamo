@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -30,27 +30,27 @@ internal static class StringUtil
     {
         if (obj is string str)
         {
-            return $"new {Types.SpkString}({Escape(str)})";
+            return $"new {Types.SpellkitString}({Escape(str)})";
         }
         else if (obj is bool b)
         {
-            return b ? $"{Types.SpkBool}.True" : $"{Types.SpkBool}.False";
+            return b ? $"{Types.SpellkitBool}.True" : $"{Types.SpellkitBool}.False";
         }
         else if (obj is char c)
         {
-            return $"new {Types.SpkChar}({Escape(c.ToString(), "'")})";
+            return $"new {Types.SpellkitChar}({Escape(c.ToString(), "'")})";
         }
         else if (obj is double d)
         {
-            return $"new {Types.SpkFloat}({d.ToString(CultureInfo.InvariantCulture)})";
+            return $"new {Types.SpellkitFloat}({d.ToString(CultureInfo.InvariantCulture)})";
         }
         else if (obj is float f)
         {
-            return $"new {Types.SpkFloat}({f.ToString(CultureInfo.InvariantCulture)})";
+            return $"new {Types.SpellkitFloat}({f.ToString(CultureInfo.InvariantCulture)})";
         }
-        else if (ReferenceEquals(obj, SpkTypeGenerator.Nil))
+        else if (ReferenceEquals(obj, SpellkitTypeGenerator.Nil))
         {
-            return Types.SpkNil + ".Instance";
+            return Types.SpellkitNil + ".Instance";
         }
         else
         {

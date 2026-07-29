@@ -1,6 +1,6 @@
 # Built-in types and functions
 
-Spellkit provides a small set of core values, types, and functions to every script. The `spk`
+Spellkit provides a small set of core values, types, and functions to every script. The `spell`
 console also registers optional standard-library modules. An embedding host can choose which
 modules and commands to expose, so a script must not assume that console modules are available in
 every hosted environment.
@@ -158,7 +158,7 @@ for host-controlled input and output.
 
 ## Standard-library modules
 
-The `spk` console registers the standard library. In an embedded host, modules are optional and
+The `spell` console registers the standard library. In an embedded host, modules are optional and
 must be registered deliberately. Import a module before using its public names.
 
 ```swift

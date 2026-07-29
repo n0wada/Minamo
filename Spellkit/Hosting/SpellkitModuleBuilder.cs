@@ -9,7 +9,7 @@ using Spellkit.Runtime.Types;
 
 namespace Spellkit.Hosting;
 
-public delegate SpkObject SpellkitCommandHandler(SpellkitCommandContext context);
+public delegate SpellkitObject SpellkitCommandHandler(SpellkitCommandContext context);
 
 public sealed class SpellkitCommandParameter
 {
@@ -65,7 +65,7 @@ public sealed class SpellkitCommandDescriptor
 
     internal bool IsPropertySetter { get; }
 
-    internal SpkObject Invoke(SpellkitCommandContext context) => handler(context);
+    internal SpellkitObject Invoke(SpellkitCommandContext context) => handler(context);
 }
 
 public sealed class SpellkitModuleBuilder
@@ -74,7 +74,7 @@ public sealed class SpellkitModuleBuilder
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SpellkitTypeBuilder> types =
         new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<Func<SpkForeignTypeInfo>> foreignTypes = new();
+    private readonly List<Func<SpellkitForeignTypeInfo>> foreignTypes = new();
     private Func<ForeignUnit>? unitFactory;
 
     internal SpellkitModuleBuilder(string name)
@@ -292,7 +292,7 @@ public sealed class SpellkitModuleBuilder
         return type;
     }
 
-    public SpellkitModuleBuilder ForeignType(Func<SpkForeignTypeInfo> factory)
+    public SpellkitModuleBuilder ForeignType(Func<SpellkitForeignTypeInfo> factory)
     {
         EnsureGeneratedModule();
         ArgumentNullException.ThrowIfNull(factory);
@@ -352,7 +352,7 @@ internal sealed record HostModuleDefinition(
     string Name,
     IReadOnlyList<SpellkitCommandDescriptor> Commands,
     IReadOnlyList<HostTypeDefinition> Types,
-    IReadOnlyList<Func<SpkForeignTypeInfo>> ForeignTypes,
+    IReadOnlyList<Func<SpellkitForeignTypeInfo>> ForeignTypes,
     Func<ForeignUnit>? UnitFactory);
 
 public sealed class SpellkitTypeBuilder

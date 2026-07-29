@@ -170,9 +170,9 @@ public sealed class RegionSyntax : SyntaxNode
 
     public string Name { get; }
 
-    public SpkCodeModel Body { get; }
+    public SpellkitCodeModel Body { get; }
 
-    public RegionSyntax(string name, SpkCodeModel body, Location loc) : base(NodeType.TestBlock, loc) =>
+    public RegionSyntax(string name, SpellkitCodeModel body, Location loc) : base(NodeType.TestBlock, loc) =>
         (Name, Body) = (name, body);
 
     internal override void ToString(StringBuilder sb)

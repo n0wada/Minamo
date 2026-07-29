@@ -5,7 +5,7 @@ namespace Spellkit.Hosting;
 
 internal static class SpellkitHostValueConverter
 {
-    internal static bool TryConvert<T>(SpkObject? value, out T? result)
+    internal static bool TryConvert<T>(SpellkitObject? value, out T? result)
     {
         if (value is null)
         {
@@ -13,7 +13,7 @@ internal static class SpellkitHostValueConverter
             return false;
         }
 
-        if (value.TypeId == Spk.Nil)
+        if (value.TypeId == SpellkitTypeCodes.Nil)
         {
             result = default;
             return true;
@@ -29,7 +29,7 @@ internal static class SpellkitHostValueConverter
         return false;
     }
 
-    internal static T? Convert<T>(SpkObject? value, string valueName)
+    internal static T? Convert<T>(SpellkitObject? value, string valueName)
     {
         if (value is null)
         {

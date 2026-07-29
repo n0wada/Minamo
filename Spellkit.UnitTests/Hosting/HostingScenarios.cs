@@ -144,13 +144,13 @@ internal static class HostingScenarios
         {
             "Spellkit.CultureInfoSettings",
             "Spellkit.FileProbe",
-            "Spellkit.Runtime.SpkMachine",
+            "Spellkit.Runtime.SpellkitMachine",
             "Spellkit.Runtime.EvalStack",
             "Spellkit.Runtime.ExecutionResult",
             "Spellkit.Runtime.TerminationReason",
-            "Spellkit.Compiler.SpkCompiler",
-            "Spellkit.Linker.SpkIncrementalLinker",
-            "Spellkit.Debug.SpkDebugger"
+            "Spellkit.Compiler.SpellkitCompilerEngine",
+            "Spellkit.Linker.SpellkitIncrementalLinker",
+            "Spellkit.Debug.SpellkitDebugger"
         })
         {
             var type = assembly.GetType(name, throwOnError: true)!;
@@ -169,7 +169,7 @@ internal static class HostingScenarios
             assembly,
             "tooling",
             IsToolingApi,
-            typeof(Spellkit.Parser.SpkParser),
+            typeof(Spellkit.Parser.SpellkitParser),
             typeof(Spellkit.Compiler.Op),
             typeof(Spellkit.Compiler.Unit),
             typeof(Spellkit.Parser.Model.SyntaxNode),
@@ -179,7 +179,7 @@ internal static class HostingScenarios
             "runtime extension",
             IsRuntimeExtensionApi,
             typeof(Spellkit.Runtime.RuntimeContext),
-            typeof(Spellkit.Runtime.Types.SpkObject));
+            typeof(Spellkit.Runtime.Types.SpellkitObject));
     }
 
     internal static void PublicApiNames()
@@ -1196,7 +1196,7 @@ internal static class HostingScenarios
                     value += 1
                 }
                 """);
-            AssertLimit(result, SpkExecutionLimitKind.Instructions);
+            AssertLimit(result, SpellkitExecutionLimitKind.Instructions);
             AssertEqual(100L, result.Metrics.Instructions, "instruction metrics");
         }
 
@@ -1212,7 +1212,7 @@ internal static class HostingScenarios
                 limit.Ping()
                 limit.Ping()
                 """);
-            AssertLimit(result, SpkExecutionLimitKind.HostCommands);
+            AssertLimit(result, SpellkitExecutionLimitKind.HostCommands);
         }
 
         using (var session = new SpellkitHost(new()
@@ -1225,7 +1225,7 @@ internal static class HostingScenarios
                 func recurse(value) => value == 0 ? 0 : 1 + recurse(value - 1)
                 recurse(20)
                 """);
-            AssertLimit(result, SpkExecutionLimitKind.CallDepth);
+            AssertLimit(result, SpellkitExecutionLimitKind.CallDepth);
         }
 
         var timeProvider = new ManualTimeProvider();
@@ -1252,7 +1252,7 @@ internal static class HostingScenarios
             Assert(commandStarted.Wait(TimeSpan.FromSeconds(5)), "host command entered");
             timeProvider.Advance(TimeSpan.FromMilliseconds(21));
             var result = execution.GetAwaiter().GetResult();
-            AssertLimit(result, SpkExecutionLimitKind.Time);
+            AssertLimit(result, SpellkitExecutionLimitKind.Time);
         }
 
         using (var cancellation = new CancellationTokenSource())
@@ -1290,7 +1290,7 @@ internal static class HostingScenarios
             var first = session.DispatchSignals();
             AssertEqual(1, first.Delivered, "limited signal delivery");
             Assert(first.Failures.Single() is
-                { Kind: SpellkitFailureKind.Limit, Limit: SpkExecutionLimitKind.Signals },
+                { Kind: SpellkitFailureKind.Limit, Limit: SpellkitExecutionLimitKind.Signals },
                 "signal limit error");
             AssertEqual(1, first.Metrics.Signals, "signal metrics");
             AssertEqual(1, session.DispatchSignals().Delivered, "remaining signal delivery");
@@ -1521,7 +1521,7 @@ internal static class HostingScenarios
         return result;
     }
 
-    private static void AssertLimit(SpellkitExecutionResult result, SpkExecutionLimitKind expected)
+    private static void AssertLimit(SpellkitExecutionResult result, SpellkitExecutionLimitKind expected)
     {
         if (result.Failure is not
             { Kind: SpellkitFailureKind.Limit, Limit: var actual } || actual != expected)

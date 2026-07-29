@@ -66,34 +66,34 @@ internal sealed class Caller
     public static readonly Caller Root = new();
     public static readonly Caller External = new();
 
-    public readonly SpkObject[] Locals;
+    public readonly SpellkitObject[] Locals;
     public readonly EvalStack EvalStack;
     public readonly int Offset;
-    public readonly SpkNativeFunction Function;
+    public readonly SpellkitNativeFunction Function;
 
     private Caller()
     {
-        Locals = Array.Empty<SpkObject>();
+        Locals = Array.Empty<SpellkitObject>();
         EvalStack = new(0);
-        Function = new(null, 0, 0, FastList<SpkObject[]>.Empty, 0);
+        Function = new(null, 0, 0, FastList<SpellkitObject[]>.Empty, 0);
     }
 
-    public Caller(SpkNativeFunction function, int offset, EvalStack evalStack, SpkObject[] locals) =>
+    public Caller(SpellkitNativeFunction function, int offset, EvalStack evalStack, SpellkitObject[] locals) =>
         (Function, Offset, EvalStack, Locals) = (function, offset, evalStack, locals);
 }
 
 internal sealed class EvalStack
 {
-    private readonly SpkObject[] array;
+    private readonly SpellkitObject[] array;
     private int size;
 
     internal int Size => size;
 
-    public EvalStack(int size) => array = new SpkObject[size];
+    public EvalStack(int size) => array = new SpellkitObject[size];
 
     internal void Dup() => array[size++] = array[size - 2];
 
-    internal SpkObject Pop()
+    internal SpellkitObject Pop()
     {
         var ret = array[--size];
         array[size] = null!;
@@ -110,13 +110,13 @@ internal sealed class EvalStack
         }
     }
 
-    internal SpkObject Peek() => array[size - 1];
+    internal SpellkitObject Peek() => array[size - 1];
 
-    internal SpkObject Peek(int n) => array[size - n];
+    internal SpellkitObject Peek(int n) => array[size - n];
 
-    internal void Push(SpkObject val) => array[size++] = val;
+    internal void Push(SpellkitObject val) => array[size++] = val;
 
-    internal void Replace(SpkObject val) => array[size - 1] = val;
+    internal void Replace(SpellkitObject val) => array[size - 1] = val;
 
     internal void Push(bool val) => array[size++] = val ? True : False;
 

@@ -33,7 +33,7 @@ internal sealed partial class LoweredEmitter
 
         if (node.HasSubject)
         {
-            target.ThrowError(SpkError.MatchFailed);
+            target.ThrowError(SpellkitError.MatchFailed);
             cw.Throw();
         }
         else

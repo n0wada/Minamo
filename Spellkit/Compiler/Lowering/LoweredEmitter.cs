@@ -85,7 +85,7 @@ internal interface ILoweredEmitterTarget
         int arity,
         out LoweredBareEnumConstructor constructor);
 
-    void ThrowError(SpkError code);
+    void ThrowError(SpellkitError code);
 
     void CallAutos(bool cls = false);
 

@@ -170,7 +170,7 @@ internal sealed partial class LoweredEmitter
                 set.Add(code);
             }
 
-            if (code < 0 && -code < Spk.Number)
+            if (code < 0 && -code < SpellkitTypeCodes.Number)
             {
                 target.AddError(CompilerError.InvalidMixin, node.Location, mixin.Local.ToString());
             }
@@ -255,7 +255,7 @@ internal sealed partial class LoweredEmitter
                 set.Add(code);
             }
 
-            if (code < 0 && -code < Spk.Number)
+            if (code < 0 && -code < SpellkitTypeCodes.Number)
             {
                 target.AddError(CompilerError.InvalidMixin, node.Location, mixin.Local.ToString());
             }
@@ -695,7 +695,7 @@ internal sealed partial class LoweredEmitter
             target.AddError(CompilerError.SelectRequiresOneInitialState, node.Location);
         }
 
-        cw.CreateSelectFactory(new SpkSelectDefinitionValue(new SelectDefinition(node.Name, states), closureCount), closureCount);
+        cw.CreateSelectFactory(new SpellkitSelectDefinitionValue(new SelectDefinition(node.Name, states), closureCount), closureCount);
         if (node.Name is not null && !node.IsInstanceFactory)
         {
             if (keepResult)
@@ -753,7 +753,7 @@ internal sealed partial class LoweredEmitter
             IteratorBody: false,
             IsStdCall: !target.NoOptimizations);
         EmitFunctionBody(-1, initializer, ctx, iteratorBody: false);
-        cw.CreateSelectFactoryTemplate(SpkString.Get(node.Name ?? "<anonymous>"));
+        cw.CreateSelectFactoryTemplate(SpellkitString.Get(node.Name ?? "<anonymous>"));
 
         if (node.Name is not null)
         {
@@ -848,7 +848,7 @@ internal sealed partial class LoweredEmitter
         }
         else if (node.Body is null)
         {
-            target.ThrowError(SpkError.NotImplemented);
+            target.ThrowError(SpellkitError.NotImplemented);
             cw.Throw();
         }
         else
@@ -921,27 +921,27 @@ internal sealed partial class LoweredEmitter
                     target.AddError(CompilerError.VarArgNoDefaultValue, p.Location);
                 }
 
-                SpkObject? val = null;
+                SpellkitObject? val = null;
 
                 switch (p.DefaultValue?.Kind)
                 {
                     case LoweredLiteralKind.Integer:
-                        val = new SpkInteger((long)p.DefaultValue.Value!);
+                        val = new SpellkitInteger((long)p.DefaultValue.Value!);
                         break;
                     case LoweredLiteralKind.Float:
-                        val = new SpkFloat((double)p.DefaultValue.Value!);
+                        val = new SpellkitFloat((double)p.DefaultValue.Value!);
                         break;
                     case LoweredLiteralKind.Char:
-                        val = new SpkChar((char)p.DefaultValue.Value!);
+                        val = new SpellkitChar((char)p.DefaultValue.Value!);
                         break;
                     case LoweredLiteralKind.Boolean:
-                        val = (bool)p.DefaultValue.Value! ? SpkBool.True : SpkBool.False;
+                        val = (bool)p.DefaultValue.Value! ? SpellkitBool.True : SpellkitBool.False;
                         break;
                     case LoweredLiteralKind.String:
-                        val = SpkString.Get((string)p.DefaultValue.Value!);
+                        val = SpellkitString.Get((string)p.DefaultValue.Value!);
                         break;
                     case LoweredLiteralKind.Nil:
-                        val = SpkNil.Instance;
+                        val = SpellkitNil.Instance;
                         break;
                     default:
                         target.AddError(CompilerError.InvalidDefaultValue, p.DefaultValueLocation, p.Name);
@@ -1072,7 +1072,7 @@ internal sealed partial class LoweredEmitter
 
         var t1 = target.PushTypeInfo(ctx, node.TargetTypeName!, node.Location);
 
-        if (t1 < 0 && -t1 == Spk.Bool)
+        if (t1 < 0 && -t1 == SpellkitTypeCodes.Bool)
         {
             target.AddError(CompilerError.BoolCastNotAllowed, node.Location);
         }

@@ -4,7 +4,7 @@ using Spellkit.Runtime;
 namespace Spellkit.Library.ConsoleLibrary;
 
 [SpellkitModule("console")]
-[SpellkitForeignType(typeof(SpkConsoleTypeInfo))]
+[SpellkitForeignType(typeof(SpellkitConsoleTypeInfo))]
 public static class ConsoleModule
 {
     [SpellkitCommand("readLine")]

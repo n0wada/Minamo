@@ -25,7 +25,7 @@ public sealed class TestDiagnosticsTests
             Name = "failure",
             FileName = "sample.kit",
             Error = "Assertion failed.",
-            StackTrace = "Spellkit.Runtime.SpkRuntimeException: Assertion failed.",
+            StackTrace = "Spellkit.Runtime.SpellkitRuntimeException: Assertion failed.",
             Expected = "1",
             Actual = "2",
             ReproductionCommand = @".\scripts\test-local.ps1 -Region ""failure""",

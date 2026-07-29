@@ -8,10 +8,10 @@ internal static class SpellkitSelectAliases
 {
     private const string ContextKey = "Spellkit.Hosting.SelectAliases";
 
-    internal static void Register(ExecutionContext context, SpkObject select, string alias)
+    internal static void Register(ExecutionContext context, SpellkitObject select, string alias)
     {
         HostNames.ValidateDottedName(alias, nameof(alias), "select alias");
-        if (select is not SpkSelectFactory and not SpkString)
+        if (select is not SpellkitSelectFactory and not SpellkitString)
         {
             throw new InvalidOperationException("Alias expects a select factory.");
         }
@@ -20,11 +20,11 @@ internal static class SpellkitSelectAliases
         {
             if (!context.RuntimeContext.Variables.TryGetValue(ContextKey, out var existing))
             {
-                existing = new Dictionary<string, SpkObject>(StringComparer.Ordinal);
+                existing = new Dictionary<string, SpellkitObject>(StringComparer.Ordinal);
                 context.RuntimeContext.Variables.Add(ContextKey, existing);
             }
 
-            var aliases = (Dictionary<string, SpkObject>)existing;
+            var aliases = (Dictionary<string, SpellkitObject>)existing;
             if (!aliases.TryAdd(alias, select))
             {
                 throw new InvalidOperationException($"The select alias '{alias}' is already registered.");
@@ -32,13 +32,13 @@ internal static class SpellkitSelectAliases
         }
     }
 
-    internal static SpkSelectFactory? ResolveFactory(RuntimeContext context, string name)
+    internal static SpellkitSelectFactory? ResolveFactory(RuntimeContext context, string name)
     {
         lock (context.SyncRoot)
         {
             return context.Variables.TryGetValue(ContextKey, out var existing)
-                && ((Dictionary<string, SpkObject>)existing).TryGetValue(name, out var target)
-                    ? target as SpkSelectFactory
+                && ((Dictionary<string, SpellkitObject>)existing).TryGetValue(name, out var target)
+                    ? target as SpellkitSelectFactory
                     : null;
         }
     }
@@ -48,8 +48,8 @@ internal static class SpellkitSelectAliases
         lock (context.SyncRoot)
         {
             return context.Variables.TryGetValue(ContextKey, out var existing)
-                && ((Dictionary<string, SpkObject>)existing).TryGetValue(name, out var target)
-                && target is SpkString text
+                && ((Dictionary<string, SpellkitObject>)existing).TryGetValue(name, out var target)
+                && target is SpellkitString text
                     ? text.Value
                     : name;
         }

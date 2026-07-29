@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$console = Join-Path $repoRoot "bin\spk.exe"
+$console = Join-Path $repoRoot "bin\spell.exe"
 $station = Join-Path $repoRoot "bin\examples\StationConsole\$Configuration\Spellkit.Examples.StationConsole.dll"
 $workflow = Join-Path $repoRoot "bin\projects\OrderWorkflow\$Configuration\Spellkit.Examples.OrderWorkflow.dll"
 $smokeDirectory = Join-Path $repoRoot "artifacts\release-smoke"
@@ -22,13 +22,13 @@ New-Item -ItemType Directory -Force -Path $smokeDirectory | Out-Null
 "print(40 + 2)" | Set-Content -Encoding UTF8 $source
 
 $help = & $console --help 2>&1
-if ($LASTEXITCODE -ne 0 -or ($help -join "`n") -notmatch "Usage: spk")
+if ($LASTEXITCODE -ne 0 -or ($help -join "`n") -notmatch "Usage: spell")
 {
     throw "Spellkit console help smoke test failed."
 }
 
 $version = & $console --version 2>&1
-if ($LASTEXITCODE -ne 0 -or ($version -join "`n") -notmatch '^spk ')
+if ($LASTEXITCODE -ne 0 -or ($version -join "`n") -notmatch '^spell ')
 {
     throw "Spellkit console version smoke test failed."
 }

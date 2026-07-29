@@ -8,7 +8,7 @@ public sealed class TextModule : ForeignUnit
 {
     public TextModule()
     {
-        AddType<SpkStringBuilderTypeInfo>();
-        AddType<SpkRegexTypeInfo>();
+        AddType<SpellkitStringBuilderTypeInfo>();
+        AddType<SpellkitRegexTypeInfo>();
     }
 }

@@ -158,7 +158,7 @@ internal sealed class SpellkitResourceRegistry : IDisposable
 
     internal SpellkitResourceRegistry(SpellkitHostEnvironment environment) => this.environment = environment;
 
-    internal SpkObject Create(
+    internal SpellkitObject Create(
         object resource,
         string typeName,
         IReadOnlyList<SpellkitCommandDescriptor> commands,
@@ -250,12 +250,12 @@ internal sealed class SpellkitResourceRegistry : IDisposable
         ThrowReleaseFailures(failures);
     }
 
-    private SpkObject CreateView(ResourceEntry entry)
+    private SpellkitObject CreateView(ResourceEntry entry)
     {
-        var labels = new List<SpkLabel>
+        var labels = new List<SpellkitLabel>
         {
-            new("Id", new SpkString(entry.Id)),
-            new("Type", new SpkString(entry.TypeName)),
+            new("Id", new SpellkitString(entry.Id)),
+            new("Type", new SpellkitString(entry.TypeName)),
             new("IsValid", Api("IsValid", _ => Bool(IsValid(entry.Id))))
         };
         if (!entry.Persistent)
@@ -271,7 +271,7 @@ internal sealed class SpellkitResourceRegistry : IDisposable
         return new SpellkitHostViewData(labels.ToArray());
     }
 
-    private SpkFunction Api(string name, Func<SpkObject[], SpkObject> handler) =>
+    private SpellkitFunction Api(string name, Func<SpellkitObject[], SpellkitObject> handler) =>
         new HostApiFunction(name, Array.Empty<Par>(), (ctx, arguments) =>
         {
             EnsureOwner(ctx);
@@ -306,7 +306,7 @@ internal sealed class SpellkitResourceRegistry : IDisposable
             return command.Invoke(context);
         });
 
-    private static SpkBool Bool(bool value) => value ? SpkBool.True : SpkBool.False;
+    private static SpellkitBool Bool(bool value) => value ? SpellkitBool.True : SpellkitBool.False;
 
     private void TraceReleased(ResourceEntry entry) => environment.Tracing.Write(
         SpellkitTraceKind.ResourceReleased,
@@ -331,7 +331,7 @@ internal sealed class SpellkitResourceRegistry : IDisposable
         public IReadOnlyList<SpellkitCommandDescriptor> Commands { get; }
         public bool Persistent { get; }
         public Action? Release { get; }
-        public SpkObject View { get; set; } = null!;
+        public SpellkitObject View { get; set; } = null!;
     }
 
     private void ReleaseEntry(ResourceEntry entry)
@@ -394,7 +394,7 @@ public sealed class SpellkitHostEnvironment : IDisposable
     public SpellkitTelemetry Telemetry { get; }
     public SpellkitTracing Tracing { get; }
     public SpellkitExecutionLimits Limits { get; }
-    internal SpkObject Root { get; }
+    internal SpellkitObject Root { get; }
 
     internal void Reset()
     {
@@ -428,7 +428,7 @@ public sealed class SpellkitHostEnvironment : IDisposable
         }
     }
 
-    internal SpkObject CreateResource(SpellkitResource resource)
+    internal SpellkitObject CreateResource(SpellkitResource resource)
     {
         ArgumentNullException.ThrowIfNull(resource);
         var resourceType = resource.GetType();
@@ -448,27 +448,27 @@ public sealed class SpellkitHostEnvironment : IDisposable
             reuseByReference: shared);
     }
 
-    private SpkObject CreateRoot() => View(
+    private SpellkitObject CreateRoot() => View(
         new("Commands", CreateCommandsApi()),
         new("State", CreateStateApi()),
         new("Signals", CreateSignalsApi()),
         new("Log", CreateLogApi()));
 
-    private SpkObject CreateCommandsApi() => View(
+    private SpellkitObject CreateCommandsApi() => View(
         new("List", Api("List", Array.Empty<Par>(), _ => CatalogEntries(Commands.List()))),
         new("Find", Api("Find", new[] { new Par("text") }, arguments =>
             CatalogEntries(Commands.Find(arguments[0].ToString())))),
         new("Describe", Api("Describe", new[] { new Par("name") }, arguments =>
         {
             var entry = Commands.Describe(arguments[0].ToString());
-            return entry is null ? SpkNil.Instance : CatalogEntry(entry);
+            return entry is null ? SpellkitNil.Instance : CatalogEntry(entry);
         })));
 
-    private SpkObject CreateStateApi() => IndexedView(
+    private SpellkitObject CreateStateApi() => IndexedView(
         (ctx, index) =>
         {
             Capabilities.Demand("state.read");
-            return State.GetRaw(Key(index)) ?? SpkNil.Instance;
+            return State.GetRaw(Key(index)) ?? SpellkitNil.Instance;
         },
         (ctx, index, value) =>
         {
@@ -489,7 +489,7 @@ public sealed class SpellkitHostEnvironment : IDisposable
         {
             Capabilities.Demand("state.read");
             var owner = State.GetOwner(Key(arguments[0]));
-            return owner is null ? SpkNil.Instance : new SpkString(owner.Value.ToString());
+            return owner is null ? SpellkitNil.Instance : new SpellkitString(owner.Value.ToString());
         })),
         new("Remove", Api("Remove", new[] { new Par("key") }, arguments =>
         {
@@ -500,10 +500,10 @@ public sealed class SpellkitHostEnvironment : IDisposable
         {
             Capabilities.Demand("state.write");
             State.ClearScript();
-            return SpkNil.Instance;
+            return SpellkitNil.Instance;
         })));
 
-    private SpkObject CreateSignalsApi() => View(
+    private SpellkitObject CreateSignalsApi() => View(
         new("List", Api("List", Array.Empty<Par>(), _ => Strings(Signals.Names))),
         new("On", Api("On", new[] { new Par("name"), new Par("handler") }, (ctx, arguments) =>
             SubscribeSignal(ctx, arguments, once: false))),
@@ -512,81 +512,81 @@ public sealed class SpellkitHostEnvironment : IDisposable
         new("Off", Api("Off", new[] { new Par("subscription") }, (ctx, arguments) =>
         {
             var id = TypeConverter.ConvertTo<long>(ctx, arguments[0]);
-            return ctx.HasErrors ? SpkNil.Instance : Bool(Signals.UnsubscribeScript(id));
+            return ctx.HasErrors ? SpellkitNil.Instance : Bool(Signals.UnsubscribeScript(id));
         })),
-        new("Emit", Api("Emit", new[] { new Par("name"), new Par("payload", SpkNil.Instance) }, arguments =>
+        new("Emit", Api("Emit", new[] { new Par("name"), new Par("payload", SpellkitNil.Instance) }, arguments =>
         {
             Signals.EmitFromScript(Key(arguments[0]), arguments[1]);
-            return SpkNil.Instance;
+            return SpellkitNil.Instance;
         })),
-        new("TryEmit", Api("TryEmit", new[] { new Par("name"), new Par("payload", SpkNil.Instance) }, arguments =>
+        new("TryEmit", Api("TryEmit", new[] { new Par("name"), new Par("payload", SpellkitNil.Instance) }, arguments =>
             Bool(Signals.TryEmitFromScript(Key(arguments[0]), arguments[1])))));
 
-    private SpkObject CreateLogApi() => View(
+    private SpellkitObject CreateLogApi() => View(
         new("Debug", LogApi("Debug", SpellkitLogLevel.Debug)),
         new("Info", LogApi("Info", SpellkitLogLevel.Info)),
         new("Warning", LogApi("Warning", SpellkitLogLevel.Warning)),
         new("Error", LogApi("Error", SpellkitLogLevel.Error)));
 
-    private SpkFunction LogApi(string name, SpellkitLogLevel level) => Api(
+    private SpellkitFunction LogApi(string name, SpellkitLogLevel level) => Api(
         name,
-        new[] { new Par("message"), new Par("properties", SpkNil.Instance) },
+        new[] { new Par("message"), new Par("properties", SpellkitNil.Instance) },
         arguments =>
         {
             Capabilities.Demand("log.write");
             Telemetry.Write(level, arguments[0].ToString(), Properties(arguments[1]));
-            return SpkNil.Instance;
+            return SpellkitNil.Instance;
         });
 
-    private SpkObject SubscribeSignal(
+    private SpellkitObject SubscribeSignal(
         ExecutionContext context,
-        SpkObject[] arguments,
+        SpellkitObject[] arguments,
         bool once)
     {
         var handler = arguments[1].ToFunction(context);
         return handler is null || context.HasErrors
-            ? SpkNil.Instance
-            : SpkInteger.Get(Signals.SubscribeScript(Key(arguments[0]), handler, once));
+            ? SpellkitNil.Instance
+            : SpellkitInteger.Get(Signals.SubscribeScript(Key(arguments[0]), handler, once));
     }
 
-    private static SpkFunction Api(string name, Par[] parameters, Func<SpkObject[], SpkObject> handler) =>
+    private static SpellkitFunction Api(string name, Par[] parameters, Func<SpellkitObject[], SpellkitObject> handler) =>
         new HostApiFunction(name, parameters, (_, arguments) => handler(arguments));
 
-    private static SpkFunction Api(
+    private static SpellkitFunction Api(
         string name,
         Par[] parameters,
-        Func<ExecutionContext, SpkObject[], SpkObject> handler) =>
+        Func<ExecutionContext, SpellkitObject[], SpellkitObject> handler) =>
         new HostApiFunction(name, parameters, handler);
 
-    private static SpkObject CatalogEntries(IEnumerable<SpellkitCommandCatalogEntry> entries) =>
-        new SpkArray(entries.Select(CatalogEntry).ToArray());
+    private static SpellkitObject CatalogEntries(IEnumerable<SpellkitCommandCatalogEntry> entries) =>
+        new SpellkitArray(entries.Select(CatalogEntry).ToArray());
 
-    private static SpkObject CatalogEntry(SpellkitCommandCatalogEntry entry) => View(
-        new("Name", new SpkString(entry.Name)),
-        new("Description", entry.Description is null ? SpkNil.Instance : new SpkString(entry.Description)),
-        new("Capability", entry.Capability is null ? SpkNil.Instance : new SpkString(entry.Capability)),
-        new("Parameters", new SpkArray(entry.Parameters.Select(Parameter).ToArray())));
+    private static SpellkitObject CatalogEntry(SpellkitCommandCatalogEntry entry) => View(
+        new("Name", new SpellkitString(entry.Name)),
+        new("Description", entry.Description is null ? SpellkitNil.Instance : new SpellkitString(entry.Description)),
+        new("Capability", entry.Capability is null ? SpellkitNil.Instance : new SpellkitString(entry.Capability)),
+        new("Parameters", new SpellkitArray(entry.Parameters.Select(Parameter).ToArray())));
 
-    private static SpkObject Parameter(SpellkitCommandParameter parameter) => View(
-        new("Name", new SpkString(parameter.Name)),
-        new("Type", new SpkString(parameter.Type.Name)),
+    private static SpellkitObject Parameter(SpellkitCommandParameter parameter) => View(
+        new("Name", new SpellkitString(parameter.Name)),
+        new("Type", new SpellkitString(parameter.Type.Name)),
         new("Optional", Bool(parameter.HasDefault)));
 
-    private static SpkObject Strings(IEnumerable<string> values) =>
-        new SpkArray(values.Select(value => (SpkObject)new SpkString(value)).ToArray());
+    private static SpellkitObject Strings(IEnumerable<string> values) =>
+        new SpellkitArray(values.Select(value => (SpellkitObject)new SpellkitString(value)).ToArray());
 
-    private static SpkBool Bool(bool value) => value ? SpkBool.True : SpkBool.False;
+    private static SpellkitBool Bool(bool value) => value ? SpellkitBool.True : SpellkitBool.False;
 
-    private static SpkObject View(params SpkLabel[] labels) => new SpellkitHostViewData(labels);
+    private static SpellkitObject View(params SpellkitLabel[] labels) => new SpellkitHostViewData(labels);
 
-    private static SpkObject IndexedView(
-        Func<ExecutionContext, SpkObject, SpkObject> getter,
-        Action<ExecutionContext, SpkObject, SpkObject> setter,
-        params SpkLabel[] labels) => new SpellkitHostViewData(labels, getter, setter);
+    private static SpellkitObject IndexedView(
+        Func<ExecutionContext, SpellkitObject, SpellkitObject> getter,
+        Action<ExecutionContext, SpellkitObject, SpellkitObject> setter,
+        params SpellkitLabel[] labels) => new SpellkitHostViewData(labels, getter, setter);
 
-    private static string Key(SpkObject value)
+    private static string Key(SpellkitObject value)
     {
-        if (value.TypeId is not Spk.String and not Spk.Char)
+        if (value.TypeId is not SpellkitTypeCodes.String and not SpellkitTypeCodes.Char)
         {
             throw new InvalidOperationException("Host keys must be strings or characters.");
         }
@@ -594,22 +594,22 @@ public sealed class SpellkitHostEnvironment : IDisposable
         return value.ToString();
     }
 
-    private static IReadOnlyDictionary<string, object?> Properties(SpkObject value)
+    private static IReadOnlyDictionary<string, object?> Properties(SpellkitObject value)
     {
-        if (value.TypeId == Spk.Nil)
+        if (value.TypeId == SpellkitTypeCodes.Nil)
         {
             return new Dictionary<string, object?>();
         }
 
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        if (value is SpkDictionary dictionary)
+        if (value is SpellkitDictionary dictionary)
         {
             foreach (var (key, item) in dictionary.Dictionary)
             {
                 result[key.ToString()] = PropertyValue(item);
             }
         }
-        else if (value is SpkTuple tuple)
+        else if (value is SpellkitTuple tuple)
         {
             for (var i = 0; i < tuple.Count; i++)
             {
@@ -625,56 +625,56 @@ public sealed class SpellkitHostEnvironment : IDisposable
         return result;
     }
 
-    private static object? PropertyValue(SpkObject value) =>
-        value.TypeId == Spk.Nil ? null : value.ToObject();
+    private static object? PropertyValue(SpellkitObject value) =>
+        value.TypeId == SpellkitTypeCodes.Nil ? null : value.ToObject();
 }
 
-internal sealed class SpellkitHostViewData : SpkTuple
+internal sealed class SpellkitHostViewData : SpellkitTuple
 {
-    public SpellkitHostViewData(SpkObject[] values) : base(values) { }
+    public SpellkitHostViewData(SpellkitObject[] values) : base(values) { }
 
     public SpellkitHostViewData(
-        SpkObject[] values,
-        Func<ExecutionContext, SpkObject, SpkObject> getter,
-        Action<ExecutionContext, SpkObject, SpkObject> setter) : base(values) =>
+        SpellkitObject[] values,
+        Func<ExecutionContext, SpellkitObject, SpellkitObject> getter,
+        Action<ExecutionContext, SpellkitObject, SpellkitObject> setter) : base(values) =>
         (Getter, Setter) = (getter, setter);
 
-    public Func<ExecutionContext, SpkObject, SpkObject>? Getter { get; }
-    public Action<ExecutionContext, SpkObject, SpkObject>? Setter { get; }
+    public Func<ExecutionContext, SpellkitObject, SpellkitObject>? Getter { get; }
+    public Action<ExecutionContext, SpellkitObject, SpellkitObject>? Setter { get; }
 }
 
-internal sealed class SpellkitHostRoot : SpkForeignObject
+internal sealed class SpellkitHostRoot : SpellkitForeignObject
 {
     public SpellkitHostRoot(SpellkitHostRootTypeInfo typeInfo) : base(typeInfo) { }
 
     public override object ToObject() => this;
-    public override SpkObject Clone() => this;
-    public override bool Equals(SpkObject? other) => ReferenceEquals(this, other);
+    public override SpellkitObject Clone() => this;
+    public override bool Equals(SpellkitObject? other) => ReferenceEquals(this, other);
 }
 
-internal sealed class SpellkitHostObject : SpkForeignObject
+internal sealed class SpellkitHostObject : SpellkitForeignObject
 {
     public SpellkitHostObject(SpellkitHostRootTypeInfo typeInfo, SpellkitHostViewData data) : base(typeInfo) =>
         Data = data;
 
     public SpellkitHostViewData Data { get; }
     public override object ToObject() => Data;
-    public override SpkObject Clone() => this;
-    public override bool Equals(SpkObject? other) => ReferenceEquals(this, other);
+    public override SpellkitObject Clone() => this;
+    public override bool Equals(SpellkitObject? other) => ReferenceEquals(this, other);
 }
 
-internal sealed class SpellkitHostRootTypeInfo : SpkForeignTypeInfo
+internal sealed class SpellkitHostRootTypeInfo : SpellkitForeignTypeInfo
 {
     public override string ReflectedTypeName => "Host";
 
-    internal override SpkObject GetInstanceMember(
-        SpkObject self,
+    internal override SpellkitObject GetInstanceMember(
+        SpellkitObject self,
         HashString name,
         ExecutionContext ctx)
     {
         var view = self is SpellkitHostObject hostObject
             ? hostObject.Data
-            : ctx.GetContextVariable<SpkObject>(SpellkitHostEnvironment.RootContextKey) as SpellkitHostViewData;
+            : ctx.GetContextVariable<SpellkitObject>(SpellkitHostEnvironment.RootContextKey) as SpellkitHostViewData;
         if (view is not null && view.TryGetItem((string)name, out var value))
         {
             return Wrap(ctx, value!);
@@ -683,25 +683,25 @@ internal sealed class SpellkitHostRootTypeInfo : SpkForeignTypeInfo
         return ctx.OperationNotSupported((string)name, self);
     }
 
-    internal static SpkObject Wrap(ExecutionContext ctx, SpkObject value)
+    internal static SpellkitObject Wrap(ExecutionContext ctx, SpellkitObject value)
     {
         if (value is SpellkitHostViewData view)
         {
             return new SpellkitHostObject(ctx.Type<SpellkitHostRootTypeInfo>(), view);
         }
 
-        if (value is SpkArray array)
+        if (value is SpellkitArray array)
         {
-            return new SpkArray(array.Select(item => Wrap(ctx, item)).ToArray());
+            return new SpellkitArray(array.Select(item => Wrap(ctx, item)).ToArray());
         }
 
         return value;
     }
 
-    protected override SpkObject GetOp(
+    protected override SpellkitObject GetOp(
         ExecutionContext ctx,
-        SpkObject self,
-        SpkObject index)
+        SpellkitObject self,
+        SpellkitObject index)
     {
         if (self is SpellkitHostObject { Data.Getter: not null } hostObject)
         {
@@ -717,18 +717,18 @@ internal sealed class SpellkitHostRootTypeInfo : SpkForeignTypeInfo
         return base.GetOp(ctx, self, index);
     }
 
-    protected override SpkObject SetOp(
+    protected override SpellkitObject SetOp(
         ExecutionContext ctx,
-        SpkObject self,
-        SpkObject index,
-        SpkObject value)
+        SpellkitObject self,
+        SpellkitObject index,
+        SpellkitObject value)
     {
         if (self is SpellkitHostObject { Data.Setter: not null } hostObject)
         {
             try
             {
                 hostObject.Data.Setter(ctx, index, value);
-                return SpkNil.Instance;
+                return SpellkitNil.Instance;
             }
             catch (Exception ex)
             {
@@ -739,17 +739,17 @@ internal sealed class SpellkitHostRootTypeInfo : SpkForeignTypeInfo
     }
 }
 
-internal sealed class HostApiFunction : SpkForeignFunction
+internal sealed class HostApiFunction : SpellkitForeignFunction
 {
-    private readonly Func<ExecutionContext, SpkObject[], SpkObject> handler;
+    private readonly Func<ExecutionContext, SpellkitObject[], SpellkitObject> handler;
 
     public HostApiFunction(
         string name,
         Par[] parameters,
-        Func<ExecutionContext, SpkObject[], SpkObject> handler)
+        Func<ExecutionContext, SpellkitObject[], SpellkitObject> handler)
         : base(name, parameters) => this.handler = handler;
 
-    protected override SpkObject CallWithMemoryLayout(ExecutionContext ctx, SpkObject[] args)
+    protected override SpellkitObject CallWithMemoryLayout(ExecutionContext ctx, SpellkitObject[] args)
     {
         try
         {
@@ -761,5 +761,5 @@ internal sealed class HostApiFunction : SpkForeignFunction
         }
     }
 
-    protected override bool Equals(SpkFunction func) => ReferenceEquals(this, func);
+    protected override bool Equals(SpellkitFunction func) => ReferenceEquals(this, func);
 }

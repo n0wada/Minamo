@@ -8,62 +8,62 @@ namespace Spellkit.Hosting;
 
 public static class SpellkitCommandConvert
 {
-    public static SpkObject FromObject(object? value) =>
-        value is SpkObject dyValue ? dyValue : TypeConverter.ConvertFrom(value);
+    public static SpellkitObject FromObject(object? value) =>
+        value is SpellkitObject dyValue ? dyValue : TypeConverter.ConvertFrom(value);
 
-    public static SpkObject FromObject<T>(T value) =>
-        value is SpkObject spkValue
-            ? spkValue
+    public static SpellkitObject FromObject<T>(T value) =>
+        value is SpellkitObject SpellkitValue
+            ? SpellkitValue
             : TypeConverter.ConvertFrom(value, typeof(T));
 
-    internal static SpkObject FromObject(object? value, Type declaredType) =>
-        value is SpkObject spkValue
-            ? spkValue
+    internal static SpellkitObject FromObject(object? value, Type declaredType) =>
+        value is SpellkitObject SpellkitValue
+            ? SpellkitValue
             : TypeConverter.ConvertFrom(value, declaredType);
 
-    public static SpkObject FromString(string? value) => SpkString.Get(value);
+    public static SpellkitObject FromString(string? value) => SpellkitString.Get(value);
 
-    public static SpkObject FromBoolean(bool value) => value ? SpkBool.True : SpkBool.False;
+    public static SpellkitObject FromBoolean(bool value) => value ? SpellkitBool.True : SpellkitBool.False;
 
-    public static SpkObject FromInteger(long value) => new SpkInteger(value);
+    public static SpellkitObject FromInteger(long value) => new SpellkitInteger(value);
 
-    public static SpkObject FromFloat(double value) => new SpkFloat(value);
+    public static SpellkitObject FromFloat(double value) => new SpellkitFloat(value);
 
-    public static SpkObject FromChar(char value) => new SpkChar(value);
+    public static SpellkitObject FromChar(char value) => new SpellkitChar(value);
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SpkObject FromAwaitable(Task task)
+    public static SpellkitObject FromAwaitable(Task task)
     {
         Task.Run(async () => await task.ConfigureAwait(false)).GetAwaiter().GetResult();
-        return SpkNil.Instance;
+        return SpellkitNil.Instance;
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SpkObject FromAwaitable<T>(Task<T> task) =>
+    public static SpellkitObject FromAwaitable<T>(Task<T> task) =>
         FromObject(Task.Run(async () => await task.ConfigureAwait(false)).GetAwaiter().GetResult());
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SpkObject FromAwaitable(ValueTask task) => FromAwaitable(task.AsTask());
+    public static SpellkitObject FromAwaitable(ValueTask task) => FromAwaitable(task.AsTask());
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SpkObject FromAwaitable<T>(ValueTask<T> task) => FromAwaitable(task.AsTask());
+    public static SpellkitObject FromAwaitable<T>(ValueTask<T> task) => FromAwaitable(task.AsTask());
 
-    public static T? ToObject<T>(ExecutionContext context, SpkObject value) =>
+    public static T? ToObject<T>(ExecutionContext context, SpellkitObject value) =>
         TypeConverter.ConvertTo<T>(context, value);
 
-    public static object? ToObject(ExecutionContext context, SpkObject value) =>
+    public static object? ToObject(ExecutionContext context, SpellkitObject value) =>
         TypeConverter.ConvertTo(context, value, typeof(object));
 
-    public static SpkObject ToSpkObject(ExecutionContext _, SpkObject value) => value;
+    public static SpellkitObject ToSpellkitObject(ExecutionContext _, SpellkitObject value) => value;
 
-    public static string ToString(ExecutionContext context, SpkObject value)
+    public static string ToString(ExecutionContext context, SpellkitObject value)
     {
-        if (value is SpkString text)
+        if (value is SpellkitString text)
         {
             return text.Value;
         }
 
-        if (value is SpkChar character)
+        if (value is SpellkitChar character)
         {
             return character.Value.ToString();
         }
@@ -72,16 +72,16 @@ public static class SpellkitCommandConvert
         return default!;
     }
 
-    public static bool ToBoolean(ExecutionContext _, SpkObject value) => value.IsTrue();
+    public static bool ToBoolean(ExecutionContext _, SpellkitObject value) => value.IsTrue();
 
-    public static char ToChar(ExecutionContext context, SpkObject value)
+    public static char ToChar(ExecutionContext context, SpellkitObject value)
     {
-        if (value is SpkString text)
+        if (value is SpellkitString text)
         {
             return string.IsNullOrEmpty(text.Value) ? '\0' : text.Value[0];
         }
 
-        if (value is SpkChar character)
+        if (value is SpellkitChar character)
         {
             return character.Value;
         }
@@ -90,31 +90,31 @@ public static class SpellkitCommandConvert
         return default;
     }
 
-    public static byte ToByte(ExecutionContext context, SpkObject value) =>
+    public static byte ToByte(ExecutionContext context, SpellkitObject value) =>
         ConvertInteger(context, value, static number => checked((byte)number));
 
-    public static short ToInt16(ExecutionContext context, SpkObject value) =>
+    public static short ToInt16(ExecutionContext context, SpellkitObject value) =>
         ConvertInteger(context, value, static number => checked((short)number));
 
-    public static int ToInt32(ExecutionContext context, SpkObject value) =>
+    public static int ToInt32(ExecutionContext context, SpellkitObject value) =>
         ConvertInteger(context, value, static number => checked((int)number));
 
-    public static long ToInt64(ExecutionContext context, SpkObject value) =>
+    public static long ToInt64(ExecutionContext context, SpellkitObject value) =>
         ConvertInteger(context, value, static number => number);
 
-    public static sbyte ToSByte(ExecutionContext context, SpkObject value) =>
+    public static sbyte ToSByte(ExecutionContext context, SpellkitObject value) =>
         ConvertInteger(context, value, static number => checked((sbyte)number));
 
-    public static ushort ToUInt16(ExecutionContext context, SpkObject value) =>
+    public static ushort ToUInt16(ExecutionContext context, SpellkitObject value) =>
         ConvertInteger(context, value, static number => checked((ushort)number));
 
-    public static uint ToUInt32(ExecutionContext context, SpkObject value) =>
+    public static uint ToUInt32(ExecutionContext context, SpellkitObject value) =>
         ConvertInteger(context, value, static number => checked((uint)number));
 
-    public static ulong ToUInt64(ExecutionContext context, SpkObject value) =>
+    public static ulong ToUInt64(ExecutionContext context, SpellkitObject value) =>
         ConvertInteger(context, value, static number => checked((ulong)number));
 
-    public static float ToSingle(ExecutionContext context, SpkObject value)
+    public static float ToSingle(ExecutionContext context, SpellkitObject value)
     {
         var number = ToFloat(context, value, typeof(float));
         if (!context.HasErrors && double.IsFinite(number) && Math.Abs(number) > float.MaxValue)
@@ -125,9 +125,9 @@ public static class SpellkitCommandConvert
         return (float)number;
     }
 
-    public static double ToDouble(ExecutionContext context, SpkObject value) => ToFloat(context, value, typeof(double));
+    public static double ToDouble(ExecutionContext context, SpellkitObject value) => ToFloat(context, value, typeof(double));
 
-    public static decimal ToDecimal(ExecutionContext context, SpkObject value)
+    public static decimal ToDecimal(ExecutionContext context, SpellkitObject value)
     {
         try
         {
@@ -142,7 +142,7 @@ public static class SpellkitCommandConvert
 
     private static T ConvertInteger<T>(
         ExecutionContext context,
-        SpkObject value,
+        SpellkitObject value,
         Func<long, T> convert)
     {
         try
@@ -156,19 +156,19 @@ public static class SpellkitCommandConvert
         }
     }
 
-    private static long ToInteger(ExecutionContext context, SpkObject value, Type targetType)
+    private static long ToInteger(ExecutionContext context, SpellkitObject value, Type targetType)
     {
-        if (value is SpkInteger integer)
+        if (value is SpellkitInteger integer)
         {
             return integer.Value;
         }
 
-        if (value is SpkFloat number)
+        if (value is SpellkitFloat number)
         {
             return checked((long)number.Value);
         }
 
-        if (value is SpkChar character)
+        if (value is SpellkitChar character)
         {
             return character.Value;
         }
@@ -177,19 +177,19 @@ public static class SpellkitCommandConvert
         return default;
     }
 
-    private static double ToFloat(ExecutionContext context, SpkObject value, Type targetType)
+    private static double ToFloat(ExecutionContext context, SpellkitObject value, Type targetType)
     {
-        if (value is SpkFloat number)
+        if (value is SpellkitFloat number)
         {
             return number.Value;
         }
 
-        if (value is SpkInteger integer)
+        if (value is SpellkitInteger integer)
         {
             return integer.Value;
         }
 
-        if (value is SpkChar character)
+        if (value is SpellkitChar character)
         {
             return character.Value;
         }

@@ -4,66 +4,66 @@ using System.Collections;
 
 namespace Spellkit.Runtime.Types;
 
-internal sealed class SpkForeignIterator : SpkIterator
+internal sealed class SpellkitForeignIterator : SpellkitIterator
 {
-    private readonly IEnumerable<SpkObject> seq;
+    private readonly IEnumerable<SpellkitObject> seq;
 
-    public SpkForeignIterator(IEnumerable<SpkObject> seq) => this.seq = seq;
+    public SpellkitForeignIterator(IEnumerable<SpellkitObject> seq) => this.seq = seq;
 
-    public override SpkFunction GetIteratorFunction() => new SpkIteratorFunction(seq);
+    public override SpellkitFunction GetIteratorFunction() => new SpellkitIteratorFunction(seq);
 
-    public override IEnumerable<SpkObject> ToEnumerable(ExecutionContext _) => seq;
+    public override IEnumerable<SpellkitObject> ToEnumerable(ExecutionContext _) => seq;
 
     public override object ToObject() => seq;
 
     public override int GetHashCode() => seq.GetHashCode();
 
-    public override bool Equals(SpkObject? other) => ReferenceEquals(this, other);
+    public override bool Equals(SpellkitObject? other) => ReferenceEquals(this, other);
 }
 
-internal sealed class SpkNativeIterator : SpkIterator
+internal sealed class SpellkitNativeIterator : SpellkitIterator
 {
     private readonly int unitId;
     private readonly int handle;
-    private readonly FastList<SpkObject[]> captures;
+    private readonly FastList<SpellkitObject[]> captures;
 
-    public SpkNativeIterator(int unitId, int handle, FastList<SpkObject[]> captures, SpkObject[] locals)
+    public SpellkitNativeIterator(int unitId, int handle, FastList<SpellkitObject[]> captures, SpellkitObject[] locals)
     {
-        var vars = new FastList<SpkObject[]>(captures) { locals };
+        var vars = new FastList<SpellkitObject[]>(captures) { locals };
         (this.unitId, this.handle, this.captures) = (unitId, handle, vars);
     }
 
-    public override SpkFunction GetIteratorFunction() => new SpkNativeIteratorFunction(unitId, handle, captures);
+    public override SpellkitFunction GetIteratorFunction() => new SpellkitNativeIteratorFunction(unitId, handle, captures);
 
     public override object ToObject() => this;
 
-    public override IEnumerable<SpkObject> ToEnumerable(ExecutionContext ctx) => new MultiPartEnumerable(ctx, GetIteratorFunction());
+    public override IEnumerable<SpellkitObject> ToEnumerable(ExecutionContext ctx) => new MultiPartEnumerable(ctx, GetIteratorFunction());
 
     public override int GetHashCode() => HashCode.Combine(unitId, handle, captures);
 
-    public override bool Equals(SpkObject? other) => ReferenceEquals(this, other);
+    public override bool Equals(SpellkitObject? other) => ReferenceEquals(this, other);
 }
 
-public sealed class EqualityComparer : IEqualityComparer<SpkObject>
+public sealed class EqualityComparer : IEqualityComparer<SpellkitObject>
 {
     private readonly ExecutionContext ctx;
-    private readonly SpkFunction func;
+    private readonly SpellkitFunction func;
 
-    public EqualityComparer(ExecutionContext ctx, SpkObject functor)
+    public EqualityComparer(ExecutionContext ctx, SpellkitObject functor)
     {
         this.ctx = ctx;
         func = functor.ToFunction(ctx)!;
         ctx.ThrowIf();
     }
 
-    public bool Equals(SpkObject? x, SpkObject? y)
+    public bool Equals(SpellkitObject? x, SpellkitObject? y)
     {
         var fst = func.Call(ctx, x!);
         var snd = func.Call(ctx, y!);
         return fst.Equals(snd, ctx);
     }
 
-    public int GetHashCode([DisallowNull] SpkObject obj)
+    public int GetHashCode([DisallowNull] SpellkitObject obj)
     {
         var x = func.Call(ctx, obj);
         return x.GetHashCode();
@@ -73,26 +73,26 @@ public sealed class EqualityComparer : IEqualityComparer<SpkObject>
 //Generated when a currently traversed iterator was changed
 internal sealed class IterationException : Exception { }
 
-internal abstract class FunctionEnumerable : IEnumerable<SpkObject>
+internal abstract class FunctionEnumerable : IEnumerable<SpellkitObject>
 {
     protected readonly ExecutionContext Context;
-    protected readonly IEnumerable<SpkObject> Source;
-    protected readonly SpkFunction Function;
+    protected readonly IEnumerable<SpellkitObject> Source;
+    protected readonly SpellkitFunction Function;
 
-    protected FunctionEnumerable(ExecutionContext context, IEnumerable<SpkObject> source, SpkFunction function) =>
+    protected FunctionEnumerable(ExecutionContext context, IEnumerable<SpellkitObject> source, SpellkitFunction function) =>
         (Context, Source, Function) = (context, source, function);
 
-    public abstract IEnumerator<SpkObject> GetEnumerator();
+    public abstract IEnumerator<SpellkitObject> GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 internal sealed class MapEnumerable : FunctionEnumerable
 {
-    public MapEnumerable(ExecutionContext context, IEnumerable<SpkObject> source, SpkFunction function)
+    public MapEnumerable(ExecutionContext context, IEnumerable<SpellkitObject> source, SpellkitFunction function)
         : base(context, source, function) { }
 
-    public override IEnumerator<SpkObject> GetEnumerator()
+    public override IEnumerator<SpellkitObject> GetEnumerator()
     {
         foreach (var item in Source)
         {
@@ -109,10 +109,10 @@ internal sealed class MapEnumerable : FunctionEnumerable
 
 internal sealed class FilterEnumerable : FunctionEnumerable
 {
-    public FilterEnumerable(ExecutionContext context, IEnumerable<SpkObject> source, SpkFunction function)
+    public FilterEnumerable(ExecutionContext context, IEnumerable<SpellkitObject> source, SpellkitFunction function)
         : base(context, source, function) { }
 
-    public override IEnumerator<SpkObject> GetEnumerator()
+    public override IEnumerator<SpellkitObject> GetEnumerator()
     {
         foreach (var item in Source)
         {
@@ -132,10 +132,10 @@ internal sealed class FilterEnumerable : FunctionEnumerable
 
 internal sealed class TakeWhileEnumerable : FunctionEnumerable
 {
-    public TakeWhileEnumerable(ExecutionContext context, IEnumerable<SpkObject> source, SpkFunction function)
+    public TakeWhileEnumerable(ExecutionContext context, IEnumerable<SpellkitObject> source, SpellkitFunction function)
         : base(context, source, function) { }
 
-    public override IEnumerator<SpkObject> GetEnumerator()
+    public override IEnumerator<SpellkitObject> GetEnumerator()
     {
         foreach (var item in Source)
         {
@@ -152,10 +152,10 @@ internal sealed class TakeWhileEnumerable : FunctionEnumerable
 
 internal sealed class SkipWhileEnumerable : FunctionEnumerable
 {
-    public SkipWhileEnumerable(ExecutionContext context, IEnumerable<SpkObject> source, SpkFunction function)
+    public SkipWhileEnumerable(ExecutionContext context, IEnumerable<SpellkitObject> source, SpellkitFunction function)
         : base(context, source, function) { }
 
-    public override IEnumerator<SpkObject> GetEnumerator()
+    public override IEnumerator<SpellkitObject> GetEnumerator()
     {
         using var enumerator = Source.GetEnumerator();
 
@@ -184,31 +184,31 @@ internal sealed class SkipWhileEnumerable : FunctionEnumerable
 }
 
 //Used to create MultiPartEnumerator
-internal sealed class MultiPartEnumerable : IEnumerable<SpkObject>
+internal sealed class MultiPartEnumerable : IEnumerable<SpellkitObject>
 {
-    private readonly SpkObject[] iterators;
+    private readonly SpellkitObject[] iterators;
     private readonly ExecutionContext ctx;
 
-    public MultiPartEnumerable(ExecutionContext ctx, params SpkObject[] iterators) =>
+    public MultiPartEnumerable(ExecutionContext ctx, params SpellkitObject[] iterators) =>
         (this.ctx, this.iterators) = (ctx, iterators);
 
-    public IEnumerator<SpkObject> GetEnumerator() => new MultiPartEnumerator(ctx, iterators);
+    public IEnumerator<SpellkitObject> GetEnumerator() => new MultiPartEnumerator(ctx, iterators);
 
     IEnumerator IEnumerable.GetEnumerator() => new MultiPartEnumerator(ctx, iterators);
 }
 
 //Used to implement "concat" method when several iterators are combined in one
-internal sealed class MultiPartEnumerator : IEnumerator<SpkObject>
+internal sealed class MultiPartEnumerator : IEnumerator<SpellkitObject>
 {
-    private readonly SpkObject[] iterators;
+    private readonly SpellkitObject[] iterators;
     private int nextIterator = 0;
-    private IEnumerator<SpkObject>? current;
+    private IEnumerator<SpellkitObject>? current;
     private readonly ExecutionContext ctx;
 
-    public MultiPartEnumerator(ExecutionContext ctx, params SpkObject[] iterators) =>
+    public MultiPartEnumerator(ExecutionContext ctx, params SpellkitObject[] iterators) =>
         (this.ctx, this.iterators) = (ctx, iterators);
 
-    public SpkObject Current => current!.Current;
+    public SpellkitObject Current => current!.Current;
 
     object IEnumerator.Current => current!.Current;
 
@@ -220,7 +220,7 @@ internal sealed class MultiPartEnumerator : IEnumerator<SpkObject>
         {
             if (iterators.Length > nextIterator)
             {
-                var it = SpkIterator.ToEnumerable(ctx, iterators[nextIterator]);
+                var it = SpellkitIterator.ToEnumerable(ctx, iterators[nextIterator]);
                 ctx.ThrowIf();
                 nextIterator++;
                 current = it.GetEnumerator();

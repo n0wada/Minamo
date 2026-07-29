@@ -171,16 +171,16 @@ public sealed class SpellkitHost
         return CreateInstance(environment ?? new SpellkitEnvironment(), program);
     }
 
-    internal SpellkitInstance CreateInstance(object? hostContext, SpkTuple? arguments) =>
+    internal SpellkitInstance CreateInstance(object? hostContext, SpellkitTuple? arguments) =>
         CreateInstance(new SpellkitEnvironment(hostContext), null, arguments);
 
-    internal SpellkitInstance CreateInstance(SpellkitEnvironment environment, SpkTuple? arguments) =>
+    internal SpellkitInstance CreateInstance(SpellkitEnvironment environment, SpellkitTuple? arguments) =>
         CreateInstance(environment, null, arguments);
 
     private SpellkitInstance CreateInstance(
         SpellkitEnvironment environment,
         SpellkitProgram? program,
-        SpkTuple? arguments = null)
+        SpellkitTuple? arguments = null)
     {
         var definitions = modules.Values.Select(m => m.Build()).ToArray();
         var instanceOptions = CloneOptions(options);
@@ -234,7 +234,7 @@ public sealed class SpellkitHost
         var compileLookup = fileImportsDisabled || lookup is null
             ? FileLookup.Restricted(compileOptions).Build()
             : lookup.WithOptions(compileOptions);
-        var linker = new SpkLinker(compileLookup);
+        var linker = new SpellkitLinker(compileLookup);
         var result = linker.Make(source);
         return result.Success && result.Value is not null
             ? Result.Create(new SpellkitProgram(result.Value, result.Messages, programOwner), result.Messages)

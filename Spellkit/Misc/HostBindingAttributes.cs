@@ -4,40 +4,40 @@ namespace Spellkit.Codegen;
 public sealed class GeneratedModuleAttribute : Attribute;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-public sealed class SpkTypeAttribute : Attribute;
+public sealed class SpellkitTypeAttribute : Attribute;
 
-public abstract class SpkMemberAttribute : Attribute;
+public abstract class SpellkitMemberAttribute : Attribute;
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
-public sealed class SpkMethodAttribute : SpkMemberAttribute
+public sealed class SpellkitMethodAttribute : SpellkitMemberAttribute
 {
-    public SpkMethodAttribute() { }
+    public SpellkitMethodAttribute() { }
 
-    public SpkMethodAttribute(string _) { }
+    public SpellkitMethodAttribute(string _) { }
 }
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
-public sealed class SpkPropertyAttribute : SpkMemberAttribute
+public sealed class SpellkitPropertyAttribute : SpellkitMemberAttribute
 {
-    public SpkPropertyAttribute() { }
+    public SpellkitPropertyAttribute() { }
 
-    public SpkPropertyAttribute(string _) { }
+    public SpellkitPropertyAttribute(string _) { }
 }
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
-public sealed class SpkStaticMethodAttribute : SpkMemberAttribute
+public sealed class SpellkitStaticMethodAttribute : SpellkitMemberAttribute
 {
-    public SpkStaticMethodAttribute() { }
+    public SpellkitStaticMethodAttribute() { }
 
-    public SpkStaticMethodAttribute(string _) { }
+    public SpellkitStaticMethodAttribute(string _) { }
 }
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
-public sealed class SpkStaticPropertyAttribute : SpkMemberAttribute
+public sealed class SpellkitStaticPropertyAttribute : SpellkitMemberAttribute
 {
-    public SpkStaticPropertyAttribute() { }
+    public SpellkitStaticPropertyAttribute() { }
 
-    public SpkStaticPropertyAttribute(string _) { }
+    public SpellkitStaticPropertyAttribute(string _) { }
 }
 
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]

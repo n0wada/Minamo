@@ -99,11 +99,11 @@ public sealed class SpellkitEnvironment
         }
     }
 
-    internal bool TryResolve(string name, out SpkObject value)
+    internal bool TryResolve(string name, out SpellkitObject value)
     {
         if (!bindings.TryGetValue(name, out var raw))
         {
-            value = SpkNil.Instance;
+            value = SpellkitNil.Instance;
             return false;
         }
 

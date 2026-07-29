@@ -1,4 +1,4 @@
-﻿using Spellkit.Runtime.Types;
+using Spellkit.Runtime.Types;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,22 +7,22 @@ namespace Spellkit.Runtime;
 
 public static class TypeConverter
 {
-    public static SpkObject ConvertFrom<T>(T obj) => ConvertFrom(obj, typeof(T), false);
+    public static SpellkitObject ConvertFrom<T>(T obj) => ConvertFrom(obj, typeof(T), false);
 
-    public static SpkObject ConvertFrom(object? obj) =>
+    public static SpellkitObject ConvertFrom(object? obj) =>
         ConvertFrom(obj, obj?.GetType()!, true);
 
-    internal static SpkObject ConvertFrom(object? obj, Type type) =>
+    internal static SpellkitObject ConvertFrom(object? obj, Type type) =>
         ConvertFrom(obj, type, false);
 
-    private static SpkObject ConvertFrom(object? obj, Type type, bool runtimeInterop)
+    private static SpellkitObject ConvertFrom(object? obj, Type type, bool runtimeInterop)
     {
         if (obj is null)
         {
-            return SpkNil.Instance;
+            return SpellkitNil.Instance;
         }
 
-        if (obj is SpkObject retval)
+        if (obj is SpellkitObject retval)
         {
             return retval;
         }
@@ -36,24 +36,24 @@ public static class TypeConverter
         switch (Type.GetTypeCode(type))
         {
             case TypeCode.Boolean: return (bool)obj ? True : False;
-            case TypeCode.Byte: return new SpkInteger((byte)obj);
-            case TypeCode.Int16: return new SpkInteger((short)obj);
-            case TypeCode.Int32: return new SpkInteger((int)obj);
-            case TypeCode.Int64: return new SpkInteger((long)obj);
-            case TypeCode.SByte: return new SpkInteger((sbyte)obj);
-            case TypeCode.UInt16: return new SpkInteger((ushort)obj);
-            case TypeCode.UInt32: return new SpkInteger((uint)obj);
+            case TypeCode.Byte: return new SpellkitInteger((byte)obj);
+            case TypeCode.Int16: return new SpellkitInteger((short)obj);
+            case TypeCode.Int32: return new SpellkitInteger((int)obj);
+            case TypeCode.Int64: return new SpellkitInteger((long)obj);
+            case TypeCode.SByte: return new SpellkitInteger((sbyte)obj);
+            case TypeCode.UInt16: return new SpellkitInteger((ushort)obj);
+            case TypeCode.UInt32: return new SpellkitInteger((uint)obj);
             case TypeCode.UInt64:
                 var unsigned = (ulong)obj;
                 return unsigned <= long.MaxValue
-                    ? new SpkInteger((long)unsigned)
-                    : new SpkInterop(type, obj);
+                    ? new SpellkitInteger((long)unsigned)
+                    : new SpellkitInterop(type, obj);
             case TypeCode.String:
-            case TypeCode.Char: return SpkString.Get(obj.ToString());
-            case TypeCode.Single: return new SpkFloat((float)obj);
-            case TypeCode.Double: return new SpkFloat((double)obj);
-            case TypeCode.Decimal: return new SpkFloat((double)(decimal)obj);
-            case TypeCode.Empty: return SpkNil.Instance;
+            case TypeCode.Char: return SpellkitString.Get(obj.ToString());
+            case TypeCode.Single: return new SpellkitFloat((float)obj);
+            case TypeCode.Double: return new SpellkitFloat((double)obj);
+            case TypeCode.Decimal: return new SpellkitFloat((double)(decimal)obj);
+            case TypeCode.Empty: return SpellkitNil.Instance;
             default:
                 if (obj is IDictionary map)
                 {
@@ -62,7 +62,7 @@ public static class TypeConverter
                     var genericArguments = dictionaryType?.GetGenericArguments();
                     var keyType = genericArguments?[0] ?? typeof(object);
                     var valueType = genericArguments?[1] ?? typeof(object);
-                    var dict = new SpkDictionary();
+                    var dict = new SpellkitDictionary();
                     foreach (DictionaryEntry kv in map)
                     {
                         dict.Dictionary[ConvertNested(kv.Key, keyType, runtimeInterop)] =
@@ -75,38 +75,38 @@ public static class TypeConverter
                 {
                     var arr = (Array)obj;
                     var elementType = type.GetElementType()!;
-                    var newArr = new SpkObject[arr.Length];
+                    var newArr = new SpellkitObject[arr.Length];
                     for (var i = 0; i < arr.Length; i++)
                     {
                         newArr[i] = ConvertNested(arr.GetValue(i), elementType, runtimeInterop);
                     }
 
-                    return new SpkArray(newArr);
+                    return new SpellkitArray(newArr);
                 }
                 else if (obj is IEnumerable seq)
                 {
                     var enumerableType = FindGenericInterface(type, typeof(IEnumerable<>));
                     var elementType = enumerableType?.GetGenericArguments()[0] ?? typeof(object);
-                    var values = new List<SpkObject>();
+                    var values = new List<SpellkitObject>();
                     foreach (var item in seq)
                     {
                         values.Add(ConvertNested(item, elementType, runtimeInterop));
                     }
 
-                    return new SpkArray(values.ToArray());
+                    return new SpellkitArray(values.ToArray());
                 }
                 else if (BCL.Type.IsAssignableFrom(type))
                 {
-                    return new SpkInterop((Type)obj);
+                    return new SpellkitInterop((Type)obj);
                 }
                 else
                 {
-                    return new SpkInterop(type, obj);
+                    return new SpellkitInterop(type, obj);
                 }
         }
     }
 
-    private static SpkObject ConvertNested(object? value, Type declaredType, bool runtimeInterop) =>
+    private static SpellkitObject ConvertNested(object? value, Type declaredType, bool runtimeInterop) =>
         runtimeInterop
             ? ConvertFrom(value)
             : ConvertFrom(value, declaredType, false);
@@ -124,9 +124,9 @@ public static class TypeConverter
                 && candidate.GetGenericTypeDefinition() == definition);
     }
 
-    public static T? ConvertTo<T>(ExecutionContext ctx, SpkObject obj) => (T?)ConvertTo(ctx, obj, typeof(T));
+    public static T? ConvertTo<T>(ExecutionContext ctx, SpellkitObject obj) => (T?)ConvertTo(ctx, obj, typeof(T));
 
-    public static object? ConvertTo(ExecutionContext ctx, SpkObject obj, Type type)
+    public static object? ConvertTo(ExecutionContext ctx, SpellkitObject obj, Type type)
     {
         if (!TryConvert(obj, type, out var result))
         {
@@ -137,14 +137,14 @@ public static class TypeConverter
         return result; 
     }
 
-    public static bool TryConvert(SpkObject obj, Type type, out object? result)
+    public static bool TryConvert(SpellkitObject obj, Type type, out object? result)
     {
         result = default;
         long i8; double r8; string str;
 
-        if (obj.TypeId == Spk.Interop)
+        if (obj.TypeId == SpellkitTypeCodes.Interop)
         {
-            var interop = (SpkInterop)obj;
+            var interop = (SpellkitInterop)obj;
 
             if (BCL.Type.IsAssignableFrom(interop.Type)) //We have a type info here
             {
@@ -172,7 +172,7 @@ public static class TypeConverter
             }
         }
 
-        if (type == BCL.SpkObject)
+        if (type == BCL.SpellkitObject)
         {
             result = obj;
             return true;
@@ -182,7 +182,7 @@ public static class TypeConverter
             result = obj.ToObject();
             return true;
         }
-        else if (BCL.SpkObject.IsAssignableFrom(type))
+        else if (BCL.SpellkitObject.IsAssignableFrom(type))
         {
             result = Convert.ChangeType(obj, type);
             return true;
@@ -265,7 +265,7 @@ public static class TypeConverter
                 result = null;
                 return true;
             default:
-                if (obj is SpkDictionary map)
+                if (obj is SpellkitDictionary map)
                 {
                     if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Dictionary<,>))
                     {
@@ -299,7 +299,7 @@ public static class TypeConverter
                         return true;
                     }
                 }
-                else if (obj is SpkEnumerable enu)
+                else if (obj is SpellkitEnumerable enu)
                 {
                     if (type.IsArray)
                     {
@@ -357,19 +357,19 @@ public static class TypeConverter
         return false;
     }
 
-    private static bool TryGetFloat(SpkObject obj, out double result)
+    private static bool TryGetFloat(SpellkitObject obj, out double result)
     {
-        if (obj is SpkFloat f)
+        if (obj is SpellkitFloat f)
         {
             result = f.Value;
             return true;
         }
-        else if (obj is SpkInteger i)
+        else if (obj is SpellkitInteger i)
         {
             result = i.Value;
             return true;
         }
-        else if (obj is SpkChar c)
+        else if (obj is SpellkitChar c)
         {
             result = c.Value;
             return true;
@@ -380,7 +380,7 @@ public static class TypeConverter
     }
 
     private static bool TryConvertInteger<T>(
-        SpkObject obj,
+        SpellkitObject obj,
         Func<long, T> convert,
         out object? result)
     {
@@ -401,14 +401,14 @@ public static class TypeConverter
         }
     }
 
-    private static bool TryGetInteger(SpkObject obj, out long result)
+    private static bool TryGetInteger(SpellkitObject obj, out long result)
     {
-        if (obj is SpkInteger i)
+        if (obj is SpellkitInteger i)
         {
             result = i.Value;
             return true;
         }
-        else if (obj is SpkFloat f)
+        else if (obj is SpellkitFloat f)
         {
             if (!double.IsFinite(f.Value)
                 || f.Value < long.MinValue
@@ -421,7 +421,7 @@ public static class TypeConverter
             result = (long)f.Value;
             return true;
         }
-        else if (obj is SpkChar c)
+        else if (obj is SpellkitChar c)
         {
             result = c.Value;
             return true;
@@ -431,14 +431,14 @@ public static class TypeConverter
         return false;
     }
 
-    private static bool TryGetString(SpkObject obj, out string result)
+    private static bool TryGetString(SpellkitObject obj, out string result)
     {
-        if (obj is SpkString s)
+        if (obj is SpellkitString s)
         {
             result = s.Value;
             return true;
         }
-        else if (obj is SpkChar c)
+        else if (obj is SpellkitChar c)
         {
             result = c.Value.ToString();
             return true;
@@ -448,7 +448,7 @@ public static class TypeConverter
         return false;
     }
 
-    public static bool TryCreateTypedArray(SpkObject[] arr, Type type, out Array? result)
+    public static bool TryCreateTypedArray(SpellkitObject[] arr, Type type, out Array? result)
     {
         var xs = Array.CreateInstance(type, arr.Length);
         result = default;

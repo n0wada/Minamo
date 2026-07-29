@@ -134,7 +134,7 @@ partial class Builder
 
             if (char.IsUpper(name[0]))
             {
-                var ti = Spk.GetTypeCodeByName(name);
+                var ti = SpellkitTypeCodes.GetTypeCodeByName(name);
 
                 if (ti != 0)
                 {

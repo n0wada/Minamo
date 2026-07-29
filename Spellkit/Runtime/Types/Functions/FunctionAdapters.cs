@@ -3,18 +3,18 @@ using Spellkit.Compiler;
 
 namespace Spellkit.Runtime.Types;
 
-internal sealed class CompositionContainer : SpkForeignFunction
+internal sealed class CompositionContainer : SpellkitForeignFunction
 {
-    private readonly SpkFunction first;
-    private readonly SpkFunction second;
+    private readonly SpellkitFunction first;
+    private readonly SpellkitFunction second;
 
-    public CompositionContainer(SpkFunction first, SpkFunction second) : base(null, first.Parameters, first.VarArgIndex)
+    public CompositionContainer(SpellkitFunction first, SpellkitFunction second) : base(null, first.Parameters, first.VarArgIndex)
     {
         this.first = first;
         this.second = second;
     }
 
-    protected override SpkObject CallWithMemoryLayout(ExecutionContext ctx, SpkObject[] args)
+    protected override SpellkitObject CallWithMemoryLayout(ExecutionContext ctx, SpellkitObject[] args)
     {
         var res = first.Call(ctx, args);
 
@@ -26,48 +26,48 @@ internal sealed class CompositionContainer : SpkForeignFunction
         return second.Call(ctx, res);
     }
 
-    protected override bool Equals(SpkFunction func) => 
+    protected override bool Equals(SpellkitFunction func) =>
            func is CompositionContainer cc
         && cc.first.Equals(first) && cc.second.Equals(second);
 }
 
-internal sealed class SpkMissingMethod : SpkForeignFunction
+internal sealed class SpellkitMissingMethod : SpellkitForeignFunction
 {
     private static readonly Par[] parameters = new Par[] { new Par("%args", ParKind.VarArg) };
 
     internal const string Name = "MissingMethod";
-    private readonly SpkNativeFunction fun;
+    private readonly SpellkitNativeFunction fun;
     private readonly string missingMethodName;
 
-    public SpkMissingMethod(string name, SpkNativeFunction fun) : base(Name, parameters, 0) => 
+    public SpellkitMissingMethod(string name, SpellkitNativeFunction fun) : base(Name, parameters, 0) =>
         (this.fun, missingMethodName) = (fun, name);
 
-    protected override SpkObject CallWithMemoryLayout(ExecutionContext ctx, SpkObject[] args)
+    protected override SpellkitObject CallWithMemoryLayout(ExecutionContext ctx, SpellkitObject[] args)
     {
         var fn = Self is not null ? fun.BindToInstance(ctx, Self) : fun;
-        var pars = new SpkObject[2];
-        pars[0] = new SpkString(missingMethodName);
-        pars[1] = args.Length == 0 ? SpkTuple.Empty : (SpkTuple)args[0];
+        var pars = new SpellkitObject[2];
+        pars[0] = new SpellkitString(missingMethodName);
+        pars[1] = args.Length == 0 ? SpellkitTuple.Empty : (SpellkitTuple)args[0];
         return fn.Call(ctx, pars);
     }
 
-    protected override SpkFunction Clone(ExecutionContext ctx) => new SpkMissingMethod(missingMethodName, fun);
+    protected override SpellkitFunction Clone(ExecutionContext ctx) => new SpellkitMissingMethod(missingMethodName, fun);
 
     public override object ToObject() => fun.ToObject();
 
-    protected override bool Equals(SpkFunction func) =>
-           func is SpkMissingMethod mi && mi.fun.Equals(fun)
+    protected override bool Equals(SpellkitFunction func) =>
+           func is SpellkitMissingMethod mi && mi.fun.Equals(fun)
         && IsSameInstance(this, func);
 }
 
-internal class SpkUnaryFunction : SpkForeignFunction
+internal class SpellkitUnaryFunction : SpellkitForeignFunction
 {
-    private readonly Func<ExecutionContext, SpkObject, SpkObject> fun;
+    private readonly Func<ExecutionContext, SpellkitObject, SpellkitObject> fun;
 
-    public SpkUnaryFunction(string name, Func<ExecutionContext, SpkObject, SpkObject> fun)
+    public SpellkitUnaryFunction(string name, Func<ExecutionContext, SpellkitObject, SpellkitObject> fun)
         : base(name, Array.Empty<Par>(), -1) => this.fun = fun;
 
-    public SpkUnaryFunction(string name, Func<ExecutionContext, SpkObject, SpkObject> fun, bool isPropertyGetter)
+    public SpellkitUnaryFunction(string name, Func<ExecutionContext, SpellkitObject, SpellkitObject> fun, bool isPropertyGetter)
         : this(name, fun)
     {
         if (isPropertyGetter)
@@ -76,11 +76,11 @@ internal class SpkUnaryFunction : SpkForeignFunction
         }
     }
 
-    internal SpkObject CallUnary(ExecutionContext ctx, SpkObject self) => fun(ctx, self);
+    internal SpellkitObject CallUnary(ExecutionContext ctx, SpellkitObject self) => fun(ctx, self);
 
-    protected override SpkObject CallWithMemoryLayout(ExecutionContext ctx, SpkObject[] args) => fun(ctx, Self!);
+    protected override SpellkitObject CallWithMemoryLayout(ExecutionContext ctx, SpellkitObject[] args) => fun(ctx, Self!);
 
-    protected override SpkObject BindOrRun(ExecutionContext ctx, SpkObject arg)
+    protected override SpellkitObject BindOrRun(ExecutionContext ctx, SpellkitObject arg)
     {
         if (!Auto)
         {
@@ -90,64 +90,64 @@ internal class SpkUnaryFunction : SpkForeignFunction
         return fun(ctx, arg);
     }
 
-    protected override SpkFunction Clone(ExecutionContext ctx) => new SpkUnaryFunction(FunctionName, fun);
+    protected override SpellkitFunction Clone(ExecutionContext ctx) => new SpellkitUnaryFunction(FunctionName, fun);
 
     public override object ToObject() => fun;
 
-    protected override bool Equals(SpkFunction func) => 
-           func is SpkUnaryFunction bin && ReferenceEquals(bin.fun, fun)
+    protected override bool Equals(SpellkitFunction func) =>
+           func is SpellkitUnaryFunction bin && ReferenceEquals(bin.fun, fun)
         && IsSameInstance(this, func);
 }
 
-internal sealed class SpkBinaryFunction : SpkForeignFunction
+internal sealed class SpellkitBinaryFunction : SpellkitForeignFunction
 {
-    private readonly Func<ExecutionContext, SpkObject, SpkObject, SpkObject> fun;
+    private readonly Func<ExecutionContext, SpellkitObject, SpellkitObject, SpellkitObject> fun;
 
-    public SpkBinaryFunction(string name, Func<ExecutionContext, SpkObject, SpkObject, SpkObject> fun, Par par)
+    public SpellkitBinaryFunction(string name, Func<ExecutionContext, SpellkitObject, SpellkitObject, SpellkitObject> fun, Par par)
         : base(name, new Par[] { par }, -1) => this.fun = fun;
 
-    private SpkBinaryFunction(string name, Func<ExecutionContext, SpkObject, SpkObject, SpkObject> fun, Par[] pars)
+    private SpellkitBinaryFunction(string name, Func<ExecutionContext, SpellkitObject, SpellkitObject, SpellkitObject> fun, Par[] pars)
         : base(name, pars, -1) => this.fun = fun;
 
-    internal SpkObject CallBinary(ExecutionContext ctx, SpkObject self, SpkObject arg) => fun(ctx, self, arg);
+    internal SpellkitObject CallBinary(ExecutionContext ctx, SpellkitObject self, SpellkitObject arg) => fun(ctx, self, arg);
 
     protected override bool CanCallWithSingleArgumentDirectly => true;
 
-    protected override SpkObject CallWithSingleArgument(ExecutionContext ctx, SpkObject arg) => fun(ctx, Self!, arg);
+    protected override SpellkitObject CallWithSingleArgument(ExecutionContext ctx, SpellkitObject arg) => fun(ctx, Self!, arg);
 
-    protected override SpkObject CallWithMemoryLayout(ExecutionContext ctx, SpkObject[] args) => fun(ctx, Self!, args[0]);
+    protected override SpellkitObject CallWithMemoryLayout(ExecutionContext ctx, SpellkitObject[] args) => fun(ctx, Self!, args[0]);
 
-    protected override SpkFunction Clone(ExecutionContext ctx) => new SpkBinaryFunction(FunctionName, fun, Parameters);
+    protected override SpellkitFunction Clone(ExecutionContext ctx) => new SpellkitBinaryFunction(FunctionName, fun, Parameters);
 
     public override object ToObject() => fun;
 
-    protected override bool Equals(SpkFunction func) => 
-           func is SpkBinaryFunction bin && ReferenceEquals(bin.fun, fun) && IsSameInstance(this, func);
+    protected override bool Equals(SpellkitFunction func) =>
+           func is SpellkitBinaryFunction bin && ReferenceEquals(bin.fun, fun) && IsSameInstance(this, func);
 }
 
-internal sealed class SpkTernaryFunction : SpkForeignFunction
+internal sealed class SpellkitTernaryFunction : SpellkitForeignFunction
 {
-    private readonly Func<ExecutionContext, SpkObject, SpkObject, SpkObject, SpkObject> fun;
+    private readonly Func<ExecutionContext, SpellkitObject, SpellkitObject, SpellkitObject, SpellkitObject> fun;
 
-    public SpkTernaryFunction(string name, Func<ExecutionContext, SpkObject, SpkObject, SpkObject, SpkObject> fun, Par par1, Par par2)
+    public SpellkitTernaryFunction(string name, Func<ExecutionContext, SpellkitObject, SpellkitObject, SpellkitObject, SpellkitObject> fun, Par par1, Par par2)
         : base(name, new Par[] { par1, par2 }, -1) => this.fun = fun;
 
-    private SpkTernaryFunction(string name, Func<ExecutionContext, SpkObject, SpkObject, SpkObject, SpkObject> fun, Par[] pars)
+    private SpellkitTernaryFunction(string name, Func<ExecutionContext, SpellkitObject, SpellkitObject, SpellkitObject, SpellkitObject> fun, Par[] pars)
         : base(name, pars, -1) => this.fun = fun;
 
-    internal SpkObject CallTernary(ExecutionContext ctx, SpkObject self, SpkObject arg1, SpkObject arg2) => fun(ctx, self, arg1, arg2);
+    internal SpellkitObject CallTernary(ExecutionContext ctx, SpellkitObject self, SpellkitObject arg1, SpellkitObject arg2) => fun(ctx, self, arg1, arg2);
 
     protected override bool CanCallWithTwoArgumentsDirectly => true;
 
-    protected override SpkObject CallWithTwoArguments(ExecutionContext ctx, SpkObject arg1, SpkObject arg2) => fun(ctx, Self!, arg1, arg2);
+    protected override SpellkitObject CallWithTwoArguments(ExecutionContext ctx, SpellkitObject arg1, SpellkitObject arg2) => fun(ctx, Self!, arg1, arg2);
 
-    protected override SpkObject CallWithMemoryLayout(ExecutionContext ctx, SpkObject[] args) => fun(ctx, Self!, args[0], args[1]);
+    protected override SpellkitObject CallWithMemoryLayout(ExecutionContext ctx, SpellkitObject[] args) => fun(ctx, Self!, args[0], args[1]);
 
-    protected override SpkFunction Clone(ExecutionContext ctx) => new SpkTernaryFunction(FunctionName, fun, Parameters);
+    protected override SpellkitFunction Clone(ExecutionContext ctx) => new SpellkitTernaryFunction(FunctionName, fun, Parameters);
 
     public override object ToObject() => fun;
 
-    protected override bool Equals(SpkFunction func) =>
-           func is SpkTernaryFunction ter && ReferenceEquals(ter.fun, fun)
+    protected override bool Equals(SpellkitFunction func) =>
+           func is SpellkitTernaryFunction ter && ReferenceEquals(ter.fun, fun)
         && IsSameInstance(this, func);
 }

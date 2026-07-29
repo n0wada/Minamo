@@ -11,24 +11,24 @@ public interface IProduction
     string Constructor { get; }
 }
 
-public sealed class SpkExceptionObject : SpkObject, IProduction
+public sealed class SpellkitExceptionObject : SpellkitObject, IProduction
 {
     public string Name { get; }
 
     public string Message { get; }
 
-    public SpkTuple Data { get; }
+    public SpellkitTuple Data { get; }
 
     internal CallStackTrace? Trace { get; private set; }
 
     public string Constructor => Name;
 
-    public override string TypeName => nameof(Spk.Exception);
+    public override string TypeName => nameof(SpellkitTypeCodes.Exception);
 
-    public SpkExceptionObject(string name, string message, SpkTuple data) : base(Spk.Exception) =>
+    public SpellkitExceptionObject(string name, string message, SpellkitTuple data) : base(SpellkitTypeCodes.Exception) =>
         (Name, Message, Data) = (name, message, data);
 
-    internal SpkExceptionObject WithTrace(CallStackTrace? trace)
+    internal SpellkitExceptionObject WithTrace(CallStackTrace? trace)
     {
         Trace = trace;
         return this;
@@ -36,15 +36,15 @@ public sealed class SpkExceptionObject : SpkObject, IProduction
 
     public override object ToObject() => this;
 
-    public override SpkObject Clone()
+    public override SpellkitObject Clone()
     {
-        var clone = new SpkExceptionObject(Name, Message, Data);
+        var clone = new SpellkitExceptionObject(Name, Message, Data);
         clone.Trace = Trace;
         return clone;
     }
 
-    public override bool Equals(SpkObject? other) =>
-        other is SpkExceptionObject ex
+    public override bool Equals(SpellkitObject? other) =>
+        other is SpellkitExceptionObject ex
         && ex.Name == Name
         && ex.Message == Message
         && ex.Data.Equals(Data);
@@ -54,52 +54,52 @@ public sealed class SpkExceptionObject : SpkObject, IProduction
     public override string ToString() => $"{Name}: {Message}";
 }
 
-[SpkType]
-internal sealed partial class SpkExceptionTypeInfo : SpkTypeInfo
+[SpellkitType]
+internal sealed partial class SpellkitExceptionTypeInfo : SpellkitTypeInfo
 {
-    public override string ReflectedTypeName => nameof(Spk.Exception);
+    public override string ReflectedTypeName => nameof(SpellkitTypeCodes.Exception);
 
-    public override int ReflectedTypeId => Spk.Exception;
+    public override int ReflectedTypeId => SpellkitTypeCodes.Exception;
 
-    public SpkExceptionTypeInfo()
+    public SpellkitExceptionTypeInfo()
     {
-        AddMixins(Spk.Equatable);
+        AddMixins(SpellkitTypeCodes.Equatable);
         SetSupportedOperations(Ops.Len);
     }
 
-    protected override SpkObject EqOp(ExecutionContext ctx, SpkObject left, SpkObject right) =>
+    protected override SpellkitObject EqOp(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
         left.TypeId == right.TypeId && left.Equals(right) ? True : False;
 
-    protected override SpkObject ToStringOp(ExecutionContext ctx, SpkObject arg, SpkObject format) =>
-        new SpkString(arg.ToString());
+    protected override SpellkitObject ToStringOp(ExecutionContext ctx, SpellkitObject arg, SpellkitObject format) =>
+        new SpellkitString(arg.ToString());
 
-    protected override SpkObject LengthOp(ExecutionContext ctx, SpkObject arg) =>
-        new SpkInteger(((SpkExceptionObject)arg).Data.Count);
+    protected override SpellkitObject LengthOp(ExecutionContext ctx, SpellkitObject arg) =>
+        new SpellkitInteger(((SpellkitExceptionObject)arg).Data.Count);
 
-    protected override SpkObject GetOp(ExecutionContext ctx, SpkObject self, SpkObject index) =>
-        ((SpkExceptionObject)self).Data.GetItem(ctx, index);
+    protected override SpellkitObject GetOp(ExecutionContext ctx, SpellkitObject self, SpellkitObject index) =>
+        ((SpellkitExceptionObject)self).Data.GetItem(ctx, index);
 
-    [SpkProperty("Name")]
-    internal static string GetName(SpkExceptionObject self) => self.Name;
+    [SpellkitProperty("Name")]
+    internal static string GetName(SpellkitExceptionObject self) => self.Name;
 
-    [SpkProperty("Message")]
-    internal static string GetMessage(SpkExceptionObject self) => self.Message;
+    [SpellkitProperty("Message")]
+    internal static string GetMessage(SpellkitExceptionObject self) => self.Message;
 
-    [SpkProperty("Data")]
-    internal static SpkObject GetData(SpkExceptionObject self) =>
+    [SpellkitProperty("Data")]
+    internal static SpellkitObject GetData(SpellkitExceptionObject self) =>
         self.Data.Count == 0 ? Nil : self.Data;
 
-    [SpkProperty("StackTrace")]
-    internal static SpkObject GetStackTrace(SpkExceptionObject self) =>
-        self.Trace is null ? Nil : new SpkString(self.Trace.ToString());
+    [SpellkitProperty("StackTrace")]
+    internal static SpellkitObject GetStackTrace(SpellkitExceptionObject self) =>
+        self.Trace is null ? Nil : new SpellkitString(self.Trace.ToString());
 
-    protected override SpkFunction? InitializeStaticMember(string name, ExecutionContext ctx)
+    protected override SpellkitFunction? InitializeStaticMember(string name, ExecutionContext ctx)
     {
         if (!char.IsUpper(name[0]))
         {
             return base.InitializeStaticMember(name, ctx);
         }
 
-        return new SpkExceptionConstructor(name, (_, args) => ErrorGenerators.RuntimeException(name, args), new("values", ParKind.VarArg));
+        return new SpellkitExceptionConstructor(name, (_, args) => ErrorGenerators.RuntimeException(name, args), new("values", ParKind.VarArg));
     }
 }

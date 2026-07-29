@@ -16,23 +16,23 @@ public sealed class SpellkitCommandGenerator : IIncrementalGenerator
     private const string PropertyAttribute = "Spellkit.Hosting.SpellkitPropertyAttribute";
     private const string ForeignTypeAttribute = "Spellkit.Hosting.SpellkitForeignTypeAttribute";
     private const string CommandContext = "Spellkit.Hosting.SpellkitCommandContext";
-    private const string ForeignType = "Spellkit.Runtime.Types.SpkForeignTypeInfo";
+    private const string ForeignType = "Spellkit.Runtime.Types.SpellkitForeignTypeInfo";
     private const string ForeignUnit = "Spellkit.Linker.ForeignUnit";
 
     private static readonly DiagnosticDescriptor InvalidModule = Error(
-        "SPKH001", "Invalid host module", "SpellkitModule on '{0}' requires a non-empty module name.");
+        "SpellkitH001", "Invalid host module", "SpellkitModule on '{0}' requires a non-empty module name.");
     private static readonly DiagnosticDescriptor InvalidMethod = Error(
-        "SPKH002", "Invalid host command", "Method '{0}' cannot be exposed as a SpellkitCommand: {1}");
+        "SpellkitH002", "Invalid host command", "Method '{0}' cannot be exposed as a SpellkitCommand: {1}");
     private static readonly DiagnosticDescriptor DuplicateCommand = Error(
-        "SPKH003", "Duplicate host command", "Module '{0}' contains more than one command named '{1}'.");
+        "SpellkitH003", "Duplicate host command", "Module '{0}' contains more than one command named '{1}'.");
     private static readonly DiagnosticDescriptor InvalidParameter = Error(
-        "SPKH004", "Invalid host command parameter", "Parameter '{0}' on command '{1}' is not supported: {2}");
+        "SpellkitH004", "Invalid host command parameter", "Parameter '{0}' on command '{1}' is not supported: {2}");
     private static readonly DiagnosticDescriptor InvalidForeignType = Error(
-        "SPKH005", "Invalid foreign host type", "Type '{0}' cannot be registered as a foreign host type: {1}");
+        "SpellkitH005", "Invalid foreign host type", "Type '{0}' cannot be registered as a foreign host type: {1}");
     private static readonly DiagnosticDescriptor InvalidForeignUnit = Error(
-        "SPKH006", "Invalid foreign host unit", "Module unit '{0}' is invalid: {1}");
+        "SpellkitH006", "Invalid foreign host unit", "Module unit '{0}' is invalid: {1}");
     private static readonly DiagnosticDescriptor InvalidProperty = Error(
-        "SPKH007", "Invalid host property", "Property '{0}' cannot be exposed as a SpellkitProperty: {1}");
+        "SpellkitH007", "Invalid host property", "Property '{0}' cannot be exposed as a SpellkitProperty: {1}");
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -296,7 +296,7 @@ public sealed class SpellkitCommandGenerator : IIncrementalGenerator
             if (type is null || type.IsAbstract || !InheritsFrom(type, ForeignType))
             {
                 Report(context, InvalidForeignType, moduleType, type?.ToDisplayString() ?? "<unknown>",
-                    "the type must be a non-abstract SpkForeignTypeInfo");
+                    "the type must be a non-abstract SpellkitForeignTypeInfo");
                 return null!;
             }
 
@@ -468,11 +468,11 @@ public sealed class SpellkitCommandGenerator : IIncrementalGenerator
         else if (method.ReturnsVoid)
         {
             writer.AppendLine(invocation + ";");
-            writer.AppendLine("return global::Spellkit.Runtime.Types.SpkNil.Instance;");
+            writer.AppendLine("return global::Spellkit.Runtime.Types.SpellkitNil.Instance;");
         }
-        else if (ReturnsDirectSpkObject(method.ReturnType))
+        else if (ReturnsDirectSpellkitObject(method.ReturnType))
         {
-            writer.AppendLine($"return {invocation} ?? global::Spellkit.Runtime.Types.SpkNil.Instance;");
+            writer.AppendLine($"return {invocation} ?? global::Spellkit.Runtime.Types.SpellkitNil.Instance;");
         }
         else
         {
@@ -524,7 +524,7 @@ public sealed class SpellkitCommandGenerator : IIncrementalGenerator
         writer.AppendLine(
             $"{target}.{Identifier(symbol.Name)} = "
             + $"{ArgumentConversion(symbol.Type, 0)};");
-        writer.AppendLine("return global::Spellkit.Runtime.Types.SpkNil.Instance;");
+        writer.AppendLine("return global::Spellkit.Runtime.Types.SpellkitNil.Instance;");
         writer.EndBlock(",");
         writer.AppendLine(
             $"global::Spellkit.Hosting.SpellkitCommandParameter.Required<{TypeName(symbol.Type)}>(\"value\"));");
@@ -539,14 +539,14 @@ public sealed class SpellkitCommandGenerator : IIncrementalGenerator
         if (nullableValueType is not null)
         {
             var converted = ArgumentConversion(nullableValueType, rawArgument, context);
-            return $"{rawArgument} is global::Spellkit.Runtime.Types.SpkNil "
+            return $"{rawArgument} is global::Spellkit.Runtime.Types.SpellkitNil "
                 + $"? default({TypeName(type)}) : {converted}";
         }
 
         if (type.IsReferenceType && type.NullableAnnotation == NullableAnnotation.Annotated)
         {
             var converted = ArgumentConversion(type, rawArgument, context);
-            return $"{rawArgument} is global::Spellkit.Runtime.Types.SpkNil "
+            return $"{rawArgument} is global::Spellkit.Runtime.Types.SpellkitNil "
                 + $"? null : {converted}";
         }
 
@@ -558,9 +558,9 @@ public sealed class SpellkitCommandGenerator : IIncrementalGenerator
         string rawArgument,
         string context)
     {
-        if (ReturnsDirectSpkObject(type))
+        if (ReturnsDirectSpellkitObject(type))
         {
-            return type.SpecialType == SpecialType.None && TypeName(type) != "global::Spellkit.Runtime.Types.SpkObject"
+            return type.SpecialType == SpecialType.None && TypeName(type) != "global::Spellkit.Runtime.Types.SpellkitObject"
                 ? $"({TypeName(type)}){rawArgument}"
                 : rawArgument;
         }
@@ -592,14 +592,14 @@ public sealed class SpellkitCommandGenerator : IIncrementalGenerator
         {
             var nonNullable = type.WithNullableAnnotation(NullableAnnotation.NotAnnotated);
             var direct = ReturnConversion(nonNullable, value);
-            return $"{value} is null ? global::Spellkit.Runtime.Types.SpkNil.Instance : {direct}";
+            return $"{value} is null ? global::Spellkit.Runtime.Types.SpellkitNil.Instance : {direct}";
         }
 
         var target = NullableValueType(type);
         if (target is not null)
         {
             var direct = ReturnConversion(target, $"{value}.Value");
-            return $"{value}.HasValue ? {direct} : global::Spellkit.Runtime.Types.SpkNil.Instance";
+            return $"{value}.HasValue ? {direct} : global::Spellkit.Runtime.Types.SpellkitNil.Instance";
         }
 
         return type.SpecialType switch
@@ -622,9 +622,9 @@ public sealed class SpellkitCommandGenerator : IIncrementalGenerator
         };
     }
 
-    private static bool ReturnsDirectSpkObject(ITypeSymbol type) =>
-        TypeName(type) == "global::Spellkit.Runtime.Types.SpkObject"
-        || type is INamedTypeSymbol namedType && InheritsFrom(namedType, "Spellkit.Runtime.Types.SpkObject");
+    private static bool ReturnsDirectSpellkitObject(ITypeSymbol type) =>
+        TypeName(type) == "global::Spellkit.Runtime.Types.SpellkitObject"
+        || type is INamedTypeSymbol namedType && InheritsFrom(namedType, "Spellkit.Runtime.Types.SpellkitObject");
 
     private static ITypeSymbol NullableValueType(ITypeSymbol type) =>
         type is INamedTypeSymbol { IsGenericType: true, ConstructedFrom.SpecialType: SpecialType.System_Nullable_T } nullable

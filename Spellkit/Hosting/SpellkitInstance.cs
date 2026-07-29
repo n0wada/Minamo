@@ -56,7 +56,7 @@ public sealed record SpellkitFailure(
     SpellkitFailureKind Kind,
     string Message,
     Exception? Exception = null,
-    SpkExecutionLimitKind? Limit = null)
+    SpellkitExecutionLimitKind? Limit = null)
 {
     internal static SpellkitFailure Compilation(IReadOnlyList<SpellkitDiagnostic> diagnostics) => new(
         SpellkitFailureKind.Compilation,
@@ -65,15 +65,15 @@ public sealed record SpellkitFailure(
 
     internal static SpellkitFailure From(Exception exception, SpellkitFailureKind fallback) => exception switch
     {
-        SpkBuildException { InnerException: { } inner } =>
+        SpellkitBuildException { InnerException: { } inner } =>
             From(inner, fallback),
-        SpkExecutionLimitException limit => new(
+        SpellkitExecutionLimitException limit => new(
             SpellkitFailureKind.Limit,
             limit.Message,
             limit,
             limit.Kind),
         OperationCanceledException => new(SpellkitFailureKind.Cancelled, exception.Message, exception),
-        SpkRuntimeException => new(SpellkitFailureKind.Runtime, exception.Message, exception),
+        SpellkitRuntimeException => new(SpellkitFailureKind.Runtime, exception.Message, exception),
         _ => new(fallback, exception.Message, exception)
     };
 }
@@ -89,10 +89,10 @@ public interface ISpellkitOperationResult
 
 public sealed class SpellkitExecutionResult : ISpellkitOperationResult
 {
-    private readonly SpkObject? value;
+    private readonly SpellkitObject? value;
 
     internal SpellkitExecutionResult(
-        SpkObject? value,
+        SpellkitObject? value,
         IReadOnlyList<BuildMessage> messages,
         SpellkitFailure? failure,
         string operation,
@@ -136,8 +136,8 @@ public sealed class SpellkitInstance : IDisposable
     private readonly System.Threading.Lock syncRoot = new();
     private readonly FileLookup lookup;
     private readonly SpellkitProgram? program;
-    private readonly SpkTuple? arguments;
-    private SpkIncrementalLinker linker;
+    private readonly SpellkitTuple? arguments;
+    private SpellkitIncrementalLinker linker;
     private RuntimeContext? runtimeContext;
     private int submission;
     private bool disposed;
@@ -149,7 +149,7 @@ public sealed class SpellkitInstance : IDisposable
         SpellkitHostEnvironment environment,
         SpellkitEnvironment spellkitEnvironment,
         SpellkitProgram? program = null,
-        SpkTuple? arguments = null)
+        SpellkitTuple? arguments = null)
     {
         this.lookup = lookup;
         this.program = program;
@@ -208,7 +208,7 @@ public sealed class SpellkitInstance : IDisposable
     }
 
     internal SpellkitExecutionResult Execute(
-        SpkCodeModel model,
+        SpellkitCodeModel model,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(model);
@@ -349,7 +349,7 @@ public sealed class SpellkitInstance : IDisposable
                 ExecutionResult result;
                 try
                 {
-                    result = SpkMachine.Execute(context);
+                    result = SpellkitMachine.Execute(context);
                     while (result.Reason is TerminationReason.Suspended)
                     {
                         if (result.Continuation is null
@@ -360,7 +360,7 @@ public sealed class SpellkitInstance : IDisposable
 
                         using var select = CreateSelectSession(suspension.Select);
                         SpellkitEnvironment.RunSelect(select);
-                        result = SpkMachine.Resume(result.Continuation);
+                        result = SpellkitMachine.Resume(result.Continuation);
                     }
                 }
                 finally
@@ -431,7 +431,7 @@ public sealed class SpellkitInstance : IDisposable
                     {
                         control?.OnSignal();
                     }
-                    catch (Exception ex) when (ex is SpkRuntimeException or OperationCanceledException)
+                    catch (Exception ex) when (ex is SpellkitRuntimeException or OperationCanceledException)
                     {
                         errors.Add(ex);
                         break;
@@ -566,7 +566,7 @@ public sealed class SpellkitInstance : IDisposable
         return new SpellkitSelectSession(this, CreateSelectInstance(factory));
     }
 
-    private SelectInstance CreateSelectInstance(SpkSelectFactory factory)
+    private SelectInstance CreateSelectInstance(SpellkitSelectFactory factory)
     {
         var nested = active;
         if (!nested)
@@ -590,7 +590,7 @@ public sealed class SpellkitInstance : IDisposable
         }
     }
 
-    internal SpkSelectFactory? ResolveSelectFactory(string name)
+    internal SpellkitSelectFactory? ResolveSelectFactory(string name)
     {
         if (SpellkitSelectAliases.ResolveFactory(runtimeContext!, name) is { } aliasedFactory)
         {
@@ -598,7 +598,7 @@ public sealed class SpellkitInstance : IDisposable
         }
 
         var selectName = SpellkitSelectAliases.ResolveName(runtimeContext!, name);
-        var matches = new List<SpkSelectFactory>();
+        var matches = new List<SpellkitSelectFactory>();
         for (var unitId = 0; unitId < runtimeContext!.Composition.Units.Length; unitId++)
         {
             var scope = runtimeContext.Composition.Units[unitId].GlobalScope;
@@ -610,7 +610,7 @@ public sealed class SpellkitInstance : IDisposable
             var symbol = scope.GetVariable(selectName);
             if (!symbol.IsEmpty()
                 && runtimeContext.Units[unitId] is { } values
-                && values[symbol.Address] is SpkSelectFactory factory)
+                && values[symbol.Address] is SpellkitSelectFactory factory)
             {
                 matches.Add(factory);
             }
@@ -650,7 +650,7 @@ public sealed class SpellkitInstance : IDisposable
                     return choiceResult;
                 }
 
-                run.Advance(SpkMachine.Resume(run.GetContinuation()));
+                run.Advance(SpellkitMachine.Resume(run.GetContinuation()));
                 if (run.IsCompleted)
                 {
                     suspendedRun = null;
@@ -715,13 +715,13 @@ public sealed class SpellkitInstance : IDisposable
 
         if (runtimeContext is null)
         {
-            context = SpkMachine.CreateExecutionContext(composition);
+            context = SpellkitMachine.CreateExecutionContext(composition);
             runtimeContext = context.RuntimeContext;
         }
         else
         {
             runtimeContext.Refresh(composition);
-            context = SpkMachine.CreateExecutionContext(runtimeContext);
+            context = SpellkitMachine.CreateExecutionContext(runtimeContext);
         }
 
         SetHostVariables(context, control);
@@ -747,7 +747,7 @@ public sealed class SpellkitInstance : IDisposable
                         string.Join(System.Environment.NewLine, made.Messages)));
                 }
 
-                var result = SpkMachine.Execute(CreateExecutionContext(made.Value, control: null));
+                var result = SpellkitMachine.Execute(CreateExecutionContext(made.Value, control: null));
                 linker.Commit();
                 var run = new SpellkitRunSession(this, result);
                 run.Advance(result);
@@ -774,7 +774,7 @@ public sealed class SpellkitInstance : IDisposable
         }
     }
 
-    internal ExecutionResult InvokeSelectChoice(SpkFunction choice, SpkObject[] arguments)
+    internal ExecutionResult InvokeSelectChoice(SpellkitFunction choice, SpellkitObject[] arguments)
     {
         lock (syncRoot)
         {
@@ -787,11 +787,11 @@ public sealed class SpellkitInstance : IDisposable
             try
             {
                 var context = CreateExecutionContext(runtimeContext!, control: null);
-                if (choice is not SpkNativeFunction function)
+                if (choice is not SpellkitNativeFunction function)
                 {
                     throw new InvalidOperationException("The select choice function is unavailable.");
                 }
-                return SpkMachine.ExecuteWithArguments(function, arguments, context);
+                return SpellkitMachine.ExecuteWithArguments(function, arguments, context);
             }
             finally
             {
@@ -803,7 +803,7 @@ public sealed class SpellkitInstance : IDisposable
         }
     }
 
-    internal bool EvaluateSelectGuard(SpkFunction guard)
+    internal bool EvaluateSelectGuard(SpellkitFunction guard)
     {
         lock (syncRoot)
         {
@@ -843,7 +843,7 @@ public sealed class SpellkitInstance : IDisposable
         RuntimeContext context,
         ExecutionControl? control)
     {
-        var executionContext = SpkMachine.CreateExecutionContext(context);
+        var executionContext = SpellkitMachine.CreateExecutionContext(context);
         SetHostVariables(executionContext, control);
         return executionContext;
     }
@@ -900,5 +900,5 @@ public sealed class SpellkitInstance : IDisposable
             control?.Signals ?? 0);
 
     private static bool IsExecutionStop(Exception exception) =>
-        exception is SpkExecutionLimitException or OperationCanceledException;
+        exception is SpellkitExecutionLimitException or OperationCanceledException;
 }

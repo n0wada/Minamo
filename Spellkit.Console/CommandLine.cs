@@ -9,23 +9,23 @@ internal static class CommandLine
 {
     private abstract class OptionValue
     {
-        public abstract SpkObject ToSpkObject();
+        public abstract SpellkitObject ToSpellkitObject();
     }
 
     private sealed class ScalarValue(string? value) : OptionValue
     {
         public string? Value { get; } = value;
 
-        public override SpkObject ToSpkObject() => Value is null ? SpkBool.True : new SpkString(Value);
+        public override SpellkitObject ToSpellkitObject() => Value is null ? SpellkitBool.True : new SpellkitString(Value);
     }
 
     private sealed class ArrayValue(IEnumerable<string?> values) : OptionValue
     {
         public List<string?> Values { get; } = new(values);
 
-        public override SpkObject ToSpkObject() =>
-            new SpkTuple(Values.Select(value =>
-                (SpkObject)(value is null ? SpkBool.True : new SpkString(value))).ToArray());
+        public override SpellkitObject ToSpellkitObject() =>
+            new SpellkitTuple(Values.Select(value =>
+                (SpellkitObject)(value is null ? SpellkitBool.True : new SpellkitString(value))).ToArray());
     }
 
     public static CommandLineOptions Read(string[] args)
@@ -35,7 +35,7 @@ internal static class CommandLine
 
         if (values.Count > 0)
         {
-            var userArguments = new List<SpkObject>();
+            var userArguments = new List<SpellkitObject>();
 
             foreach (var (name, value) in values)
             {
@@ -44,10 +44,10 @@ internal static class CommandLine
                     throw new CommandLineException($"Unknown switch -{name}.");
                 }
 
-                userArguments.Add(new SpkLabel(name.TrimStart('-'), value.ToSpkObject()));
+                userArguments.Add(new SpellkitLabel(name.TrimStart('-'), value.ToSpellkitObject()));
             }
 
-            options.UserArguments = new SpkTuple(userArguments.ToArray());
+            options.UserArguments = new SpellkitTuple(userArguments.ToArray());
         }
 
         return options;
@@ -334,7 +334,7 @@ internal sealed class CommandLineOptions
     [Binding("h", "-help", Help = "Display command-line help and exit.", Category = General)]
     public bool ShowHelp { get; set; }
 
-    public SpkTuple? UserArguments { get; set; }
+    public SpellkitTuple? UserArguments { get; set; }
 
     public IEnumerable<string> GetFileNames()
     {

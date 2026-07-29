@@ -54,21 +54,21 @@ public class BuildMessage
     protected string GetFileName() => File ?? "<memory>";
 }
 
-public class SpkException : Exception
+public class SpellkitException : Exception
 {
-    public SpkException(string message, Exception? innerException) : base(message, innerException) { }
+    public SpellkitException(string message, Exception? innerException) : base(message, innerException) { }
 
-    public SpkException(string message) : base(message, null) { }
+    public SpellkitException(string message) : base(message, null) { }
 }
 
-public class SpkBuildException : SpkException
+public class SpellkitBuildException : SpellkitException
 {
     public IEnumerable<BuildMessage> Messages { get; }
 
-    public SpkBuildException(IEnumerable<BuildMessage> messages) : base("") =>
+    public SpellkitBuildException(IEnumerable<BuildMessage> messages) : base("") =>
         Messages = messages;
 
-    public SpkBuildException(string message, Exception? innerException) : base(message, innerException) =>
+    public SpellkitBuildException(string message, Exception? innerException) : base(message, innerException) =>
         Messages = Enumerable.Empty<BuildMessage>();
 
     public override string Message =>
@@ -115,7 +115,7 @@ public sealed class Result<T> : Result
     {
         if (!Success)
         {
-            throw new SpkBuildException(Messages);
+            throw new SpellkitBuildException(Messages);
         }
 
         return Value!;

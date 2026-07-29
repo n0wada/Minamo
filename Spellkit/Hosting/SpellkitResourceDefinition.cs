@@ -128,7 +128,7 @@ internal static class SpellkitResourceDefinition
                 Description,
                 Capability,
                 Parameters,
-                (SpellkitCommandHandler)(_ => SpkNil.Instance));
+                (SpellkitCommandHandler)(_ => SpellkitNil.Instance));
 
         internal SpellkitCommandDescriptor Bind(SpellkitResource resource) =>
             new(
@@ -138,7 +138,7 @@ internal static class SpellkitResourceDefinition
                 Parameters,
                 context => Invoke(resource, context));
 
-        private SpkObject Invoke(SpellkitResource resource, SpellkitCommandContext context)
+        private SpellkitObject Invoke(SpellkitResource resource, SpellkitCommandContext context)
         {
             var parameters = Method.GetParameters();
             var arguments = new object?[parameters.Length];
@@ -152,7 +152,7 @@ internal static class SpellkitResourceDefinition
 
             if (context.ExecutionContext.HasErrors)
             {
-                return SpkNil.Instance;
+                return SpellkitNil.Instance;
             }
 
             object? result;
@@ -169,7 +169,7 @@ internal static class SpellkitResourceDefinition
 
             if (Method.ReturnType == typeof(void))
             {
-                return SpkNil.Instance;
+                return SpellkitNil.Instance;
             }
             if (result is Task task)
             {
@@ -189,12 +189,12 @@ internal static class SpellkitResourceDefinition
             return SpellkitCommandConvert.FromObject(result, Method.ReturnType);
         }
 
-        private static SpkObject AwaitTask(Task task, Type taskType)
+        private static SpellkitObject AwaitTask(Task task, Type taskType)
         {
             SpellkitCommandConvert.FromAwaitable(task);
             if (!taskType.IsGenericType)
             {
-                return SpkNil.Instance;
+                return SpellkitNil.Instance;
             }
             var value = taskType.GetProperty(nameof(Task<object>.Result))!.GetValue(task);
             return SpellkitCommandConvert.FromObject(value, taskType.GetGenericArguments()[0]);

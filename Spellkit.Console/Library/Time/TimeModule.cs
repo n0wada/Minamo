@@ -6,25 +6,25 @@ namespace Spellkit.Library.Time;
 [SpellkitModule("time")]
 public sealed class TimeModule : ForeignUnit
 {
-    public SpkDateTimeTypeInfo DateTime { get; }
+    public SpellkitDateTimeTypeInfo DateTime { get; }
 
-    public SpkLocalDateTimeTypeInfo LocalDateTime { get; }
+    public SpellkitLocalDateTimeTypeInfo LocalDateTime { get; }
 
-    public SpkTimeDeltaTypeInfo TimeDelta { get; }
+    public SpellkitTimeDeltaTypeInfo TimeDelta { get; }
 
-    public SpkCalendarTypeInfo Calendar { get; }
+    public SpellkitCalendarTypeInfo Calendar { get; }
 
-    public SpkTimeTypeInfo Time { get; }
+    public SpellkitTimeTypeInfo Time { get; }
 
-    public SpkDateTypeInfo Date { get; }
+    public SpellkitDateTypeInfo Date { get; }
 
     public TimeModule()
     {
-        DateTime = AddType<SpkDateTimeTypeInfo>();
-        LocalDateTime = AddType<SpkLocalDateTimeTypeInfo>();
-        TimeDelta = AddType<SpkTimeDeltaTypeInfo>();
-        Calendar = AddType<SpkCalendarTypeInfo>();
-        Time = AddType<SpkTimeTypeInfo>();
-        Date = AddType<SpkDateTypeInfo>();
+        DateTime = AddType<SpellkitDateTimeTypeInfo>();
+        LocalDateTime = AddType<SpellkitLocalDateTimeTypeInfo>();
+        TimeDelta = AddType<SpellkitTimeDeltaTypeInfo>();
+        Calendar = AddType<SpellkitCalendarTypeInfo>();
+        Time = AddType<SpellkitTimeTypeInfo>();
+        Date = AddType<SpellkitDateTypeInfo>();
     }
 }

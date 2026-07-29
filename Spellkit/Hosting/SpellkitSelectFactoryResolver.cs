@@ -7,5 +7,5 @@ internal sealed class SpellkitSelectFactoryResolver(SpellkitInstance instance)
 {
     internal const string ContextKey = "Spellkit.Hosting.SelectFactoryResolver";
 
-    internal SpkSelectFactory? Resolve(string name) => instance.ResolveSelectFactory(name);
+    internal SpellkitSelectFactory? Resolve(string name) => instance.ResolveSelectFactory(name);
 }

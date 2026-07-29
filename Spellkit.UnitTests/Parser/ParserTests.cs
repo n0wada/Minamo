@@ -21,7 +21,7 @@ public sealed class ParserTests
     [InlineData("0^2..10")]
     public void RejectsRemovedBitwiseOperators(string source)
     {
-        var result = SpkParser.Parse(source, "<removed-bitwise-operator>");
+        var result = SpellkitParser.Parse(source, "<removed-bitwise-operator>");
 
         Assert.False(result.Success);
     }
@@ -31,7 +31,7 @@ public sealed class ParserTests
     [InlineData("4 >> 1")]
     public void ParsesOverloadableShiftOperators(string source)
     {
-        var result = SpkParser.Parse(source, "<overloadable-shift-operator>");
+        var result = SpellkitParser.Parse(source, "<overloadable-shift-operator>");
 
         Assert.True(result.Success);
     }
@@ -39,8 +39,8 @@ public sealed class ParserTests
     [Fact]
     public void ParsesSourceStringAndPreservesSourceName()
     {
-        var successful = SpkParser.Parse("let value = 42");
-        var failed = SpkParser.Parse("let =", "generated.kit");
+        var successful = SpellkitParser.Parse("let value = 42");
+        var failed = SpellkitParser.Parse("let =", "generated.kit");
 
         Assert.True(successful.Success);
         Assert.False(failed.Success);
@@ -60,7 +60,7 @@ public sealed class ParserTests
         {
             File.WriteAllText(path, "let =");
 
-            var result = SpkParser.ParseFile(path);
+            var result = SpellkitParser.ParseFile(path);
 
             Assert.False(result.Success);
             Assert.All(
@@ -87,7 +87,7 @@ public sealed class ParserTests
             await File.WriteAllTextAsync(path, "let value = 42");
 
             var buffer = await SourceBuffer.FromFileAsync(path);
-            var result = SpkParser.Parse(buffer);
+            var result = SpellkitParser.Parse(buffer);
 
             Assert.True(result.Success);
             Assert.Equal(path.Replace('\\', '/'), buffer.FileName);
@@ -111,7 +111,7 @@ public sealed class ParserTests
     [Fact]
     public void PreservesParameterizedTypeHintsAndExpandsNullableSyntax()
     {
-        var result = SpkParser.Parse(SourceBuffer.FromString(
+        var result = SpellkitParser.Parse(SourceBuffer.FromString(
             "let value: Result<List<String?>, Error>? = nil",
             "<type-hints>"));
 
@@ -140,7 +140,7 @@ public sealed class ParserTests
             let current: String? = nil
             """;
 
-        var result = SpkParser.Parse(SourceBuffer.FromString(source, "<type-hint-forms>"));
+        var result = SpellkitParser.Parse(SourceBuffer.FromString(source, "<type-hint-forms>"));
 
         Assert.True(result.Success);
     }
@@ -163,7 +163,7 @@ public sealed class ParserTests
     [InlineData("let value: Result<String,> = nil")]
     public void RejectsEmptyTypeHintArguments(string source)
     {
-        var result = SpkParser.Parse(SourceBuffer.FromString(source, "<invalid-type-hints>"));
+        var result = SpellkitParser.Parse(SourceBuffer.FromString(source, "<invalid-type-hints>"));
 
         Assert.False(result.Success);
     }
@@ -174,7 +174,7 @@ public sealed class ParserTests
     [InlineData("enum Legacy { Value(String value) }")]
     public void RejectsLegacyFieldSyntax(string source)
     {
-        var result = SpkParser.Parse(SourceBuffer.FromString(source, "<legacy-fields>"));
+        var result = SpellkitParser.Parse(SourceBuffer.FromString(source, "<legacy-fields>"));
 
         Assert.False(result.Success);
     }
@@ -188,7 +188,7 @@ public sealed class ParserTests
     [InlineData("/*")]
     public void ReportsTruncatedInputWithoutThrowing(string source)
     {
-        var result = SpkParser.Parse(SourceBuffer.FromString(source, "<truncated>"));
+        var result = SpellkitParser.Parse(SourceBuffer.FromString(source, "<truncated>"));
 
         Assert.False(result.Success);
         Assert.NotEmpty(result.Errors);
@@ -198,7 +198,7 @@ public sealed class ParserTests
     [Fact]
     public void TracksLocationsAcrossMixedLineEndings()
     {
-        var result = SpkParser.Parse(SourceBuffer.FromString(
+        var result = SpellkitParser.Parse(SourceBuffer.FromString(
             "let first = 1\r\nlet second = 2\nlet =",
             "mixed-lines.kit"));
 

@@ -8,34 +8,34 @@ using System.Text;
 namespace Spellkit.Runtime;
 public static class ErrorGenerators
 {
-    internal static SpkExceptionObject RuntimeException(SpkError code, params object[] args) =>
+    internal static SpellkitExceptionObject RuntimeException(SpellkitError code, params object[] args) =>
         RuntimeException(code.ToString(), args);
 
-    internal static SpkExceptionObject RuntimeException(string constructor, params object[] args)
+    internal static SpellkitExceptionObject RuntimeException(string constructor, params object[] args)
     {
         var arr = args.Length == 0
-            ? SpkTuple.Empty
-            : new SpkTuple(args.Select(TypeConverter.ConvertFrom).ToArray());
+            ? SpellkitTuple.Empty
+            : new SpellkitTuple(args.Select(TypeConverter.ConvertFrom).ToArray());
 
         return RuntimeException(constructor, arr);
     }
 
-    internal static SpkExceptionObject RuntimeException(string constructor, SpkTuple data) =>
+    internal static SpellkitExceptionObject RuntimeException(string constructor, SpellkitTuple data) =>
         new(constructor, GetErrorDescription(constructor, data), data);
 
-    public static SpkObject CustomError(this ExecutionContext ctx, string constructor)
+    public static SpellkitObject CustomError(this ExecutionContext ctx, string constructor)
     {
         ctx.Error = RuntimeException(constructor);
         return Nil;
     }
 
-    public static SpkObject Failure(this ExecutionContext ctx, string detail)
+    public static SpellkitObject Failure(this ExecutionContext ctx, string detail)
     {
-        ctx.Error = RuntimeException(SpkError.Failure, detail);
+        ctx.Error = RuntimeException(SpellkitError.Failure, detail);
         return Nil;
     }
 
-    public static SpkObject OverloadProhibited(this ExecutionContext ctx, SpkTypeInfo typeInfo, string name)
+    public static SpellkitObject OverloadProhibited(this ExecutionContext ctx, SpellkitTypeInfo typeInfo, string name)
     {
         name = Builtins.NameToOperator(name);
 
@@ -60,311 +60,311 @@ public static class ErrorGenerators
             name = $"{typeInfo.ReflectedTypeName}.{name}";
         }
 
-        ctx.Error = RuntimeException(SpkError.OverloadProhibited, name);
+        ctx.Error = RuntimeException(SpellkitError.OverloadProhibited, name);
         return Nil;
     }
 
-    public static SpkObject IOFailed(this ExecutionContext ctx)
+    public static SpellkitObject IOFailed(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.IOFailed);
+        ctx.Error = RuntimeException(SpellkitError.IOFailed);
         return Nil;
     }
 
-    public static SpkObject IOFailed(this ExecutionContext ctx, string detail)
+    public static SpellkitObject IOFailed(this ExecutionContext ctx, string detail)
     {
-        ctx.Error = RuntimeException(SpkError.IOFailed, detail);
+        ctx.Error = RuntimeException(SpellkitError.IOFailed, detail);
         return Nil;
     }
 
-    public static SpkObject TypeClosed(this ExecutionContext ctx, SpkTypeInfo typeInfo)
+    public static SpellkitObject TypeClosed(this ExecutionContext ctx, SpellkitTypeInfo typeInfo)
     {
-        ctx.Error = RuntimeException(SpkError.TypeClosed, typeInfo.ReflectedTypeName);
+        ctx.Error = RuntimeException(SpellkitError.TypeClosed, typeInfo.ReflectedTypeName);
         return Nil;
     }
 
-    public static SpkObject Overflow(this ExecutionContext ctx)
+    public static SpellkitObject Overflow(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.Overflow);
+        ctx.Error = RuntimeException(SpellkitError.Overflow);
         return Nil;
     }
 
-    public static SpkObject InvalidOperation(this ExecutionContext ctx)
+    public static SpellkitObject InvalidOperation(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidOperation);
+        ctx.Error = RuntimeException(SpellkitError.InvalidOperation);
         return Nil;
     }
 
-    public static SpkObject NotImplemented(this ExecutionContext ctx, string op)
+    public static SpellkitObject NotImplemented(this ExecutionContext ctx, string op)
     {
-        ctx.Error = RuntimeException(SpkError.NotImplemented, Builtins.NameToOperator(op));
+        ctx.Error = RuntimeException(SpellkitError.NotImplemented, Builtins.NameToOperator(op));
         return Nil;
     }
 
-    public static SpkObject ParsingFailed(this ExecutionContext ctx)
+    public static SpellkitObject ParsingFailed(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.ParsingFailed);
+        ctx.Error = RuntimeException(SpellkitError.ParsingFailed);
         return Nil;
     }
 
-    public static SpkObject ParsingFailed(this ExecutionContext ctx, string detail)
+    public static SpellkitObject ParsingFailed(this ExecutionContext ctx, string detail)
     {
-        ctx.Error = RuntimeException(SpkError.ParsingFailed, detail);
+        ctx.Error = RuntimeException(SpellkitError.ParsingFailed, detail);
         return Nil;
     }
 
-    public static SpkObject Timeout(this ExecutionContext ctx)
+    public static SpellkitObject Timeout(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.Timeout);
+        ctx.Error = RuntimeException(SpellkitError.Timeout);
         return Nil;
     }
 
-    public static SpkObject ValueMissing(this ExecutionContext ctx)
+    public static SpellkitObject ValueMissing(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.ValueMissing);
+        ctx.Error = RuntimeException(SpellkitError.ValueMissing);
         return Nil;
     }
 
-    public static SpkObject InvalidOverload(this ExecutionContext ctx)
+    public static SpellkitObject InvalidOverload(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidOverload);
+        ctx.Error = RuntimeException(SpellkitError.InvalidOverload);
         return Nil;
     }
 
-    public static SpkObject InvalidOverload(this ExecutionContext ctx, object func)
+    public static SpellkitObject InvalidOverload(this ExecutionContext ctx, object func)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidOverload, func);
+        ctx.Error = RuntimeException(SpellkitError.InvalidOverload, func);
         return Nil;
     }
 
-    public static SpkObject ConstructorFailed(this ExecutionContext ctx, object[]? args, Type type, Exception ex)
+    public static SpellkitObject ConstructorFailed(this ExecutionContext ctx, object[]? args, Type type, Exception ex)
     {
         var sb = new StringBuilder();
         sb.Append("new(");
         ProcessArguments(sb, args);
         sb.Append(')');
-        ctx.Error = RuntimeException(SpkError.ConstructorFailed, sb.ToString(), type.FullName ?? type.Name, ex.Message);
+        ctx.Error = RuntimeException(SpellkitError.ConstructorFailed, sb.ToString(), type.FullName ?? type.Name, ex.Message);
         return Nil;
     }
 
-    public static SpkObject InvalidValue(this ExecutionContext ctx, object val1)
+    public static SpellkitObject InvalidValue(this ExecutionContext ctx, object val1)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidValue, val1);
+        ctx.Error = RuntimeException(SpellkitError.InvalidValue, val1);
         return Nil;
     }
 
-    public static SpkObject InvalidValue(this ExecutionContext ctx, object val1, object val2)
+    public static SpellkitObject InvalidValue(this ExecutionContext ctx, object val1, object val2)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidValue, val1, val2);
+        ctx.Error = RuntimeException(SpellkitError.InvalidValue, val1, val2);
         return Nil;
     }
 
-    public static SpkObject InvalidValue(this ExecutionContext ctx)
+    public static SpellkitObject InvalidValue(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidValue);
+        ctx.Error = RuntimeException(SpellkitError.InvalidValue);
         return Nil;
     }
 
-    public static SpkObject PrivateAccess(this ExecutionContext ctx)
+    public static SpellkitObject PrivateAccess(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.PrivateAccess);
+        ctx.Error = RuntimeException(SpellkitError.PrivateAccess);
         return Nil;
     }
 
-    public static SpkObject IndexReadOnly(this ExecutionContext ctx, object obj)
+    public static SpellkitObject IndexReadOnly(this ExecutionContext ctx, object obj)
     {
-        ctx.Error = RuntimeException(SpkError.IndexReadOnly, obj);
+        ctx.Error = RuntimeException(SpellkitError.IndexReadOnly, obj);
         return Nil;
     }
 
-    public static SpkObject IndexReadOnly(this ExecutionContext ctx)
+    public static SpellkitObject IndexReadOnly(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.IndexReadOnly);
+        ctx.Error = RuntimeException(SpellkitError.IndexReadOnly);
         return Nil;
     }
 
-    public static SpkObject MultipleValuesForArgument(this ExecutionContext ctx, string funName, string argName)
+    public static SpellkitObject MultipleValuesForArgument(this ExecutionContext ctx, string funName, string argName)
     {
-        ctx.Error = RuntimeException(SpkError.MultipleValuesForArgument, funName, argName);
+        ctx.Error = RuntimeException(SpellkitError.MultipleValuesForArgument, funName, argName);
         return Nil;
     }
 
-    public static SpkObject CollectionModified(this ExecutionContext ctx)
+    public static SpellkitObject CollectionModified(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.CollectionModified);
+        ctx.Error = RuntimeException(SpellkitError.CollectionModified);
         return Nil;
     }
 
-    public static SpkObject AssertionFailed(this ExecutionContext ctx, string reason)
+    public static SpellkitObject AssertionFailed(this ExecutionContext ctx, string reason)
     {
-        ctx.Error = RuntimeException(SpkError.AssertionFailed, reason);
+        ctx.Error = RuntimeException(SpellkitError.AssertionFailed, reason);
         return Nil;
     }
 
-    public static SpkObject PrivateNameAccess(this ExecutionContext ctx, string name)
+    public static SpellkitObject PrivateNameAccess(this ExecutionContext ctx, string name)
     {
-        ctx.Error = RuntimeException(SpkError.PrivateNameAccess, name);
+        ctx.Error = RuntimeException(SpellkitError.PrivateNameAccess, name);
         return Nil;
     }
 
-    public static SpkObject OperationNotSupported(this ExecutionContext ctx, string op, SpkObject obj)
+    public static SpellkitObject OperationNotSupported(this ExecutionContext ctx, string op, SpellkitObject obj)
     {
-        ctx.Error = RuntimeException(SpkError.OperationNotSupported, Builtins.NameToOperator(op), obj.TypeName);
+        ctx.Error = RuntimeException(SpellkitError.OperationNotSupported, Builtins.NameToOperator(op), obj.TypeName);
         return Nil;
     }
 
-    public static SpkObject OperationNotSupported(this ExecutionContext ctx, string op, int typeId)
+    public static SpellkitObject OperationNotSupported(this ExecutionContext ctx, string op, int typeId)
     {
         var typeName = ctx.RuntimeContext.Types[typeId].ReflectedTypeName;
-        ctx.Error = RuntimeException(SpkError.OperationNotSupported, Builtins.NameToOperator(op), typeName, 0, 0);
+        ctx.Error = RuntimeException(SpellkitError.OperationNotSupported, Builtins.NameToOperator(op), typeName, 0, 0);
         return Nil;
     }
 
-    public static SpkObject StaticOperationNotSupported(this ExecutionContext ctx, string op, int typeId)
+    public static SpellkitObject StaticOperationNotSupported(this ExecutionContext ctx, string op, int typeId)
     {
         var typeName = ctx.RuntimeContext.Types[typeId].ReflectedTypeName;
         //Small hack to get OperationNotSupported.4. It allows to use the same general code of "OperationNotSupported",
         //but a different text for a case of a static operation
-        ctx.Error = RuntimeException(SpkError.OperationNotSupported, Builtins.NameToOperator(op), typeName, 0, 0);
+        ctx.Error = RuntimeException(SpellkitError.OperationNotSupported, Builtins.NameToOperator(op), typeName, 0, 0);
         return Nil;
     }
 
-    public static SpkObject OperationNotSupported(this ExecutionContext ctx, string op, SpkObject obj1, SpkObject obj2)
+    public static SpellkitObject OperationNotSupported(this ExecutionContext ctx, string op, SpellkitObject obj1, SpellkitObject obj2)
     {
-        ctx.Error = RuntimeException(SpkError.OperationNotSupported, Builtins.NameToOperator(op), obj1.TypeName, obj2.TypeName);
+        ctx.Error = RuntimeException(SpellkitError.OperationNotSupported, Builtins.NameToOperator(op), obj1.TypeName, obj2.TypeName);
         return Nil;
     }
 
-    public static SpkObject InvalidCast(this ExecutionContext ctx)
+    public static SpellkitObject InvalidCast(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidCast);
+        ctx.Error = RuntimeException(SpellkitError.InvalidCast);
         return Nil;
     }
 
-    public static SpkObject InvalidCast(this ExecutionContext ctx, string type1, string type2)
+    public static SpellkitObject InvalidCast(this ExecutionContext ctx, string type1, string type2)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidCast, type1, type2);
+        ctx.Error = RuntimeException(SpellkitError.InvalidCast, type1, type2);
         return Nil;
     }
 
-    public static SpkObject IndexOutOfRange(this ExecutionContext ctx, object obj)
+    public static SpellkitObject IndexOutOfRange(this ExecutionContext ctx, object obj)
     {
-        ctx.Error = RuntimeException(SpkError.IndexOutOfRange, obj);
+        ctx.Error = RuntimeException(SpellkitError.IndexOutOfRange, obj);
         return Nil;
     }
 
-    public static SpkObject IndexOutOfRange(this ExecutionContext ctx)
+    public static SpellkitObject IndexOutOfRange(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.IndexOutOfRange);
+        ctx.Error = RuntimeException(SpellkitError.IndexOutOfRange);
         return Nil;
     }
 
-    public static SpkObject KeyNotFound(this ExecutionContext ctx)
+    public static SpellkitObject KeyNotFound(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.KeyNotFound);
+        ctx.Error = RuntimeException(SpellkitError.KeyNotFound);
         return Nil;
     }
 
-    public static SpkObject KeyNotFound(this ExecutionContext ctx, object key)
+    public static SpellkitObject KeyNotFound(this ExecutionContext ctx, object key)
     {
-        ctx.Error = RuntimeException(SpkError.KeyNotFound, key);
+        ctx.Error = RuntimeException(SpellkitError.KeyNotFound, key);
         return Nil;
     }
 
-    public static SpkObject KeyAlreadyPresent(this ExecutionContext ctx, object key)
+    public static SpellkitObject KeyAlreadyPresent(this ExecutionContext ctx, object key)
     {
-        ctx.Error = RuntimeException(SpkError.KeyAlreadyPresent, key);
+        ctx.Error = RuntimeException(SpellkitError.KeyAlreadyPresent, key);
         return Nil;
     }
 
-    public static SpkObject KeyAlreadyPresent(this ExecutionContext ctx)
+    public static SpellkitObject KeyAlreadyPresent(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.KeyAlreadyPresent);
+        ctx.Error = RuntimeException(SpellkitError.KeyAlreadyPresent);
         return Nil;
     }
 
-    public static SpkObject InvalidType(this ExecutionContext ctx)
+    public static SpellkitObject InvalidType(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidType);
+        ctx.Error = RuntimeException(SpellkitError.InvalidType);
         return Nil;
     }
 
-    public static SpkObject InvalidType(this ExecutionContext ctx, SpkObject value)
+    public static SpellkitObject InvalidType(this ExecutionContext ctx, SpellkitObject value)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidType, value.TypeName);
+        ctx.Error = RuntimeException(SpellkitError.InvalidType, value.TypeName);
         return Nil;
     }
 
-    public static SpkObject InvalidType(this ExecutionContext ctx, int expected, SpkObject got)
+    public static SpellkitObject InvalidType(this ExecutionContext ctx, int expected, SpellkitObject got)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidType, ctx.RuntimeContext.Types[expected].ReflectedTypeName, got.TypeName);
+        ctx.Error = RuntimeException(SpellkitError.InvalidType, ctx.RuntimeContext.Types[expected].ReflectedTypeName, got.TypeName);
         return Nil;
     }
 
-    public static SpkObject InvalidType(this ExecutionContext ctx, int expected1, int exptected2, SpkObject got)
+    public static SpellkitObject InvalidType(this ExecutionContext ctx, int expected1, int exptected2, SpellkitObject got)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName, ctx.RuntimeContext.Types[got.TypeId].ReflectedTypeName);
+        ctx.Error = RuntimeException(SpellkitError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName, ctx.RuntimeContext.Types[got.TypeId].ReflectedTypeName);
         return Nil;
     }
 
-    public static SpkObject InvalidType(this ExecutionContext ctx, int expected1, int exptected2, int expected3, SpkObject got)
+    public static SpellkitObject InvalidType(this ExecutionContext ctx, int expected1, int exptected2, int expected3, SpellkitObject got)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName,
+        ctx.Error = RuntimeException(SpellkitError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName,
             ctx.RuntimeContext.Types[expected3].ReflectedTypeName, got.TypeName);
         return Nil;
     }
 
-    public static SpkObject InvalidType(this ExecutionContext ctx, int expected1, int exptected2, int expected3, int expected4, SpkObject got)
+    public static SpellkitObject InvalidType(this ExecutionContext ctx, int expected1, int exptected2, int expected3, int expected4, SpellkitObject got)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName,
+        ctx.Error = RuntimeException(SpellkitError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName,
             ctx.RuntimeContext.Types[expected3].ReflectedTypeName, ctx.RuntimeContext.Types[expected4].ReflectedTypeName, got.TypeName);
         return Nil;
     }
 
-    public static SpkObject InvalidType(this ExecutionContext ctx, string typeName)
+    public static SpellkitObject InvalidType(this ExecutionContext ctx, string typeName)
     {
-        ctx.Error = RuntimeException(SpkError.InvalidType, typeName);
+        ctx.Error = RuntimeException(SpellkitError.InvalidType, typeName);
         return Nil;
     }
 
-    public static SpkObject ExternalFunctionFailure(this ExecutionContext ctx, SpkFunction func, string error)
+    public static SpellkitObject ExternalFunctionFailure(this ExecutionContext ctx, SpellkitFunction func, string error)
     {
         var functionName = func.Self is null ? func.FunctionName
             : $"{func.Self.TypeName}.{func.FunctionName}";
-        ctx.Error = RuntimeException(SpkError.ExternalFunctionFailure, functionName, error);
+        ctx.Error = RuntimeException(SpellkitError.ExternalFunctionFailure, functionName, error);
         return Nil;
     }
 
-    public static SpkObject DivideByZero(this ExecutionContext ctx)
+    public static SpellkitObject DivideByZero(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.DivideByZero);
+        ctx.Error = RuntimeException(SpellkitError.DivideByZero);
         return Nil;
     }
 
-    public static SpkObject TooManyArguments(this ExecutionContext ctx)
+    public static SpellkitObject TooManyArguments(this ExecutionContext ctx)
     {
-        ctx.Error = RuntimeException(SpkError.TooManyArguments);
+        ctx.Error = RuntimeException(SpellkitError.TooManyArguments);
         return Nil;
     }
 
-    public static SpkObject TooManyArguments(this ExecutionContext ctx, string functionName, int functionArguments, int passedArguments)
+    public static SpellkitObject TooManyArguments(this ExecutionContext ctx, string functionName, int functionArguments, int passedArguments)
     {
-        ctx.Error = RuntimeException(SpkError.TooManyArguments, functionName, functionArguments, passedArguments);
+        ctx.Error = RuntimeException(SpellkitError.TooManyArguments, functionName, functionArguments, passedArguments);
         return Nil;
     }
 
-    public static SpkObject RequiredArgumentMissing(this ExecutionContext ctx, string functionName, string argumentName)
+    public static SpellkitObject RequiredArgumentMissing(this ExecutionContext ctx, string functionName, string argumentName)
     {
-        ctx.Error = RuntimeException(SpkError.RequiredArgumentMissing, functionName, argumentName);
+        ctx.Error = RuntimeException(SpellkitError.RequiredArgumentMissing, functionName, argumentName);
         return Nil;
     }
 
-    public static SpkObject ArgumentNotFound(this ExecutionContext ctx, string functionName, string argumentName)
+    public static SpellkitObject ArgumentNotFound(this ExecutionContext ctx, string functionName, string argumentName)
     {
-        ctx.Error = RuntimeException(SpkError.ArgumentNotFound, functionName, argumentName);
+        ctx.Error = RuntimeException(SpellkitError.ArgumentNotFound, functionName, argumentName);
         return Nil;
     }
 
-    public static SpkObject MethodNotFound(this ExecutionContext ctx, string name, Type type, SpkObject[]? args)
+    public static SpellkitObject MethodNotFound(this ExecutionContext ctx, string name, Type type, SpellkitObject[]? args)
     {
         var sb = new StringBuilder();
         sb.Append(type.FullName ?? type.Name);
@@ -373,23 +373,23 @@ public static class ErrorGenerators
         sb.Append('(');
         ProcessArguments(sb, args);
         sb.Append(')');
-        ctx.Error = RuntimeException(SpkError.MethodNotFound, sb.ToString());
+        ctx.Error = RuntimeException(SpellkitError.MethodNotFound, sb.ToString());
         return Nil;
     }
 
-    public static SpkError GetErrorCode(SpkObject err)
+    public static SpellkitError GetErrorCode(SpellkitObject err)
     {
-        if (err is SpkExceptionObject ex2 && Enum.TryParse<SpkError>(ex2.Name, true, out var exCode))
+        if (err is SpellkitExceptionObject ex2 && Enum.TryParse<SpellkitError>(ex2.Name, true, out var exCode))
         {
             return exCode;
         }
 
-        return SpkError.UnexpectedError;
+        return SpellkitError.UnexpectedError;
     }
 
-    public static string GetErrorDescription(SpkObject err)
+    public static string GetErrorDescription(SpellkitObject err)
     {
-        if (err is SpkExceptionObject ex)
+        if (err is SpellkitExceptionObject ex)
         {
             return ex.Message;
         }
@@ -397,9 +397,9 @@ public static class ErrorGenerators
         return err.ToString() ?? string.Empty;
     }
 
-    private static string GetErrorDescription(string constructor, SpkTuple data)
+    private static string GetErrorDescription(string constructor, SpellkitTuple data)
     {
-        if (!Enum.TryParse<SpkError>(constructor, true, out _))
+        if (!Enum.TryParse<SpellkitError>(constructor, true, out _))
         {
             if (data.Count > 0)
             {
@@ -420,7 +420,7 @@ public static class ErrorGenerators
         if (str is not null && data.Count > 0)
         {
             var vals = data.ToArray()
-                .Select(v => v is SpkTypeInfo t ? t.ReflectedTypeName : (v.ToString() ?? ""))
+                .Select(v => v is SpellkitTypeInfo t ? t.ReflectedTypeName : (v.ToString() ?? ""))
                 .ToArray();
             str = string.Format(str, vals);
         }
@@ -443,7 +443,7 @@ public static class ErrorGenerators
                     sb.Append(',');
                 }
 
-                var tt = (args[i] is SpkObject obj ? obj.ToObject() : args[i])?.GetType();
+                var tt = (args[i] is SpellkitObject obj ? obj.ToObject() : args[i])?.GetType();
 
                 if (tt is null)
                 {

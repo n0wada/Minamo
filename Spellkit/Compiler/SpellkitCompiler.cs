@@ -24,11 +24,11 @@ public static class SpellkitCompiler
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(lookup);
-        return new SpkLinker(lookup).Make(SourceBuffer.FromString(source, sourceName));
+        return new SpellkitLinker(lookup).Make(SourceBuffer.FromString(source, sourceName));
     }
 
     public static Result<UnitComposition> Compile(
-        SpkCodeModel codeModel,
+        SpellkitCodeModel codeModel,
         BuilderOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(codeModel);
@@ -37,12 +37,12 @@ public static class SpellkitCompiler
     }
 
     public static Result<UnitComposition> Compile(
-        SpkCodeModel codeModel,
+        SpellkitCodeModel codeModel,
         FileLookup lookup)
     {
         ArgumentNullException.ThrowIfNull(codeModel);
         ArgumentNullException.ThrowIfNull(lookup);
-        return new SpkLinker(lookup).Make(codeModel);
+        return new SpellkitLinker(lookup).Make(codeModel);
     }
 
     public static Result<UnitComposition> CompileFile(
@@ -58,6 +58,6 @@ public static class SpellkitCompiler
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(lookup);
-        return new SpkLinker(lookup).Make(SourceBuffer.FromFile(path));
+        return new SpellkitLinker(lookup).Make(SourceBuffer.FromFile(path));
     }
 }

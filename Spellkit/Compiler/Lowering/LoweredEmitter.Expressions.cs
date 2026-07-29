@@ -96,7 +96,7 @@ internal sealed partial class LoweredEmitter
             BuildPattern(node.Pattern, ctx, rebind: false, openMatch: true, flags);
             var skip = cw.DefineLabel();
             cw.JumpIfTrue(skip);
-            target.ThrowError(SpkError.MatchFailed);
+            target.ThrowError(SpellkitError.MatchFailed);
             cw.Throw();
             cw.MarkLabel(skip);
             cw.NoOperation();
@@ -114,7 +114,7 @@ internal sealed partial class LoweredEmitter
         BuildPattern(node.Pattern, ctx, rebind: true, openMatch: false);
         var skip = cw.DefineLabel();
         cw.JumpIfTrue(skip);
-        target.ThrowError(SpkError.MatchFailed);
+        target.ThrowError(SpellkitError.MatchFailed);
         cw.Throw();
         cw.MarkLabel(skip);
         cw.NoOperation();
@@ -603,7 +603,7 @@ internal sealed partial class LoweredEmitter
 
     private void EmitRange(LoweredRange node, bool keepResult, CompilerContext ctx)
     {
-        cw.LoadType(Spk.Iterator);
+        cw.LoadType(SpellkitTypeCodes.Iterator);
         cw.LoadMember(Builtins.Range);
         cw.PrepareCall(4);
 
@@ -681,8 +681,8 @@ internal sealed partial class LoweredEmitter
         }
         else
         {
-            cw.LoadType(Spk.Array);
-            cw.LoadMember(nameof(Spk.Array));
+            cw.LoadType(SpellkitTypeCodes.Array);
+            cw.LoadMember(nameof(SpellkitTypeCodes.Array));
             cw.PrepareCall(node.Elements.Count);
 
             for (var i = 0; i < node.Elements.Count; i++)
@@ -790,13 +790,13 @@ internal sealed partial class LoweredEmitter
 
         if (node.IsDictionary)
         {
-            cw.LoadType(Spk.Dictionary);
-            cw.LoadMember(nameof(Spk.Dictionary));
+            cw.LoadType(SpellkitTypeCodes.Dictionary);
+            cw.LoadMember(nameof(SpellkitTypeCodes.Dictionary));
         }
         else
         {
-            cw.LoadType(Spk.Array);
-            cw.LoadMember(nameof(Spk.Array));
+            cw.LoadType(SpellkitTypeCodes.Array);
+            cw.LoadMember(nameof(SpellkitTypeCodes.Array));
         }
 
         cw.PrepareCall(0);

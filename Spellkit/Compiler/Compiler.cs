@@ -41,27 +41,27 @@ public sealed class BuilderOptions
         };
 }
 
-internal sealed class SpkCompiler
+internal sealed class SpellkitCompilerEngine
 {
     private readonly BuilderOptions options;
-    private readonly SpkLinker linker;
+    private readonly SpellkitLinker linker;
     private readonly Builder builder;
 
-    public SpkCompiler(BuilderOptions options, SpkLinker linker)
+    public SpellkitCompilerEngine(BuilderOptions options, SpellkitLinker linker)
     {
         this.options = options ?? BuilderOptions.Default();
         this.linker = linker;
         builder = new(this.options, linker);
     }
 
-    public SpkCompiler(SpkCompiler compiler)
+    public SpellkitCompilerEngine(SpellkitCompilerEngine compiler)
     {
         options = compiler.options;
         linker = compiler.linker;
         builder = new(compiler.builder);
     }
 
-    public Result<Unit> Compile(SpkCodeModel codeModel)
+    public Result<Unit> Compile(SpellkitCodeModel codeModel)
     {
         var unit = builder.Build(codeModel);
         return Result.Create(unit, builder.Messages);

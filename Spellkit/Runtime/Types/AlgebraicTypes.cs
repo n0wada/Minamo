@@ -6,44 +6,44 @@ using Spellkit.Runtime.Types.Functions;
 
 namespace Spellkit.Runtime.Types;
 
-internal sealed class SpkOptionTypeInfo : SpkForeignTypeInfo<Spellkit.Linker.Lang>
+internal sealed class SpellkitOptionTypeInfo : SpellkitForeignTypeInfo<Spellkit.Linker.Lang>
 {
     public override string ReflectedTypeName => "Option";
 
-    public SpkOptionTypeInfo()
+    public SpellkitOptionTypeInfo()
     {
-        AddMixins(Spk.Lookup);
+        AddMixins(SpellkitTypeCodes.Lookup);
         SetSupportedOperations(Ops.Get | Ops.Len);
     }
 
-    protected override SpkFunction? InitializeStaticMember(string name, ExecutionContext ctx) =>
+    protected override SpellkitFunction? InitializeStaticMember(string name, ExecutionContext ctx) =>
         name switch
         {
-            "Some" => new SpkExternalFunction("Some", false, CreateSome, new Par("x")),
-            "None" => new SpkExternalFunction("None", true, CreateNone),
+            "Some" => new SpellkitExternalFunction("Some", false, CreateSome, new Par("x")),
+            "None" => new SpellkitExternalFunction("None", true, CreateNone),
             _ => base.InitializeStaticMember(name, ctx)
         };
 
-    private SpkObject CreateSome(ExecutionContext ctx, SpkObject? _, SpkObject[] args)
+    private SpellkitObject CreateSome(ExecutionContext ctx, SpellkitObject? _, SpellkitObject[] args)
     {
-        var fields = new SpkTuple(new SpkObject[] { new SpkLabel("x", args[0]) });
-        return new SpkClass(this, "Some", fields, SpkTuple.Empty, DeclaringUnit);
+        var fields = new SpellkitTuple(new SpellkitObject[] { new SpellkitLabel("x", args[0]) });
+        return new SpellkitClass(this, "Some", fields, SpellkitTuple.Empty, DeclaringUnit);
     }
 
-    private SpkObject CreateNone(ExecutionContext ctx, SpkObject? _, SpkObject[] args) =>
-        new SpkClass(this, "None", SpkTuple.Empty, SpkTuple.Empty, DeclaringUnit);
+    private SpellkitObject CreateNone(ExecutionContext ctx, SpellkitObject? _, SpellkitObject[] args) =>
+        new SpellkitClass(this, "None", SpellkitTuple.Empty, SpellkitTuple.Empty, DeclaringUnit);
 
-    protected override SpkObject LengthOp(ExecutionContext ctx, SpkObject arg) =>
-        SpkInteger.Get(((SpkClass)arg).Fields.Count);
+    protected override SpellkitObject LengthOp(ExecutionContext ctx, SpellkitObject arg) =>
+        SpellkitInteger.Get(((SpellkitClass)arg).Fields.Count);
 
-    protected override SpkObject GetOp(ExecutionContext ctx, SpkObject self, SpkObject index) =>
-        ((SpkClass)self).Fields.GetItem(ctx, index);
+    protected override SpellkitObject GetOp(ExecutionContext ctx, SpellkitObject self, SpellkitObject index) =>
+        ((SpellkitClass)self).Fields.GetItem(ctx, index);
 
-    protected override SpkObject ToStringOp(ExecutionContext ctx, SpkObject arg, SpkObject format)
+    protected override SpellkitObject ToStringOp(ExecutionContext ctx, SpellkitObject arg, SpellkitObject format)
     {
-        var option = (SpkClass)arg;
+        var option = (SpellkitClass)arg;
 
-        IEnumerable<SpkObject> Iterate()
+        IEnumerable<SpellkitObject> Iterate()
         {
             var values = option.Fields.UnsafeAccess();
             for (var i = 0; i < option.Fields.Count; i++)
@@ -53,52 +53,52 @@ internal sealed class SpkOptionTypeInfo : SpkForeignTypeInfo<Spellkit.Linker.Lan
         }
 
         return option.Fields.Count == 0
-            ? new SpkString($"Option.{option.Constructor}()")
-            : new SpkString($"Option.{option.Constructor}({(Iterate().ToLiteral(ctx))})");
+            ? new SpellkitString($"Option.{option.Constructor}()")
+            : new SpellkitString($"Option.{option.Constructor}({(Iterate().ToLiteral(ctx))})");
     }
 }
 
-internal sealed class SpkResultTypeInfo : SpkForeignTypeInfo<Spellkit.Linker.Lang>
+internal sealed class SpellkitResultTypeInfo : SpellkitForeignTypeInfo<Spellkit.Linker.Lang>
 {
     public override string ReflectedTypeName => "Result";
 
-    public SpkResultTypeInfo()
+    public SpellkitResultTypeInfo()
     {
-        AddMixins(Spk.Lookup);
+        AddMixins(SpellkitTypeCodes.Lookup);
         SetSupportedOperations(Ops.Get | Ops.Len);
     }
 
-    protected override SpkFunction? InitializeStaticMember(string name, ExecutionContext ctx) =>
+    protected override SpellkitFunction? InitializeStaticMember(string name, ExecutionContext ctx) =>
         name switch
         {
-            "Ok" => new SpkExternalFunction("Ok", false, CreateOk, new Par("x")),
-            "Err" => new SpkExternalFunction("Err", false, CreateErr, new Par("y")),
+            "Ok" => new SpellkitExternalFunction("Ok", false, CreateOk, new Par("x")),
+            "Err" => new SpellkitExternalFunction("Err", false, CreateErr, new Par("y")),
             _ => base.InitializeStaticMember(name, ctx)
         };
 
-    private SpkObject CreateOk(ExecutionContext ctx, SpkObject? _, SpkObject[] args)
+    private SpellkitObject CreateOk(ExecutionContext ctx, SpellkitObject? _, SpellkitObject[] args)
     {
-        var fields = new SpkTuple(new SpkObject[] { new SpkLabel("x", args[0]) });
-        return new SpkClass(this, "Ok", fields, SpkTuple.Empty, DeclaringUnit);
+        var fields = new SpellkitTuple(new SpellkitObject[] { new SpellkitLabel("x", args[0]) });
+        return new SpellkitClass(this, "Ok", fields, SpellkitTuple.Empty, DeclaringUnit);
     }
 
-    private SpkObject CreateErr(ExecutionContext ctx, SpkObject? _, SpkObject[] args)
+    private SpellkitObject CreateErr(ExecutionContext ctx, SpellkitObject? _, SpellkitObject[] args)
     {
-        var fields = new SpkTuple(new SpkObject[] { new SpkLabel("y", args[0]) });
-        return new SpkClass(this, "Err", fields, SpkTuple.Empty, DeclaringUnit);
+        var fields = new SpellkitTuple(new SpellkitObject[] { new SpellkitLabel("y", args[0]) });
+        return new SpellkitClass(this, "Err", fields, SpellkitTuple.Empty, DeclaringUnit);
     }
 
-    protected override SpkObject LengthOp(ExecutionContext ctx, SpkObject arg) =>
-        SpkInteger.Get(((SpkClass)arg).Fields.Count);
+    protected override SpellkitObject LengthOp(ExecutionContext ctx, SpellkitObject arg) =>
+        SpellkitInteger.Get(((SpellkitClass)arg).Fields.Count);
 
-    protected override SpkObject GetOp(ExecutionContext ctx, SpkObject self, SpkObject index) =>
-        ((SpkClass)self).Fields.GetItem(ctx, index);
+    protected override SpellkitObject GetOp(ExecutionContext ctx, SpellkitObject self, SpellkitObject index) =>
+        ((SpellkitClass)self).Fields.GetItem(ctx, index);
 
-    protected override SpkObject ToStringOp(ExecutionContext ctx, SpkObject arg, SpkObject format)
+    protected override SpellkitObject ToStringOp(ExecutionContext ctx, SpellkitObject arg, SpellkitObject format)
     {
-        var result = (SpkClass)arg;
+        var result = (SpellkitClass)arg;
 
-        IEnumerable<SpkObject> Iterate()
+        IEnumerable<SpellkitObject> Iterate()
         {
             var values = result.Fields.UnsafeAccess();
             for (var i = 0; i < result.Fields.Count; i++)
@@ -108,7 +108,7 @@ internal sealed class SpkResultTypeInfo : SpkForeignTypeInfo<Spellkit.Linker.Lan
         }
 
         return result.Fields.Count == 0
-            ? new SpkString($"Result.{result.Constructor}()")
-            : new SpkString($"Result.{result.Constructor}({(Iterate().ToLiteral(ctx))})");
+            ? new SpellkitString($"Result.{result.Constructor}()")
+            : new SpellkitString($"Result.{result.Constructor}({(Iterate().ToLiteral(ctx))})");
     }
 }

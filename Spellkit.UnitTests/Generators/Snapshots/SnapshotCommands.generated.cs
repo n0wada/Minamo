@@ -17,8 +17,8 @@ public static class SnapshotCommandsHostingExtensions
             global::Spellkit.Hosting.SpellkitCommandParameter.Optional<int>("count", 2));
             module.RawCommand("Maybe", null, null, context =>
             {
-                var result = global::GeneratorFixture.SnapshotCommands.Maybe(context.RawArgument(0) is global::Spellkit.Runtime.Types.SpkNil ? default(int?) : global::Spellkit.Hosting.SpellkitCommandConvert.ToInt32(context.ExecutionContext, context.RawArgument(0)));
-                return result.HasValue ? global::Spellkit.Hosting.SpellkitCommandConvert.FromInteger(result.Value) : global::Spellkit.Runtime.Types.SpkNil.Instance;
+                var result = global::GeneratorFixture.SnapshotCommands.Maybe(context.RawArgument(0) is global::Spellkit.Runtime.Types.SpellkitNil ? default(int?) : global::Spellkit.Hosting.SpellkitCommandConvert.ToInt32(context.ExecutionContext, context.RawArgument(0)));
+                return result.HasValue ? global::Spellkit.Hosting.SpellkitCommandConvert.FromInteger(result.Value) : global::Spellkit.Runtime.Types.SpellkitNil.Instance;
             },
             global::Spellkit.Hosting.SpellkitCommandParameter.Required<int?>("value"));
         });

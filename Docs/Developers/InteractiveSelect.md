@@ -308,7 +308,7 @@ var environment = new SpellkitEnvironment()
     });
 ```
 
-The `spk` console provides its own runner for direct startup and REPL use. The
+The `spell` console provides its own runner for direct startup and REPL use. The
 [Quest Console example](../../Examples/QuestConsole/README.md) demonstrates the event-driven
 `Start` / `SpellkitRunSession` form.
 

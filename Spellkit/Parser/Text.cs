@@ -64,7 +64,7 @@ internal sealed class StringBuffer : SourceBuffer
         {
             if (value < 0 || value > bufferLen)
             {
-                throw new SpkException($"End of file, position: {value}.", null);
+                throw new SpellkitException($"End of file, position: {value}.", null);
             }
 
             bufferPosition = value;

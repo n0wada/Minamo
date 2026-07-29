@@ -31,9 +31,9 @@ public sealed class ExecutionContext
     public ExecutionContext Clone() => new(CallStack, RuntimeContext) { Control = Control };
 
     #region CallBack
-    internal SpkFunction? CallBackFunction { get; set; }
+    internal SpellkitFunction? CallBackFunction { get; set; }
 
-    internal SpkObject InvokeCallBackFunction()
+    internal SpellkitObject InvokeCallBackFunction()
     {
         var fn = CallBackFunction!;
         CallBackFunction = null;
@@ -41,7 +41,7 @@ public sealed class ExecutionContext
         return fn.Call(this);
     }
 
-    internal SpkObject InvokeCallBackFunction(SpkObject arg)
+    internal SpellkitObject InvokeCallBackFunction(SpellkitObject arg)
     {
         var fn = CallBackFunction!;
         CallBackFunction = null;
@@ -49,7 +49,7 @@ public sealed class ExecutionContext
         return fn.Call(this, arg);
     }
 
-    internal SpkObject InvokeCallBackFunction(SpkObject arg1, SpkObject arg2)
+    internal SpellkitObject InvokeCallBackFunction(SpellkitObject arg1, SpellkitObject arg2)
     {
         var fn = CallBackFunction!;
         CallBackFunction = null;
@@ -57,7 +57,7 @@ public sealed class ExecutionContext
         return fn.Call(this, arg1, arg2);
     }
 
-    internal SpkObject InvokeCallBackFunction(params SpkObject[] args)
+    internal SpellkitObject InvokeCallBackFunction(params SpellkitObject[] args)
     {
         var fn = CallBackFunction!;
         CallBackFunction = null;
@@ -75,8 +75,8 @@ public sealed class ExecutionContext
     #region Errors
     public bool HasErrors => Error != null;
 
-    private SpkObject? _error;
-    public SpkObject? Error
+    private SpellkitObject? _error;
+    public SpellkitObject? Error
     {
         get => _error;
         internal set
@@ -92,7 +92,7 @@ public sealed class ExecutionContext
 
     internal CallStackTrace? Trace { get; set; }
 
-    public SpkObject? PopError()
+    public SpellkitObject? PopError()
     {
         var err = Error;
         Error = null;
@@ -105,7 +105,7 @@ public sealed class ExecutionContext
         {
             var err = Error;
             Error = null;
-            throw new SpkCodeException(err);
+            throw new SpellkitCodeException(err);
         }
     }
     #endregion
@@ -141,13 +141,13 @@ public sealed class ExecutionContext
 
     internal sealed class ArgContainer
     {
-        public SpkObject[] Locals = null!;
-        public SpkObject[]? VarArgs;
+        public SpellkitObject[] Locals = null!;
+        public SpellkitObject[]? VarArgs;
         public int VarArgsSize;
         public int VarArgsIndex;
     }
 
-    internal ArgContainer PushArguments(SpkObject[] locals, int varArgsIndex, SpkObject[]? varArgs = null)
+    internal ArgContainer PushArguments(SpellkitObject[] locals, int varArgsIndex, SpellkitObject[]? varArgs = null)
     {
         if (containers.Count <= count)
         {
@@ -168,7 +168,7 @@ public sealed class ExecutionContext
     #endregion
 }
 
-public enum SpkExecutionLimitKind
+public enum SpellkitExecutionLimitKind
 {
     Instructions,
     Time,
@@ -177,12 +177,12 @@ public enum SpkExecutionLimitKind
     CallDepth
 }
 
-public sealed class SpkExecutionLimitException : SpkRuntimeException
+public sealed class SpellkitExecutionLimitException : SpellkitRuntimeException
 {
-    public SpkExecutionLimitException(SpkExecutionLimitKind kind, string message)
+    public SpellkitExecutionLimitException(SpellkitExecutionLimitKind kind, string message)
         : base(message) => Kind = kind;
 
-    public SpkExecutionLimitKind Kind { get; }
+    public SpellkitExecutionLimitKind Kind { get; }
 }
 
 internal sealed class ExecutionControl : IDisposable
@@ -240,8 +240,8 @@ internal sealed class ExecutionControl : IDisposable
     {
         if (maxInstructions is not null && Instructions >= maxInstructions.Value)
         {
-            throw new SpkExecutionLimitException(
-                SpkExecutionLimitKind.Instructions,
+            throw new SpellkitExecutionLimitException(
+                SpellkitExecutionLimitKind.Instructions,
                 $"Instruction limit of {maxInstructions.Value} was exceeded.");
         }
 
@@ -257,8 +257,8 @@ internal sealed class ExecutionControl : IDisposable
     {
         if (maxHostCommands is not null && HostCommands >= maxHostCommands.Value)
         {
-            throw new SpkExecutionLimitException(
-                SpkExecutionLimitKind.HostCommands,
+            throw new SpellkitExecutionLimitException(
+                SpellkitExecutionLimitKind.HostCommands,
                 $"Host command limit of {maxHostCommands.Value} was exceeded.");
         }
 
@@ -270,8 +270,8 @@ internal sealed class ExecutionControl : IDisposable
     {
         if (maxSignals is not null && Signals >= maxSignals.Value)
         {
-            throw new SpkExecutionLimitException(
-                SpkExecutionLimitKind.Signals,
+            throw new SpellkitExecutionLimitException(
+                SpellkitExecutionLimitKind.Signals,
                 $"Signal delivery limit of {maxSignals.Value} was exceeded.");
         }
 
@@ -283,8 +283,8 @@ internal sealed class ExecutionControl : IDisposable
     {
         if (MaxCallDepth is not null && depth > MaxCallDepth.Value)
         {
-            throw new SpkExecutionLimitException(
-                SpkExecutionLimitKind.CallDepth,
+            throw new SpellkitExecutionLimitException(
+                SpellkitExecutionLimitKind.CallDepth,
                 $"Call depth limit of {MaxCallDepth.Value} was exceeded.");
         }
     }
@@ -295,8 +295,8 @@ internal sealed class ExecutionControl : IDisposable
             && (timeoutSource?.IsCancellationRequested == true
                 || timeProvider.GetElapsedTime(started) > timeLimit))
         {
-            throw new SpkExecutionLimitException(
-                SpkExecutionLimitKind.Time,
+            throw new SpellkitExecutionLimitException(
+                SpellkitExecutionLimitKind.Time,
                 $"Execution time limit of {timeLimit} was exceeded.");
         }
 
@@ -327,27 +327,27 @@ internal sealed class ExecutionResult
 {
     public long Ticks { get; }
 
-    public SpkObject? Value { get; }
+    public SpellkitObject? Value { get; }
 
     public ExecutionContext Context { get; }
 
     public TerminationReason Reason { get; }
 
-    internal SpkMachine.VmContinuation? Continuation { get; }
+    internal SpellkitMachine.VmContinuation? Continuation { get; }
 
     internal VmSuspension? Suspension { get; }
 
     private ExecutionResult(
         long ticks,
-        SpkObject? value,
+        SpellkitObject? value,
         ExecutionContext ctx,
         TerminationReason reason,
-        SpkMachine.VmContinuation? continuation = null,
+        SpellkitMachine.VmContinuation? continuation = null,
         VmSuspension? suspension = null) =>
         (Ticks, Value, Context, Reason, Continuation, Suspension) =
         (ticks, value, ctx, reason, continuation, suspension);
 
-    internal static ExecutionResult Fetch(long ticks, SpkObject? value, ExecutionContext ctx) =>
+    internal static ExecutionResult Fetch(long ticks, SpellkitObject? value, ExecutionContext ctx) =>
         new(ticks, value, ctx, TerminationReason.Complete);
 
     internal static ExecutionResult Abort(long ticks, ExecutionContext ctx) =>
@@ -355,7 +355,7 @@ internal sealed class ExecutionResult
 
     internal static ExecutionResult Suspend(
         ExecutionContext ctx,
-        SpkMachine.VmContinuation continuation,
+        SpellkitMachine.VmContinuation continuation,
         VmSuspension suspension) =>
         new(0, null, ctx, TerminationReason.Suspended, continuation, suspension);
 }

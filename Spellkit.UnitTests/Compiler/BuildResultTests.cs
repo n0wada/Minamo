@@ -41,7 +41,7 @@ public sealed class BuildResultTests
             "ignored",
             new[] { Message(BuildMessageType.Error, "error") });
 
-        Assert.Throws<SpkBuildException>(() => result.GetValueOrThrow());
+        Assert.Throws<SpellkitBuildException>(() => result.GetValueOrThrow());
         Assert.False(result.TryGetValue(out var value));
         Assert.Null(value);
     }

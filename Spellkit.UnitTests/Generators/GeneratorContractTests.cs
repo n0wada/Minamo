@@ -161,22 +161,22 @@ public sealed class GeneratorContractTests
 
         AssertDiagnostic(
             diagnostics,
-            "SPKH001",
+            "SpellkitH001",
             "EmptyName",
             "SpellkitModule on 'EmptyName' requires a non-empty module name.");
         AssertDiagnostic(
             diagnostics,
-            "SPKH003",
+            "SpellkitH003",
             "Second",
             "Module 'duplicate' contains more than one command named 'same'.");
         AssertDiagnostic(
             diagnostics,
-            "SPKH004",
+            "SpellkitH004",
             "value",
             "Parameter 'value' on command 'Ref' is not supported: "
                 + "ref, in, and out parameters are not supported");
         Assert.Contains(diagnostics, diagnostic =>
-            diagnostic.Id == "SPKH007"
+            diagnostic.Id == "SpellkitH007"
             && diagnostic.GetMessage().Contains(
                 "indexers are not supported",
                 StringComparison.Ordinal));
@@ -253,12 +253,12 @@ public sealed class GeneratorContractTests
         var diagnostics = Errors(Generate(source));
 
         Assert.Contains(diagnostics, diagnostic =>
-            diagnostic.Id == "SPKH002"
+            diagnostic.Id == "SpellkitH002"
             && diagnostic.GetMessage().Contains(
                 "generic module classes are not supported",
                 StringComparison.Ordinal));
         Assert.Contains(diagnostics, diagnostic =>
-            diagnostic.Id == "SPKH002"
+            diagnostic.Id == "SpellkitH002"
             && diagnostic.GetMessage().Contains(
                 "generic methods are not supported",
                 StringComparison.Ordinal));
@@ -305,7 +305,7 @@ public sealed class GeneratorContractTests
         AssertNoErrors(valid.Compilation.GetDiagnostics());
         Assert.Contains("RawCommand(\"integer\"", valid.GeneratedSource, StringComparison.Ordinal);
         Assert.Contains("RawCommand(\"text\"", valid.GeneratedSource, StringComparison.Ordinal);
-        Assert.Contains(invalid, diagnostic => diagnostic.Id == "SPKH003");
+        Assert.Contains(invalid, diagnostic => diagnostic.Id == "SpellkitH003");
     }
 
     [Fact]

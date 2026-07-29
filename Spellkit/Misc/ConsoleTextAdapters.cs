@@ -7,28 +7,28 @@ namespace Spellkit;
 
 public sealed class ConsoleTextReader : TextReader
 {
-    private readonly SpkObject read;
-    private readonly SpkObject readLine;
+    private readonly SpellkitObject read;
+    private readonly SpellkitObject readLine;
     private readonly ExecutionContext ctx;
 
-    public ConsoleTextReader(ExecutionContext ctx, SpkObject read, SpkObject readLine) =>
+    public ConsoleTextReader(ExecutionContext ctx, SpellkitObject read, SpellkitObject readLine) =>
         (this.ctx, this.read, this.readLine) = (ctx, read, readLine);
 
     public override int Read()
     {
         var ret = read.Invoke(ctx);
 
-        if (ret is SpkInteger i)
+        if (ret is SpellkitInteger i)
         {
             return (int)i.Value;
         }
-        else if (ret is SpkChar c)
+        else if (ret is SpellkitChar c)
         {
             return c.Value;
         }
         else
         {
-            ctx.InvalidType(Spk.Integer, Spk.Char, ret);
+            ctx.InvalidType(SpellkitTypeCodes.Integer, SpellkitTypeCodes.Char, ret);
             return 0;
         }
     }
@@ -37,7 +37,7 @@ public sealed class ConsoleTextReader : TextReader
     {
         var ret = readLine.Invoke(ctx);
 
-        if (ret is SpkString s)
+        if (ret is SpellkitString s)
         {
             return s.Value;
         }
@@ -57,18 +57,18 @@ public sealed class ConsoleTextReader : TextReader
 
 public sealed class ConsoleTextWriter : TextWriter
 {
-    private readonly SpkObject write;
-    private readonly SpkObject? writeLine;
+    private readonly SpellkitObject write;
+    private readonly SpellkitObject? writeLine;
     private readonly ExecutionContext ctx;
 
     public override Encoding Encoding => Encoding.UTF8;
 
-    public ConsoleTextWriter(ExecutionContext ctx, SpkObject write) : this(ctx, write, null) { }
+    public ConsoleTextWriter(ExecutionContext ctx, SpellkitObject write) : this(ctx, write, null) { }
 
-    public ConsoleTextWriter(ExecutionContext ctx, SpkObject write, SpkObject? writeLine) =>
+    public ConsoleTextWriter(ExecutionContext ctx, SpellkitObject write, SpellkitObject? writeLine) =>
         (this.ctx, this.write, this.writeLine) = (ctx, write, writeLine);
 
-    public override void Write(string? value) => write.Invoke(ctx, SpkString.Get(value));
+    public override void Write(string? value) => write.Invoke(ctx, SpellkitString.Get(value));
 
-    public override void WriteLine(string? value) => (writeLine ?? write).Invoke(ctx, SpkString.Get(value));
+    public override void WriteLine(string? value) => (writeLine ?? write).Invoke(ctx, SpellkitString.Get(value));
 }

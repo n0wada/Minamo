@@ -7,39 +7,39 @@ using System.Text;
 
 namespace Spellkit.Runtime;
 
-public class SpkRuntimeException : SpkException
+public class SpellkitRuntimeException : SpellkitException
 {
-    public SpkRuntimeException(string message, Exception? innerException) : base(message, innerException) { }
+    public SpellkitRuntimeException(string message, Exception? innerException) : base(message, innerException) { }
 
-    public SpkRuntimeException(string message) : base(message) { }
+    public SpellkitRuntimeException(string message) : base(message) { }
 }
 
-public sealed class SpkCodeException : SpkRuntimeException
+public sealed class SpellkitCodeException : SpellkitRuntimeException
 {
     public override string Message => ErrorGenerators.GetErrorDescription(Error);
 
-    public SpkObject Error { get; }
+    public SpellkitObject Error { get; }
 
     public CallStackTrace? CallTrace { get; private set; }
 
-    internal SpkCodeException(SpkObject err, CallStackTrace cs, Exception? innerException)
+    internal SpellkitCodeException(SpellkitObject err, CallStackTrace cs, Exception? innerException)
         : base(null!, innerException) => (Error, CallTrace) = (err, cs);
 
-    public SpkCodeException(SpkObject err) : base(null!, null) => Error = err;
+    public SpellkitCodeException(SpellkitObject err) : base(null!, null) => Error = err;
 
-    public SpkCodeException(SpkError errorCode, params object[] args) : base(null!, null) =>
+    public SpellkitCodeException(SpellkitError errorCode, params object[] args) : base(null!, null) =>
         Error = ErrorGenerators.RuntimeException(errorCode, args);
 
     public override string ToString()
     {
-        var header = Error is SpkExceptionObject ex
+        var header = Error is SpellkitExceptionObject ex
             ? $"{ex.Name}: {Message}"
             : $"Error D{((int)ErrorGenerators.GetErrorCode(Error)).ToString().PadLeft(3, '0')}: {Message}";
         return CallTrace is null ? header : $"{header}\nStack trace:\n{CallTrace}";
     }
 }
 
-public enum SpkError
+public enum SpellkitError
 {
     None,
 

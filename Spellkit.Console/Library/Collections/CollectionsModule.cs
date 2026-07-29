@@ -4,10 +4,10 @@ using Spellkit.Runtime.Types;
 namespace Spellkit.Library.Collections;
 
 [SpellkitModule("collections")]
-[SpellkitForeignType(typeof(SpkSortedDictionaryTypeInfo))]
+[SpellkitForeignType(typeof(SpellkitSortedDictionaryTypeInfo))]
 public static class CollectionsModule
 {
     [SpellkitCommand("SortedDictionary")]
-    internal static SpkObject SortedDictionary(SpellkitCommandContext host, SpkObject values = null!) =>
-        SpkSortedDictionaryTypeInfo.New(host.ExecutionContext, values);
+    internal static SpellkitObject SortedDictionary(SpellkitCommandContext host, SpellkitObject values = null!) =>
+        SpellkitSortedDictionaryTypeInfo.New(host.ExecutionContext, values);
 }

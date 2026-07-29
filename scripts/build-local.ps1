@@ -70,7 +70,7 @@ if ($Configuration -eq "Release")
         "Spellkit.pdb",
         "Spellkit.Generators.deps.json",
         "Spellkit.Generators.pdb",
-        "spk.pdb"))
+        "spell.pdb"))
     {
         $file = Join-Path $releaseOutput $fileName
         if (Test-Path -LiteralPath $file)

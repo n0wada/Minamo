@@ -123,11 +123,11 @@ internal static class BytecodeFormatter
                     {
                         var obj = unit.Objects[op.Data];
 
-                        if (obj.TypeId is Spk.String)
+                        if (obj.TypeId is SpellkitTypeCodes.String)
                         {
                             sb.Append($" {StringUtil.Escape(obj.ToString())}");
                         }
-                        else if (obj.TypeId is Spk.Char)
+                        else if (obj.TypeId is SpellkitTypeCodes.Char)
                         {
                             sb.Append($" {StringUtil.Escape(obj.ToString(), "'")}");
                         }

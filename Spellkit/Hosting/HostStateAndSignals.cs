@@ -52,7 +52,7 @@ public sealed class SpellkitStateStore : IDisposable
         }
     }
 
-    internal SpkObject? GetRaw(string key)
+    internal SpellkitObject? GetRaw(string key)
     {
         lock (syncRoot)
         {
@@ -83,7 +83,7 @@ public sealed class SpellkitStateStore : IDisposable
 
     public bool TryGet<T>(string key, out T? value)
     {
-        SpkObject raw;
+        SpellkitObject raw;
         lock (syncRoot)
         {
             ThrowIfDisposed();
@@ -100,16 +100,16 @@ public sealed class SpellkitStateStore : IDisposable
 
     public void Set<T>(string key, T value) => SetRaw(key, TypeConverter.ConvertFrom(value));
 
-    internal void SetRaw(string key, SpkObject value) =>
+    internal void SetRaw(string key, SpellkitObject value) =>
         SetRaw(key, value, SpellkitStateOwner.Host);
 
     public void SetScript<T>(string key, T value) =>
         SetScriptRaw(key, TypeConverter.ConvertFrom(value));
 
-    internal void SetScriptRaw(string key, SpkObject value) =>
+    internal void SetScriptRaw(string key, SpellkitObject value) =>
         SetRaw(key, value, SpellkitStateOwner.Script);
 
-    internal void SetFromScript(string key, SpkObject value)
+    internal void SetFromScript(string key, SpellkitObject value)
     {
         ValidateKey(key);
         ArgumentNullException.ThrowIfNull(value);
@@ -125,7 +125,7 @@ public sealed class SpellkitStateStore : IDisposable
         }
     }
 
-    private void SetRaw(string key, SpkObject value, SpellkitStateOwner owner)
+    private void SetRaw(string key, SpellkitObject value, SpellkitStateOwner owner)
     {
         ValidateKey(key);
         ArgumentNullException.ThrowIfNull(value);
@@ -202,7 +202,7 @@ public sealed class SpellkitStateStore : IDisposable
         }
     }
 
-    private sealed record StateEntry(SpkObject Value, SpellkitStateOwner Owner);
+    private sealed record StateEntry(SpellkitObject Value, SpellkitStateOwner Owner);
 }
 
 internal sealed record HostSignalDefinition(
@@ -212,9 +212,9 @@ internal sealed record HostSignalDefinition(
 
 public sealed class SpellkitSignal
 {
-    private readonly SpkObject payload;
+    private readonly SpellkitObject payload;
 
-    internal SpellkitSignal(string name, SpkObject payload)
+    internal SpellkitSignal(string name, SpellkitObject payload)
     {
         Name = name;
         this.payload = payload;
@@ -228,7 +228,7 @@ public sealed class SpellkitSignal
     public bool TryGetPayload<T>(out T? payload) =>
         SpellkitHostValueConverter.TryConvert(this.payload, out payload);
 
-    internal SpkObject RawPayload => payload;
+    internal SpellkitObject RawPayload => payload;
 }
 
 public sealed class SpellkitSignalDispatchResult : ISpellkitOperationResult
@@ -331,7 +331,7 @@ public sealed class SpellkitSignalDispatcher : IDisposable
     public bool TryEmit(string name, object? payload = null) =>
         TryEmitRaw(name, TypeConverter.ConvertFrom(payload));
 
-    internal void EmitRaw(string name, SpkObject payload)
+    internal void EmitRaw(string name, SpellkitObject payload)
     {
         if (!TryEmitRaw(name, payload))
         {
@@ -339,7 +339,7 @@ public sealed class SpellkitSignalDispatcher : IDisposable
         }
     }
 
-    internal bool TryEmitRaw(string name, SpkObject payload)
+    internal bool TryEmitRaw(string name, SpellkitObject payload)
     {
         RequireDefinition(name);
         ArgumentNullException.ThrowIfNull(payload);
@@ -357,7 +357,7 @@ public sealed class SpellkitSignalDispatcher : IDisposable
         return true;
     }
 
-    internal long SubscribeScript(string name, SpkFunction handler, bool once)
+    internal long SubscribeScript(string name, SpellkitFunction handler, bool once)
     {
         var definition = RequireDefinition(name);
         environment.Capabilities.Demand(definition.ListenCapability);
@@ -413,14 +413,14 @@ public sealed class SpellkitSignalDispatcher : IDisposable
         }
     }
 
-    internal void EmitFromScript(string name, SpkObject payload)
+    internal void EmitFromScript(string name, SpellkitObject payload)
     {
         var definition = RequireDefinition(name);
         environment.Capabilities.Demand(definition.EmitCapability);
         EmitRaw(name, payload);
     }
 
-    internal bool TryEmitFromScript(string name, SpkObject payload)
+    internal bool TryEmitFromScript(string name, SpellkitObject payload)
     {
         var definition = RequireDefinition(name);
         environment.Capabilities.Demand(definition.EmitCapability);
@@ -443,13 +443,13 @@ public sealed class SpellkitSignalDispatcher : IDisposable
         }
     }
 
-    internal IReadOnlyList<SpkFunction> GetScriptHandlers(string name)
+    internal IReadOnlyList<SpellkitFunction> GetScriptHandlers(string name)
     {
         lock (syncRoot)
         {
             if (!scriptSubscriptions.TryGetValue(name, out var subscriptions))
             {
-                return Array.Empty<SpkFunction>();
+                return Array.Empty<SpellkitFunction>();
             }
 
             var handlers = subscriptions.Select(subscription => subscription.Handler).ToArray();
@@ -510,6 +510,6 @@ public sealed class SpellkitSignalDispatcher : IDisposable
     private InvalidOperationException QueueFull() => new(
         $"The pending signal limit of {MaxPending} has been reached.");
 
-    private sealed record ScriptSubscription(long Id, SpkFunction Handler, bool Once);
+    private sealed record ScriptSubscription(long Id, SpellkitFunction Handler, bool Once);
     private sealed record HostSubscription(string Name, Action<SpellkitSignal> Handler);
 }

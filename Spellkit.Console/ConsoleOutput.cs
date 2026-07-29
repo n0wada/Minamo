@@ -1,4 +1,4 @@
-﻿using Spellkit.Runtime;
+using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System;
 using System.Collections.Generic;
@@ -30,7 +30,7 @@ internal static class ConsoleOutput
             return;
         }
 
-        if (res.Value is SpkNil || res.Value is null)
+        if (res.Value is SpellkitNil || res.Value is null)
         {
             return;
         }
@@ -39,7 +39,7 @@ internal static class ConsoleOutput
         Output(fmt);
     }
 
-    public static string Format(SpkObject obj, ExecutionContext ctx, bool notype = false, int maxLen = 0)
+    public static string Format(SpellkitObject obj, ExecutionContext ctx, bool notype = false, int maxLen = 0)
     {
         string fmt;
 
@@ -49,7 +49,7 @@ internal static class ConsoleOutput
         }
         catch (Exception ex)
         {
-            return $"Formatting failed:\n{(ex is SpkCodeException c ? c.ToString() : ex.Message)}";
+            return $"Formatting failed:\n{(ex is SpellkitCodeException c ? c.ToString() : ex.Message)}";
         }
 
         if (maxLen > 0 && fmt.Length > maxLen)
@@ -64,13 +64,13 @@ internal static class ConsoleOutput
 
     public static void Help()
     {
-        Output("Usage: spk [options] [file ...]");
+        Output("Usage: spell [options] [file ...]");
         LineFeed();
         Output("Options:");
         Output(CommandLine.GenerateHelp<CommandLineOptions>("-").TrimEnd('\r', '\n'));
     }
 
-    public static void Version() => Output($"spk {GetVersion()}");
+    public static void Version() => Output($"spell {GetVersion()}");
 
     public static void Header()
     {
@@ -78,7 +78,7 @@ internal static class ConsoleOutput
         {
             var ts = FileProbe.GetAssembyTimeStamp();
             Title = $"Spellkit - {FileProbe.GetExecutablePath()}";
-            Header($"Spk (Spellkit Console). Build {ts.ToString().Trim()}");
+            Header($"Spellkit (Spellkit Console). Build {ts.ToString().Trim()}");
             Subheader($"Version {GetVersion()}");
             Subheader($"Running {Environment.OSVersion}");
         }

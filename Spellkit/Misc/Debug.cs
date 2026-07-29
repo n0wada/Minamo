@@ -494,7 +494,7 @@ public sealed class CallStackTrace : IEnumerable<CallFrame>
     }
 }
 
-internal sealed class SpkDebugger
+internal sealed class SpellkitDebugger
 {
     private const string DefaultName = "<func>";
     private const string Unknown = "<unknown>";
@@ -502,7 +502,7 @@ internal sealed class SpkDebugger
 
     internal UnitComposition Composition { get; }
 
-    public SpkDebugger(UnitComposition asm)
+    public SpellkitDebugger(UnitComposition asm)
     {
         Composition = asm;
 
@@ -589,38 +589,38 @@ public readonly struct Par
 {
     public readonly string Name;
     public readonly bool IsVarArg;
-    public readonly SpkObject? Value;
+    public readonly SpellkitObject? Value;
     public readonly TypeAnnotation? TypeAnnotation;
 
-    internal Par(string name, SpkObject? val, bool isVarArg, TypeAnnotation? ta) =>
+    internal Par(string name, SpellkitObject? val, bool isVarArg, TypeAnnotation? ta) =>
         (Name, Value, IsVarArg, TypeAnnotation) = (name, val, isVarArg, ta);
 
-    internal Par(string name, SpkObject? val, bool isVarArg) =>
+    internal Par(string name, SpellkitObject? val, bool isVarArg) =>
         (Name, Value, IsVarArg, TypeAnnotation) = (name, val, isVarArg, null);
 
     public Par(string name, ParKind kind) => (Name, Value, IsVarArg, TypeAnnotation) = (name, null, kind == ParKind.VarArg, null);
 
-    public Par(string name, ParKind kind, SpkObject? value)
+    public Par(string name, ParKind kind, SpellkitObject? value)
     {
-        value ??= SpkNil.Instance;
+        value ??= SpellkitNil.Instance;
         (Name, Value, IsVarArg, TypeAnnotation) = (name, value, kind == ParKind.VarArg, null);
     }
 
-    public Par(string name, SpkObject? value)
+    public Par(string name, SpellkitObject? value)
     {
-        value ??= SpkNil.Instance;
+        value ??= SpellkitNil.Instance;
         (Name, Value, IsVarArg, TypeAnnotation) = (name, value, false, null);
     }
 
     public Par(string name) => (Name, Value, IsVarArg, TypeAnnotation) = (name, null, false, null);
 
-    public Par(string name, int value) => (Name, Value, IsVarArg, TypeAnnotation) = (name, SpkInteger.Get(value), false, null);
+    public Par(string name, int value) => (Name, Value, IsVarArg, TypeAnnotation) = (name, SpellkitInteger.Get(value), false, null);
 
-    public Par(string name, double value) => (Name, Value, IsVarArg, TypeAnnotation) = (name, new SpkFloat(value), false, null);
+    public Par(string name, double value) => (Name, Value, IsVarArg, TypeAnnotation) = (name, new SpellkitFloat(value), false, null);
 
-    public Par(string name, string value) => (Name, Value, IsVarArg, TypeAnnotation) = (name, new SpkString(value), false, null);
+    public Par(string name, string value) => (Name, Value, IsVarArg, TypeAnnotation) = (name, new SpellkitString(value), false, null);
 
-    public Par(string name, char value) => (Name, Value, IsVarArg, TypeAnnotation) = (name, new SpkChar(value), false, null);
+    public Par(string name, char value) => (Name, Value, IsVarArg, TypeAnnotation) = (name, new SpellkitChar(value), false, null);
 
     public Par(string name, bool value) => (Name, Value, IsVarArg, TypeAnnotation) = (name, value ? True : False, false, null);
 

@@ -32,7 +32,7 @@ internal sealed class ReplSession : IDisposable
                 .UseOutput(Console.Write)
                 .UseSelect(RunSelectSession);
         session = host.CreateInstance(spellkitEnvironment, options.UserArguments);
-        CompilationLinker = new SpkIncrementalLinker(lookup, options.UserArguments);
+        CompilationLinker = new SpellkitIncrementalLinker(lookup, options.UserArguments);
         commands = new ReplCommands(this);
     }
 
@@ -75,7 +75,7 @@ internal sealed class ReplSession : IDisposable
 
     public RuntimeContext? RuntimeContext => session.RuntimeContext;
 
-    public SpkIncrementalLinker CompilationLinker { get; private set; }
+    public SpellkitIncrementalLinker CompilationLinker { get; private set; }
 
     public CommandLineOptions Options { get; }
 
@@ -106,7 +106,7 @@ internal sealed class ReplSession : IDisposable
             }
 
             source.AppendLine(line);
-            if (line.Length > 0 && !SpkParser.Parse(SourceBuffer.FromString(source.ToString())).Success)
+            if (line.Length > 0 && !SpellkitParser.Parse(SourceBuffer.FromString(source.ToString())).Success)
             {
                 expectsMore = true;
                 continue;
@@ -121,7 +121,7 @@ internal sealed class ReplSession : IDisposable
     public void Reset()
     {
         session.Reset();
-        CompilationLinker = new SpkIncrementalLinker(
+        CompilationLinker = new SpellkitIncrementalLinker(
             CompilationLinker.Lookup,
             Options.UserArguments);
     }
@@ -282,11 +282,11 @@ internal sealed class ReplSession : IDisposable
             return false;
         }
 
-        var value = result.GetValue<Spellkit.Runtime.Types.SpkObject>();
-        if (value is not null and not Spellkit.Runtime.Types.SpkNil
+        var value = result.GetValue<Spellkit.Runtime.Types.SpellkitObject>();
+        if (value is not null and not Spellkit.Runtime.Types.SpellkitNil
             && RuntimeContext is not null)
         {
-            var context = SpkMachine.CreateExecutionContext(RuntimeContext);
+            var context = SpellkitMachine.CreateExecutionContext(RuntimeContext);
             ConsoleOutput.Output(ConsoleOutput.Format(value, context));
         }
 

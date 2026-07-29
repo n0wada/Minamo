@@ -49,19 +49,19 @@ You need the .NET 10 SDK. From PowerShell at the repository root:
 Start the interactive console:
 
 ```powershell
-.\bin\spk.exe
+.\bin\spell.exe
 ```
 
 Or execute a source file:
 
 ```powershell
-.\bin\spk.exe .\hello.kit
+.\bin\spell.exe .\hello.kit
 ```
 
 Start an interactive select declared by the file:
 
 ```powershell
-.\bin\spk.exe .\Player.kit --do music.player
+.\bin\spell.exe .\Player.kit --do music.player
 ```
 
 Inside the REPL, use `do music.player`. The console displays the currently available choices;
@@ -70,7 +70,7 @@ enter their number or stable choice ID.
 Use `--help` or `--version` for command-line information; enter `#help` in the REPL for
 interactive commands.
 
-The Windows `spk.exe` distribution is framework-dependent and requires the .NET 10
+The Windows `spell.exe` distribution is framework-dependent and requires the .NET 10
 Runtime to be installed.
 
 ## Embed Spellkit in C#
@@ -145,7 +145,7 @@ the application, tooling, and runtime-extension surfaces.
 | Path | Purpose |
 | --- | --- |
 | `Spellkit` | Parser, compiler, linker, VM, runtime types, and Hosting API |
-| `Spellkit.Console` | `spk` command-line runner, REPL, and standard modules |
+| `Spellkit.Console` | `spell` command-line runner, REPL, and standard modules |
 | `Spellkit.Generators` | Source generators for C# host bindings |
 | `Spellkit.UnitTests` | xUnit tests and the optional `.kit` language report runner |
 | `Examples` | Runnable C# hosts and Spellkit scripts |

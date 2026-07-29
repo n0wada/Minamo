@@ -6,32 +6,32 @@ using System.Reflection;
 
 namespace Spellkit.Runtime.Types;
 
-internal sealed class SpkForeignConstructor : SpkForeignFunction
+internal sealed class SpellkitForeignConstructor : SpellkitForeignFunction
 {
-    private readonly Func<ExecutionContext, SpkObject, SpkObject, SpkObject> fun;
+    private readonly Func<ExecutionContext, SpellkitObject, SpellkitObject, SpellkitObject> fun;
 
-    public SpkForeignConstructor(Func<ExecutionContext, SpkObject, SpkObject, SpkObject> fun)
+    public SpellkitForeignConstructor(Func<ExecutionContext, SpellkitObject, SpellkitObject, SpellkitObject> fun)
         : base("new", new Par[] { new Par("values", ParKind.VarArg) }, 0) => this.fun = fun;
 
-    private SpkForeignConstructor(Func<ExecutionContext, SpkObject, SpkObject, SpkObject> fun, Par[] pars) : base("new", pars, 0) => this.fun = fun;
+    private SpellkitForeignConstructor(Func<ExecutionContext, SpellkitObject, SpellkitObject, SpellkitObject> fun, Par[] pars) : base("new", pars, 0) => this.fun = fun;
 
-    protected override SpkObject CallWithMemoryLayout(ExecutionContext ctx, SpkObject[] args) => fun(ctx, Self!, args[0]);
+    protected override SpellkitObject CallWithMemoryLayout(ExecutionContext ctx, SpellkitObject[] args) => fun(ctx, Self!, args[0]);
 
-    protected override SpkFunction Clone(ExecutionContext ctx) => new SpkForeignConstructor(fun, Parameters);
+    protected override SpellkitFunction Clone(ExecutionContext ctx) => new SpellkitForeignConstructor(fun, Parameters);
 
-    protected override bool Equals(SpkFunction func) => func is SpkForeignConstructor c && c.fun.Equals(fun);
+    protected override bool Equals(SpellkitFunction func) => func is SpellkitForeignConstructor c && c.fun.Equals(fun);
 }
 
-public sealed class SpkInterop : SpkObject
+public sealed class SpellkitInterop : SpellkitObject
 {
     internal readonly Type Type;
     internal readonly object Object;
 
-    public override string TypeName => $"{nameof(Spk.Interop)}<{Type.FullName ?? Type.Name}>";
+    public override string TypeName => $"{nameof(SpellkitTypeCodes.Interop)}<{Type.FullName ?? Type.Name}>";
     
-    public SpkInterop(Type type, object obj) : base(Spk.Interop) => (Type, Object) = (type, obj);
+    public SpellkitInterop(Type type, object obj) : base(SpellkitTypeCodes.Interop) => (Type, Object) = (type, obj);
 
-    public SpkInterop(Type obj) : base(Spk.Interop) => (Type, Object) = (obj, obj);
+    public SpellkitInterop(Type obj) : base(SpellkitTypeCodes.Interop) => (Type, Object) = (obj, obj);
 
     public override int GetHashCode() => Object.GetHashCode();
 
@@ -39,10 +39,10 @@ public sealed class SpkInterop : SpkObject
 
     public override string ToString() => Object.ToString() ?? "";
 
-    public override bool Equals(SpkObject? other) => other is SpkInterop i && ReferenceEquals(Object, i.Object);
+    public override bool Equals(SpellkitObject? other) => other is SpellkitInterop i && ReferenceEquals(Object, i.Object);
 }
 
-internal sealed class SpkInteropFunction : SpkForeignFunction
+internal sealed class SpellkitInteropFunction : SpellkitForeignFunction
 {
     private readonly static Par[] pars = new Par[] { new Par("args", ParKind.VarArg) };
     private readonly string name;
@@ -52,26 +52,26 @@ internal sealed class SpkInteropFunction : SpkForeignFunction
 
     public override string FunctionName => name;
 
-    public SpkInteropFunction(string name, Type type, List<MethodInfo> methods, bool auto) : base(name, pars, 0) =>
+    public SpellkitInteropFunction(string name, Type type, List<MethodInfo> methods, bool auto) : base(name, pars, 0) =>
         (this.name, this.type, this.methods, Attr, parameters) = (name, type, methods, auto ? FunAttr.Auto : FunAttr.None, new ParameterInfo[methods.Count][]);
 
-    protected override SpkObject BindOrRun(ExecutionContext ctx, SpkObject arg)
+    protected override SpellkitObject BindOrRun(ExecutionContext ctx, SpellkitObject arg)
     {
         if (Auto)
         {
-            return CallInteropMethod(ctx, arg, Array.Empty<SpkObject>());
+            return CallInteropMethod(ctx, arg, Array.Empty<SpellkitObject>());
         }
 
         return base.BindOrRun(ctx, arg);
     }
 
-    protected override SpkObject CallWithMemoryLayout(ExecutionContext ctx, SpkObject[] args) => CallInteropMethod(ctx, Self!, args);
+    protected override SpellkitObject CallWithMemoryLayout(ExecutionContext ctx, SpellkitObject[] args) => CallInteropMethod(ctx, Self!, args);
 
-    private SpkObject CallInteropMethod(ExecutionContext ctx, SpkObject self, SpkObject[] args)
+    private SpellkitObject CallInteropMethod(ExecutionContext ctx, SpellkitObject self, SpellkitObject[] args)
     {
-        var tupleArgs = args.Length > 0 ? ((SpkTuple)args[0]).UnsafeAccess() : null;
+        var tupleArgs = args.Length > 0 ? ((SpellkitTuple)args[0]).UnsafeAccess() : null;
         var arguments = tupleArgs is null ? Array.Empty<object>() : tupleArgs.Select(a => a.ToObject()).ToArray();
-        var argumentTypes = tupleArgs is null ? Array.Empty<Type>() : arguments.Select(a => a is null ? SpkNil.Instance.GetType() : a.GetType()).ToArray();
+        var argumentTypes = tupleArgs is null ? Array.Empty<Type>() : arguments.Select(a => a is null ? SpellkitNil.Instance.GetType() : a.GetType()).ToArray();
 
         if (!ResolveMethod(self, arguments, argumentTypes, false, out var result))
         {
@@ -84,7 +84,7 @@ internal sealed class SpkInteropFunction : SpkForeignFunction
         return result;
     }
 
-    private bool ResolveMethod(SpkObject self, object[] arguments, Type[] argumentTypes, bool generalize, out SpkObject result)
+    private bool ResolveMethod(SpellkitObject self, object[] arguments, Type[] argumentTypes, bool generalize, out SpellkitObject result)
     {
         result = Nil;
 
@@ -123,7 +123,7 @@ internal sealed class SpkInteropFunction : SpkForeignFunction
         return true;
     }
 
-    protected override SpkFunction Clone(ExecutionContext ctx) => new SpkInteropFunction(name, type, methods, Attr == FunAttr.Auto);
+    protected override SpellkitFunction Clone(ExecutionContext ctx) => new SpellkitInteropFunction(name, type, methods, Attr == FunAttr.Auto);
 
-    protected override bool Equals(SpkFunction func) => func is SpkInteropFunction f && f.name == name && f.type.Equals(type);
+    protected override bool Equals(SpellkitFunction func) => func is SpellkitInteropFunction f && f.name == name && f.type.Equals(type);
 }

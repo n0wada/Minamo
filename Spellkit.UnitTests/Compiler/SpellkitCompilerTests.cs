@@ -11,7 +11,7 @@ public sealed class SpellkitCompilerTests
     public void CompilesSourceAndCodeModelThroughFacade()
     {
         var sourceResult = SpellkitCompiler.Compile("let answer = 42");
-        var parsed = SpkParser.Parse("let answer = 42").GetValueOrThrow();
+        var parsed = SpellkitParser.Parse("let answer = 42").GetValueOrThrow();
         var modelResult = SpellkitCompiler.Compile(parsed);
 
         Assert.True(sourceResult.Success);
@@ -25,11 +25,11 @@ public sealed class SpellkitCompilerTests
     {
         var options = new BuilderOptions { Debug = true };
         var lookup = FileLookup.Restricted(options).Build();
-        var linker = new SpkLinker(lookup);
+        var linker = new SpellkitLinker(lookup);
 
         Assert.Same(options, linker.BuilderOptions);
         Assert.DoesNotContain(
-            typeof(SpkLinker).GetConstructors(),
+            typeof(SpellkitLinker).GetConstructors(),
             constructor => constructor.GetParameters()
                 .Any(parameter => parameter.ParameterType == typeof(BuilderOptions)));
     }

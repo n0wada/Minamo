@@ -9,21 +9,21 @@ namespace Spellkit.Runtime;
 
 public static class Extensions
 {
-    public static T Type<T>(this ExecutionContext ctx) where T : SpkTypeInfo =>
+    public static T Type<T>(this ExecutionContext ctx) where T : SpellkitTypeInfo =>
         ctx.RuntimeContext.Types.OfType<T>().First();
 }
 
 public static class ImplicitConverter
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static double GetFloat(this SpkObject self)
+    public static double GetFloat(this SpellkitObject self)
     {
-        if (self is SpkFloat r8)
+        if (self is SpellkitFloat r8)
         {
             return r8.Value;
         }
 
-        if (self is SpkInteger i8)
+        if (self is SpellkitInteger i8)
         {
             return i8.Value;
         }
@@ -32,14 +32,14 @@ public static class ImplicitConverter
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static char GetChar(this SpkObject self)
+    public static char GetChar(this SpellkitObject self)
     {
-        if (self is SpkChar c)
+        if (self is SpellkitChar c)
         {
             return c.Value;
         }
 
-        if (self is SpkString str)
+        if (self is SpellkitString str)
         {
             return str.Value.Length > 0 ? str.Value[0] : '\0';
         }
@@ -50,16 +50,16 @@ public static class ImplicitConverter
 
 public sealed class RuntimeContext
 {
-    internal readonly SpkStringTypeInfo String;
-    internal readonly SpkCharTypeInfo Char;
-    internal readonly SpkNilTypeInfo Nil;
-    internal readonly SpkTupleTypeInfo Tuple;
-    internal readonly SpkArrayTypeInfo Array;
-    internal readonly FastList<SpkTypeInfo> Types;
+    internal readonly SpellkitStringTypeInfo String;
+    internal readonly SpellkitCharTypeInfo Char;
+    internal readonly SpellkitNilTypeInfo Nil;
+    internal readonly SpellkitTupleTypeInfo Tuple;
+    internal readonly SpellkitArrayTypeInfo Array;
+    internal readonly FastList<SpellkitTypeInfo> Types;
 
     internal readonly System.Threading.Lock SyncRoot = new();
 
-    internal SpkObject[][] Units { get; private set; }
+    internal SpellkitObject[][] Units { get; private set; }
 
     internal MemoryLayout[][] Layouts { get; private set; }
 
@@ -69,14 +69,14 @@ public sealed class RuntimeContext
 
     internal RuntimeContext(UnitComposition composition)
     {
-        Types = Spk.GetAll();
-        String = (SpkStringTypeInfo)Types[Spk.String];
-        Char = (SpkCharTypeInfo)Types[Spk.Char];
-        Nil = (SpkNilTypeInfo)Types[Spk.Nil];
-        Tuple = (SpkTupleTypeInfo)Types[Spk.Tuple];
-        Array = (SpkArrayTypeInfo)Types[Spk.Array];
+        Types = SpellkitTypeCodes.GetAll();
+        String = (SpellkitStringTypeInfo)Types[SpellkitTypeCodes.String];
+        Char = (SpellkitCharTypeInfo)Types[SpellkitTypeCodes.Char];
+        Nil = (SpellkitNilTypeInfo)Types[SpellkitTypeCodes.Nil];
+        Tuple = (SpellkitTupleTypeInfo)Types[SpellkitTypeCodes.Tuple];
+        Array = (SpellkitArrayTypeInfo)Types[SpellkitTypeCodes.Array];
         Composition = composition;
-        Units = new SpkObject[Composition.Units.Length][];
+        Units = new SpellkitObject[Composition.Units.Length][];
         Layouts = Composition.Units.Select(u => u.Layouts.UnsafeGetArray()).ToArray();
     }
 
@@ -85,7 +85,7 @@ public sealed class RuntimeContext
         Composition = composition;
 
         //Take into account new modules
-        var newUnits = new SpkObject[Composition.Units.Length][];
+        var newUnits = new SpellkitObject[Composition.Units.Length][];
         for (var i = 0; i < Units.Length; i++)
         {
             newUnits[i] = Units[i];

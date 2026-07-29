@@ -45,7 +45,7 @@ internal sealed partial class HandwrittenParser
         tokensSinceError = mark.TokensSinceError;
     }
 
-    public Result<SpkCodeModel> Parse()
+    public Result<SpellkitCodeModel> Parse()
     {
         while (!IsAtEnd && Errors.Count < MaximumErrorCount)
         {
@@ -81,7 +81,7 @@ internal sealed partial class HandwrittenParser
             }
         }
 
-        var model = new SpkCodeModel(root, imports.ToArray(), fileName);
+        var model = new SpellkitCodeModel(root, imports.ToArray(), fileName);
         return Errors.Count == 0 ? Result.Create(model) : Result.Create(model, Errors);
     }
 

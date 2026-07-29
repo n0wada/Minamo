@@ -32,12 +32,12 @@ public sealed record SpellkitChoice
 
 public sealed class SpellkitSelectResult
 {
-    private readonly SpkObject? value;
+    private readonly SpellkitObject? value;
 
     internal SpellkitSelectResult(
         IReadOnlyList<SpellkitChoice> choices,
         bool isCompleted,
-        SpkObject? value = null)
+        SpellkitObject? value = null)
     {
         Choices = choices;
         IsCompleted = isCompleted;
@@ -60,7 +60,7 @@ public sealed class SpellkitSelectSession : IDisposable
     private readonly SpellkitInstance instance;
     private readonly SelectInstance selectInstance;
     private SpellkitSelectSession? nested;
-    private SpkMachine.VmContinuation? choiceContinuation;
+    private SpellkitMachine.VmContinuation? choiceContinuation;
     private bool disposed;
 
     internal SpellkitSelectSession(SpellkitInstance instance, SelectInstance selectInstance)
@@ -191,7 +191,7 @@ public sealed class SpellkitSelectSession : IDisposable
         var continuation = choiceContinuation
             ?? throw new InvalidOperationException("The nested select has no parent continuation.");
         choiceContinuation = null;
-        return ApplyChoiceExecution(SpkMachine.Resume(continuation));
+        return ApplyChoiceExecution(SpellkitMachine.Resume(continuation));
     }
 
     private SpellkitSelectResult ApplyChoiceExecution(ExecutionResult result)
@@ -214,7 +214,7 @@ public sealed class SpellkitSelectSession : IDisposable
             throw new InvalidOperationException("The select choice did not complete successfully.");
         }
 
-        var outcome = selectInstance.Apply(result.Value ?? SpkNil.Instance);
+        var outcome = selectInstance.Apply(result.Value ?? SpellkitNil.Instance);
             if (outcome.IsCompleted)
             {
                 return new(Array.Empty<SpellkitChoice>(), isCompleted: true, outcome.Value);
@@ -237,7 +237,7 @@ public sealed class SpellkitSelectSession : IDisposable
     private bool IsAvailable(SelectChoiceDefinition choice) =>
         selectInstance.Guard(choice) is not { } guard || instance.EvaluateSelectGuard(guard);
 
-    private static SpkObject[] ConvertArguments(
+    private static SpellkitObject[] ConvertArguments(
         SelectChoiceDefinition choice,
         object? argument,
         bool hasArgument)
@@ -249,7 +249,7 @@ public sealed class SpellkitSelectSession : IDisposable
                 throw new ArgumentException($"Choice '{choice.Name}' does not accept an argument.", nameof(argument));
             }
 
-            return Array.Empty<SpkObject>();
+            return Array.Empty<SpellkitObject>();
         }
 
         if (!hasArgument)
@@ -269,7 +269,7 @@ public sealed class SpellkitSelectSession : IDisposable
                 nameof(argument));
         }
 
-        var values = new SpkObject[tuple.Length];
+        var values = new SpellkitObject[tuple.Length];
         for (var i = 0; i < tuple.Length; i++)
         {
             values[i] = TypeConverter.ConvertFrom(tuple[i]);
@@ -287,8 +287,8 @@ public sealed class SpellkitRunSession : IDisposable
 {
     private readonly SpellkitInstance instance;
     private SpellkitSelectSession? select;
-    private SpkMachine.VmContinuation? continuation;
-    private SpkObject? value;
+    private SpellkitMachine.VmContinuation? continuation;
+    private SpellkitObject? value;
     private Exception? failure;
     private bool completed;
     private bool disposed;
@@ -339,7 +339,7 @@ public sealed class SpellkitRunSession : IDisposable
         return select ?? throw new InvalidOperationException("The script is not waiting for a select.");
     }
 
-    internal SpkMachine.VmContinuation GetContinuation() =>
+    internal SpellkitMachine.VmContinuation GetContinuation() =>
         continuation ?? throw new InvalidOperationException("The script has no suspended VM continuation.");
 
     internal void Advance(ExecutionResult result)

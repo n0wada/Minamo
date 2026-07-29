@@ -74,7 +74,7 @@ public class Unit
 
     public FastList<HashString> Strings { get; }
 
-    public FastList<SpkObject> Objects { get; }
+    public FastList<SpellkitObject> Objects { get; }
 
     public FastList<Op> Ops { get; }
 

@@ -22,22 +22,22 @@ public sealed class VmContinuationTests
 
         var units = new FastList<Unit>();
         units.Add(unit);
-        var context = SpkMachine.CreateExecutionContext(new UnitComposition(units));
+        var context = SpellkitMachine.CreateExecutionContext(new UnitComposition(units));
 
-        var suspended = SpkMachine.Execute(context);
+        var suspended = SpellkitMachine.Execute(context);
 
         Assert.Equal(TerminationReason.Suspended, suspended.Reason);
-        var continuation = Assert.IsType<SpkMachine.VmContinuation>(suspended.Continuation);
+        var continuation = Assert.IsType<SpellkitMachine.VmContinuation>(suspended.Continuation);
 
-        var suspendedAgain = SpkMachine.Resume(continuation);
+        var suspendedAgain = SpellkitMachine.Resume(continuation);
 
         Assert.Equal(TerminationReason.Suspended, suspendedAgain.Reason);
         Assert.Same(continuation, suspendedAgain.Continuation);
 
-        var completed = SpkMachine.Resume(continuation);
+        var completed = SpellkitMachine.Resume(continuation);
 
         Assert.Equal(TerminationReason.Complete, completed.Reason);
-        Assert.Equal(2L, ((SpkInteger)completed.Value!).Value);
-        Assert.Throws<InvalidOperationException>(() => SpkMachine.Resume(continuation));
+        Assert.Equal(2L, ((SpellkitInteger)completed.Value!).Value);
+        Assert.Throws<InvalidOperationException>(() => SpellkitMachine.Resume(continuation));
     }
 }

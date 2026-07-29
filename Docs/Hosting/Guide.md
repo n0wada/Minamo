@@ -135,7 +135,7 @@ runtime integrations.
 Invalid Hosting API usage, such as a duplicate registration or an invalid argument, still throws
 a normal C# exception immediately.
 
-Commands can return either CLR values supported by `TypeConverter` or an existing `SpkObject`.
+Commands can return either CLR values supported by `TypeConverter` or an existing `SpellkitObject`.
 Parameters are converted to their declared CLR types before the handler uses them.
 
 Commands can also accept Spellkit functions as callbacks through the command context:
@@ -975,8 +975,8 @@ Custom Spellkit foreign types can be registered by the generated module initiali
 public static class GameTypes { }
 ```
 
-The generator validates that foreign types derive from `SpkForeignTypeInfo` and have an accessible
-parameterless constructor. Generator diagnostics currently use `SPKH001` through `SPKH007`.
+The generator validates that foreign types derive from `SpellkitForeignTypeInfo` and have an accessible
+parameterless constructor. Generator diagnostics currently use `SpellkitH001` through `SpellkitH007`.
 
 A specialized module can derive from `ForeignUnit` directly. Applying `SpellkitModule` makes the
 generator register that unit through `module.Unit(...)`:
@@ -990,33 +990,33 @@ public sealed class TypesModule : ForeignUnit
 ```
 
 This form is useful when several foreign types share a strongly typed declaring unit. It cannot be
-combined with generated `SpellkitCommand` or `SpkForeignType` declarations on the same module class.
+combined with generated `SpellkitCommand` or `SpellkitForeignType` declarations on the same module class.
 The imperative API follows the same rule: a module configured with `Unit(...)` cannot also add
 generated command, static type, or foreign type registrations.
 
 Foreign type members use the related type-binding attributes:
 
 ```csharp
-[SpkType]
-public sealed partial class EntityTypeInfo : SpkForeignTypeInfo
+[SpellkitType]
+public sealed partial class EntityTypeInfo : SpellkitForeignTypeInfo
 {
-    [SpkMethod]
+    [SpellkitMethod]
     internal static string Name(ExecutionContext context, Entity self) => self.Name;
 
-    [SpkProperty]
+    [SpellkitProperty]
     internal static long Id(ExecutionContext context, Entity self) => self.Id;
 
-    [SpkStaticMethod]
+    [SpellkitStaticMethod]
     internal static Entity Find(ExecutionContext context, long id) { /* ... */ }
 
-    [SpkStaticProperty]
+    [SpellkitStaticProperty]
     internal static Entity None(ExecutionContext context) { /* ... */ }
 }
 ```
 
-`SpellkitCommand` exposes ordinary host commands on a module or static host type. `SpkType` and its member
-attributes bind instance and static members on a `SpkForeignTypeInfo`. Operators and conversions stay
-as explicit `SpkForeignTypeInfo` overrides because they participate in the runtime type protocol.
+`SpellkitCommand` exposes ordinary host commands on a module or static host type. `SpellkitType` and its member
+attributes bind instance and static members on a `SpellkitForeignTypeInfo`. Operators and conversions stay
+as explicit `SpellkitForeignTypeInfo` overrides because they participate in the runtime type protocol.
 
 The optional library modules can be enabled explicitly with their generated extensions:
 

@@ -263,9 +263,9 @@ public sealed class TypeAnnotation : IEnumerable<Qualident>
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-public sealed class SpkCodeModel
+public sealed class SpellkitCodeModel
 {
-    public SpkCodeModel(BlockSyntax root, ImportSyntax[] imports, string fileName) =>
+    public SpellkitCodeModel(BlockSyntax root, ImportSyntax[] imports, string fileName) =>
         (Root, Imports, FileName) = (root, imports, fileName);
 
     public ImportSyntax[] Imports { get; }

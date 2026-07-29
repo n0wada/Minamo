@@ -914,7 +914,7 @@ internal sealed partial class HandwrittenParser
         Expect(TokenKind.EndRegion);
         return new RegionSyntax(
             name ?? string.Empty,
-            new SpkCodeModel(block, regionImports.ToArray(), fileName),
+            new SpellkitCodeModel(block, regionImports.ToArray(), fileName),
             regionToken.Location);
     }
 }

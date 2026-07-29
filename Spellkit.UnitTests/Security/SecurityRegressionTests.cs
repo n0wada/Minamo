@@ -21,29 +21,29 @@ public sealed class SecurityRegressionTests
             .GetMethod(nameof(TwoParameters), BindingFlags.NonPublic | BindingFlags.Static)!
             .GetParameters();
 
-        Assert.True(SpkInteropTypeInfo.ParametersMatch(
+        Assert.True(SpellkitInteropTypeInfo.ParametersMatch(
             parameters,
-            new SpkObject[] { new SpkInterop(typeof(string)), new SpkInterop(typeof(int)) }));
-        Assert.False(SpkInteropTypeInfo.ParametersMatch(
+            new SpellkitObject[] { new SpellkitInterop(typeof(string)), new SpellkitInterop(typeof(int)) }));
+        Assert.False(SpellkitInteropTypeInfo.ParametersMatch(
             parameters,
-            new SpkObject[] { new SpkInterop(typeof(string)), new SpkInterop(typeof(string)) }));
+            new SpellkitObject[] { new SpellkitInterop(typeof(string)), new SpellkitInterop(typeof(string)) }));
     }
 
     [Fact]
     public void NumericConversionEnforcesSignedAndUnsignedBounds()
     {
-        Assert.True(TypeConverter.TryConvert(new SpkInteger(int.MinValue), typeof(int), out _));
-        Assert.True(TypeConverter.TryConvert(new SpkInteger(int.MaxValue), typeof(int), out _));
+        Assert.True(TypeConverter.TryConvert(new SpellkitInteger(int.MinValue), typeof(int), out _));
+        Assert.True(TypeConverter.TryConvert(new SpellkitInteger(int.MaxValue), typeof(int), out _));
         Assert.False(TypeConverter.TryConvert(
-            new SpkInteger((long)int.MinValue - 1),
+            new SpellkitInteger((long)int.MinValue - 1),
             typeof(int),
             out _));
         Assert.False(TypeConverter.TryConvert(
-            new SpkInteger((long)int.MaxValue + 1),
+            new SpellkitInteger((long)int.MaxValue + 1),
             typeof(int),
             out _));
-        Assert.True(TypeConverter.TryConvert(new SpkInteger(uint.MaxValue), typeof(uint), out _));
-        Assert.False(TypeConverter.TryConvert(SpkInteger.MinusOne, typeof(uint), out _));
+        Assert.True(TypeConverter.TryConvert(new SpellkitInteger(uint.MaxValue), typeof(uint), out _));
+        Assert.False(TypeConverter.TryConvert(SpellkitInteger.MinusOne, typeof(uint), out _));
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public sealed class SecurityRegressionTests
 
         Assert.False(timedOut.Success);
         Assert.Equal(SpellkitFailureKind.Limit, timedOut.Failure?.Kind);
-        Assert.Equal(SpkExecutionLimitKind.Time, timedOut.Failure?.Limit);
+        Assert.Equal(SpellkitExecutionLimitKind.Time, timedOut.Failure?.Limit);
 
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -204,7 +204,7 @@ public sealed class SecurityRegressionTests
             .CreateInstance();
         var handle = owner.Environment.CreateResource(new ProtectedResource());
         using var other = new SpellkitHost()
-            .Module("foreign", module => module.Command<SpkObject>("Get", _ => handle))
+            .Module("foreign", module => module.Command<SpellkitObject>("Get", _ => handle))
             .CreateInstance();
 
         var result = other.Execute("import foreign\nforeign.Get().IsValid()");
@@ -221,9 +221,9 @@ public sealed class SecurityRegressionTests
         unit.Ops.Add(new Op((OpCode)int.MaxValue));
         var units = new FastList<Unit>();
         units.Add(unit);
-        var context = SpkMachine.CreateExecutionContext(new UnitComposition(units));
+        var context = SpellkitMachine.CreateExecutionContext(new UnitComposition(units));
 
-        var error = Assert.Throws<InvalidOperationException>(() => SpkMachine.Execute(context));
+        var error = Assert.Throws<InvalidOperationException>(() => SpellkitMachine.Execute(context));
 
         Assert.Contains("Unknown opcode value", error.Message, StringComparison.Ordinal);
     }
@@ -234,7 +234,7 @@ public sealed class SecurityRegressionTests
         const int payloadSize = 1_000_000;
         var source = "let payload = \"" + new string('a', payloadSize) + "\"\npayload.Length()";
 
-        var result = SpkParser.Parse(SourceBuffer.FromString(source, "<large-input>"));
+        var result = SpellkitParser.Parse(SourceBuffer.FromString(source, "<large-input>"));
 
         Assert.True(result.Success);
     }

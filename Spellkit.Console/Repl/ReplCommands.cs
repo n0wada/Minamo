@@ -1,4 +1,4 @@
-﻿#pragma warning disable CA1822
+#pragma warning disable CA1822
 using Spellkit.Runtime;
 using System;
 using System.Collections.Generic;
@@ -139,11 +139,11 @@ internal sealed class ReplCommands
             return;
         }
 
-        var xs = SpkMachine.DumpVariables(session.RuntimeContext).ToList();
+        var xs = SpellkitMachine.DumpVariables(session.RuntimeContext).ToList();
         var vals = new string[xs.Count];
         var types = new string[xs.Count];
         var (keyLen, valLen) = (0, 0);
-        var etx = SpkMachine.CreateExecutionContext(session.RuntimeContext);
+        var etx = SpellkitMachine.CreateExecutionContext(session.RuntimeContext);
 
         for (var i = 0; i < xs.Count; i++)
         {

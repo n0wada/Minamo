@@ -16,7 +16,7 @@ internal sealed class LoweringPass
         this.noOptimizations = noOptimizations;
     }
 
-    public LoweredModule LowerModule(SpkCodeModel codeModel, CompilerContext ctx, bool includeLangModule)
+    public LoweredModule LowerModule(SpellkitCodeModel codeModel, CompilerContext ctx, bool includeLangModule)
     {
         var importOffset = includeLangModule ? 1 : 0;
         var imports = new LoweredImport[codeModel.Imports.Length + importOffset];

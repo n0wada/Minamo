@@ -13,9 +13,9 @@ public sealed class ConsoleEndToEndTests
         var version = await RunAsync("--version");
 
         Assert.Equal(0, help.ExitCode);
-        Assert.Contains("Usage: spk", help.StandardOutput, StringComparison.Ordinal);
+        Assert.Contains("Usage: spell", help.StandardOutput, StringComparison.Ordinal);
         Assert.Equal(0, version.ExitCode);
-        Assert.StartsWith("spk ", version.StandardOutput.Trim(), StringComparison.Ordinal);
+        Assert.StartsWith("spell ", version.StandardOutput.Trim(), StringComparison.Ordinal);
     }
 
     [Fact]

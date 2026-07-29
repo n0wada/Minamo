@@ -10,7 +10,7 @@ namespace Spellkit.Linker;
 [GeneratedModule]
 internal sealed partial class Lang : ForeignUnit
 {
-    private readonly SpkTuple? startupArguments;
+    private readonly SpellkitTuple? startupArguments;
     private SpellkitHostRootTypeInfo hostRootType = null!;
 
     public Lang(bool exposeHostObject = true)
@@ -22,32 +22,32 @@ internal sealed partial class Lang : ForeignUnit
         }
     }
 
-    public Lang(SpkTuple? args, bool exposeHostObject = true) : this(exposeHostObject) =>
+    public Lang(SpellkitTuple? args, bool exposeHostObject = true) : this(exposeHostObject) =>
         startupArguments = args;
 
     protected override void InitializeTypes()
     {
-        AddType<SpkOptionTypeInfo>();
-        AddType<SpkResultTypeInfo>();
+        AddType<SpellkitOptionTypeInfo>();
+        AddType<SpellkitResultTypeInfo>();
         hostRootType = AddType<SpellkitHostRootTypeInfo>();
     }
 
     protected override void Execute(ExecutionContext ctx) => Add("args", startupArguments ?? Nil);
 
-    [SpkStaticMethod("referenceEquals")]
-    public static bool Equals(SpkObject value, SpkObject other) => ReferenceEquals(value, other);
+    [SpellkitStaticMethod("referenceEquals")]
+    public static bool Equals(SpellkitObject value, SpellkitObject other) => ReferenceEquals(value, other);
 
-    [SpkStaticMethod("isCallable")]
-    public static bool IsCallable(ExecutionContext ctx, SpkObject value) => value.TryGetFunction(ctx, out _);
+    [SpellkitStaticMethod("isCallable")]
+    public static bool IsCallable(ExecutionContext ctx, SpellkitObject value) => value.TryGetFunction(ctx, out _);
 
-    [SpkStaticMethod("alias")]
-    public static void Alias(ExecutionContext ctx, SpkObject select, string name)
+    [SpellkitStaticMethod("alias")]
+    public static void Alias(ExecutionContext ctx, SpellkitObject select, string name)
     {
         SpellkitSelectAliases.Register(ctx, select, name);
     }
 
-    [SpkStaticMethod("print")]
-    public static void Print(ExecutionContext ctx, [VarArg]SpkTuple values, [Default(",")]string separator, [Default("\n")]SpkObject terminator)
+    [SpellkitStaticMethod("print")]
+    public static void Print(ExecutionContext ctx, [VarArg]SpellkitTuple values, [Default(",")]string separator, [Default("\n")]SpellkitObject terminator)
     {
         var fst = true;
         
@@ -58,7 +58,7 @@ internal sealed partial class Lang : ForeignUnit
                 WriteOutput(ctx, separator);
             }
 
-            if (a is SpkString s)
+            if (a is SpellkitString s)
             {
                 WriteOutput(ctx, s.Value);
             }
@@ -75,18 +75,18 @@ internal sealed partial class Lang : ForeignUnit
             }
         }
 
-        if (terminator.TypeId is Spk.String or Spk.Char)
+        if (terminator.TypeId is SpellkitTypeCodes.String or SpellkitTypeCodes.Char)
         {
             WriteOutput(ctx, terminator.ToString());
         }
-        else if (terminator.TypeId is not Spk.Nil)
+        else if (terminator.TypeId is not SpellkitTypeCodes.Nil)
         {
-            throw new SpkCodeException(SpkError.InvalidType, terminator);
+            throw new SpellkitCodeException(SpellkitError.InvalidType, terminator);
         }
     }
 
-    [SpkStaticMethod("fmt")]
-    public static SpkObject Format(ExecutionContext ctx, [VarArg]SpkTuple values)
+    [SpellkitStaticMethod("fmt")]
+    public static SpellkitObject Format(ExecutionContext ctx, [VarArg]SpellkitTuple values)
     {
         if (values.Count == 0)
         {
@@ -95,13 +95,13 @@ internal sealed partial class Lang : ForeignUnit
 
         var template = values[0];
 
-        if (template.TypeId is not Spk.String and not Spk.Char)
+        if (template.TypeId is not SpellkitTypeCodes.String and not SpellkitTypeCodes.Char)
         {
-            return ctx.InvalidType(Spk.String, template);
+            return ctx.InvalidType(SpellkitTypeCodes.String, template);
         }
 
-        var result = SpkStringTypeInfo.Format(ctx, template.ToString(), values.ToArray()[1..]);
-        return ctx.HasErrors ? Nil : SpkString.Get(result!);
+        var result = SpellkitStringTypeInfo.Format(ctx, template.ToString(), values.ToArray()[1..]);
+        return ctx.HasErrors ? Nil : SpellkitString.Get(result!);
     }
 
     private static void WriteOutput(ExecutionContext ctx, string value)
@@ -116,23 +116,23 @@ internal sealed partial class Lang : ForeignUnit
         Console.Write(value);
     }
 
-    [SpkStaticMethod("constructorName")]
-    public static string? GetConstructorName(SpkObject value) => value is IProduction c ? c.Constructor : null;
+    [SpellkitStaticMethod("constructorName")]
+    public static string? GetConstructorName(SpellkitObject value) => value is IProduction c ? c.Constructor : null;
 
-    [SpkStaticMethod("Exception")]
-    public static SpkObject CreateException(string name, [VarArg]SpkTuple? data = null)
+    [SpellkitStaticMethod("Exception")]
+    public static SpellkitObject CreateException(string name, [VarArg]SpellkitTuple? data = null)
     {
-        var payload = data ?? SpkTuple.Empty;
+        var payload = data ?? SpellkitTuple.Empty;
         var message = payload.Count == 0 ? string.Empty : payload[0].ToString() ?? string.Empty;
-        return new SpkExceptionObject(name, message, payload);
+        return new SpellkitExceptionObject(name, message, payload);
     }
 
-    [SpkStaticMethod("typeName")]
-    public static string GetTypeName(SpkObject value)
+    [SpellkitStaticMethod("typeName")]
+    public static string GetTypeName(SpellkitObject value)
     {
-        if (value.TypeId is Spk.TypeInfo)
+        if (value.TypeId is SpellkitTypeCodes.TypeInfo)
         {
-            return ((SpkTypeInfo)value).ReflectedTypeName;
+            return ((SpellkitTypeInfo)value).ReflectedTypeName;
         }
         else
         {
@@ -140,8 +140,8 @@ internal sealed partial class Lang : ForeignUnit
         }
     }
 
-    [SpkStaticMethod("caller")]
-    public static SpkObject GetCaller(ExecutionContext ctx)
+    [SpellkitStaticMethod("caller")]
+    public static SpellkitObject GetCaller(ExecutionContext ctx)
     {
         if (ctx.CallStack.Count > 2)
         {
@@ -155,8 +155,8 @@ internal sealed partial class Lang : ForeignUnit
         return Nil;
     }
 
-    [SpkStaticMethod("assert")]
-    public static void Assert(ExecutionContext ctx, [Default(true)]SpkObject expect, SpkObject got, string? errorText = null)
+    [SpellkitStaticMethod("assert")]
+    public static void Assert(ExecutionContext ctx, [Default(true)]SpellkitObject expect, SpellkitObject got, string? errorText = null)
     {
         if (!Eq(ctx, expect.ToObject(), got.ToObject()))
         {
@@ -203,7 +203,7 @@ internal sealed partial class Lang : ForeignUnit
             return true;
         }
 
-        if (x is SpkObject xa && y is SpkObject ba)
+        if (x is SpellkitObject xa && y is SpellkitObject ba)
         {
             return xa.Equals(ba, ctx);
         }

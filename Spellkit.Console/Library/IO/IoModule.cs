@@ -11,26 +11,26 @@ using System.Text;
 namespace Spellkit.Library.IO;
 
 [SpellkitModule("io")]
-[SpellkitForeignType(typeof(SpkDriveTypeInfo))]
+[SpellkitForeignType(typeof(SpellkitDriveTypeInfo))]
 public static class IoModule
 {
     [SpellkitCommand(Type = "File")]
-    internal static SpkObject? ReadText(SpellkitCommandContext host, string path, object? encoding = null)
+    internal static SpellkitObject? ReadText(SpellkitCommandContext host, string path, object? encoding = null)
     {
         var enc = GetEncoding(host.ExecutionContext, encoding);
         return host.ExecutionContext.HasErrors
             ? Nil
-            : host.ExecutionContext.Handle(() => new SpkString(File.ReadAllText(path, enc)));
+            : host.ExecutionContext.Handle(() => new SpellkitString(File.ReadAllText(path, enc)));
     }
 
     [SpellkitCommand(Type = "File")]
-    internal static SpkObject? ReadLines(SpellkitCommandContext host, string path, object? encoding = null)
+    internal static SpellkitObject? ReadLines(SpellkitCommandContext host, string path, object? encoding = null)
     {
         var enc = GetEncoding(host.ExecutionContext, encoding);
         return host.ExecutionContext.HasErrors
             ? Nil
             : host.ExecutionContext.Handle(() =>
-                new SpkArray(File.ReadAllLines(path, enc).Select(line => new SpkString(line)).ToArray()));
+                new SpellkitArray(File.ReadAllLines(path, enc).Select(line => new SpellkitString(line)).ToArray()));
     }
 
     [SpellkitCommand(Type = "File")]
@@ -44,10 +44,10 @@ public static class IoModule
     }
 
     [SpellkitCommand(Type = "File")]
-    internal static void WriteAllLines(SpellkitCommandContext host, string path, SpkObject value, object? encoding = null)
+    internal static void WriteAllLines(SpellkitCommandContext host, string path, SpellkitObject value, object? encoding = null)
     {
         var enc = GetEncoding(host.ExecutionContext, encoding);
-        var sequence = SpkIterator.ToEnumerable(host.ExecutionContext, value).ToArray();
+        var sequence = SpellkitIterator.ToEnumerable(host.ExecutionContext, value).ToArray();
 
         if (host.ExecutionContext.HasErrors)
         {
@@ -62,13 +62,13 @@ public static class IoModule
     }
 
     [SpellkitCommand(Type = "File")]
-    internal static SpkObject? ReadAllBytes(SpellkitCommandContext host, string path) =>
+    internal static SpellkitObject? ReadAllBytes(SpellkitCommandContext host, string path) =>
         host.ExecutionContext.Handle(() =>
-            host.ExecutionContext.Type<SpkByteArrayTypeInfo>().Create(File.ReadAllBytes(path)));
+            host.ExecutionContext.Type<SpellkitByteArrayTypeInfo>().Create(File.ReadAllBytes(path)));
 
     [SpellkitCommand(Type = "File")]
-    internal static void WriteAllBytes(SpellkitCommandContext host, string path, SpkObject value) =>
-        host.ExecutionContext.Handle(() => File.WriteAllBytes(path, ((SpkByteArray)value).GetBytes()));
+    internal static void WriteAllBytes(SpellkitCommandContext host, string path, SpellkitObject value) =>
+        host.ExecutionContext.Handle(() => File.WriteAllBytes(path, ((SpellkitByteArray)value).GetBytes()));
 
     [SpellkitCommand(Type = "File")]
     internal static bool? Exists(SpellkitCommandContext host, string path) =>
@@ -87,36 +87,36 @@ public static class IoModule
         });
 
     [SpellkitCommand(Type = "File")]
-    internal static SpkObject? GetAttributes(SpellkitCommandContext host, string path) =>
+    internal static SpellkitObject? GetAttributes(SpellkitCommandContext host, string path) =>
         host.ExecutionContext.Handle(() =>
         {
             var attributes = File.GetAttributes(path);
-            return SpkTuple.Create(
-                new("readOnly", (SpkBool)attributes.HasFlag(FileAttributes.ReadOnly)),
-                new("hidden", (SpkBool)attributes.HasFlag(FileAttributes.Hidden)),
-                new("system", (SpkBool)attributes.HasFlag(FileAttributes.System)),
-                new("directory", (SpkBool)attributes.HasFlag(FileAttributes.Directory)),
-                new("archive", (SpkBool)attributes.HasFlag(FileAttributes.Archive)),
-                new("device", (SpkBool)attributes.HasFlag(FileAttributes.Device)),
-                new("normal", (SpkBool)attributes.HasFlag(FileAttributes.Normal)),
-                new("temporary", (SpkBool)attributes.HasFlag(FileAttributes.Temporary)),
-                new("sparseFile", (SpkBool)attributes.HasFlag(FileAttributes.SparseFile)),
-                new("reparsePoint", (SpkBool)attributes.HasFlag(FileAttributes.ReparsePoint)),
-                new("compressed", (SpkBool)attributes.HasFlag(FileAttributes.Compressed)),
-                new("offline", (SpkBool)attributes.HasFlag(FileAttributes.Offline)),
-                new("notContentIndexed", (SpkBool)attributes.HasFlag(FileAttributes.NotContentIndexed)),
-                new("encrypted", (SpkBool)attributes.HasFlag(FileAttributes.Encrypted)),
-                new("integrityStream", (SpkBool)attributes.HasFlag(FileAttributes.IntegrityStream)),
-                new("noScrubData", (SpkBool)attributes.HasFlag(FileAttributes.NoScrubData)));
+            return SpellkitTuple.Create(
+                new("readOnly", (SpellkitBool)attributes.HasFlag(FileAttributes.ReadOnly)),
+                new("hidden", (SpellkitBool)attributes.HasFlag(FileAttributes.Hidden)),
+                new("system", (SpellkitBool)attributes.HasFlag(FileAttributes.System)),
+                new("directory", (SpellkitBool)attributes.HasFlag(FileAttributes.Directory)),
+                new("archive", (SpellkitBool)attributes.HasFlag(FileAttributes.Archive)),
+                new("device", (SpellkitBool)attributes.HasFlag(FileAttributes.Device)),
+                new("normal", (SpellkitBool)attributes.HasFlag(FileAttributes.Normal)),
+                new("temporary", (SpellkitBool)attributes.HasFlag(FileAttributes.Temporary)),
+                new("sparseFile", (SpellkitBool)attributes.HasFlag(FileAttributes.SparseFile)),
+                new("reparsePoint", (SpellkitBool)attributes.HasFlag(FileAttributes.ReparsePoint)),
+                new("compressed", (SpellkitBool)attributes.HasFlag(FileAttributes.Compressed)),
+                new("offline", (SpellkitBool)attributes.HasFlag(FileAttributes.Offline)),
+                new("notContentIndexed", (SpellkitBool)attributes.HasFlag(FileAttributes.NotContentIndexed)),
+                new("encrypted", (SpellkitBool)attributes.HasFlag(FileAttributes.Encrypted)),
+                new("integrityStream", (SpellkitBool)attributes.HasFlag(FileAttributes.IntegrityStream)),
+                new("noScrubData", (SpellkitBool)attributes.HasFlag(FileAttributes.NoScrubData)));
         });
 
     [SpellkitCommand(Type = "File")]
-    internal static void SetAttributes(SpellkitCommandContext host, string path, SpkObject attributes) =>
+    internal static void SetAttributes(SpellkitCommandContext host, string path, SpellkitObject attributes) =>
         host.ExecutionContext.Handle(() =>
         {
             FileAttributes result = default;
 
-            foreach (var item in SpkIterator.ToEnumerable(host.ExecutionContext, attributes))
+            foreach (var item in SpellkitIterator.ToEnumerable(host.ExecutionContext, attributes))
             {
                 var name = item.ToString(host.ExecutionContext).Value;
                 if (!Enum.TryParse<FileAttributes>(name, out var parsed))
@@ -143,31 +143,31 @@ public static class IoModule
         host.ExecutionContext.Handle(() => File.Move(source, destination, overwrite));
 
     [SpellkitCommand(Type = "File")]
-    internal static SpkObject? GetCreationTime(SpellkitCommandContext host, string path) =>
+    internal static SpellkitObject? GetCreationTime(SpellkitCommandContext host, string path) =>
         host.ExecutionContext.Handle(() =>
-            new SpkDateTime(host.ExecutionContext.Type<SpkDateTimeTypeInfo>(), File.GetCreationTimeUtc(path).Ticks));
+            new SpellkitDateTime(host.ExecutionContext.Type<SpellkitDateTimeTypeInfo>(), File.GetCreationTimeUtc(path).Ticks));
 
     [SpellkitCommand(Type = "File")]
-    internal static void SetCreationTime(SpellkitCommandContext host, string path, SpkObject value) =>
-        host.ExecutionContext.Handle(() => File.SetCreationTimeUtc(path, GetDateTimeUtc((SpkDateTime)value)));
+    internal static void SetCreationTime(SpellkitCommandContext host, string path, SpellkitObject value) =>
+        host.ExecutionContext.Handle(() => File.SetCreationTimeUtc(path, GetDateTimeUtc((SpellkitDateTime)value)));
 
     [SpellkitCommand(Type = "File")]
-    internal static SpkObject? GetLastAccessTime(SpellkitCommandContext host, string path) =>
+    internal static SpellkitObject? GetLastAccessTime(SpellkitCommandContext host, string path) =>
         host.ExecutionContext.Handle(() =>
-            new SpkDateTime(host.ExecutionContext.Type<SpkDateTimeTypeInfo>(), File.GetLastAccessTimeUtc(path).Ticks));
+            new SpellkitDateTime(host.ExecutionContext.Type<SpellkitDateTimeTypeInfo>(), File.GetLastAccessTimeUtc(path).Ticks));
 
     [SpellkitCommand(Type = "File")]
-    internal static void SetLastAccessTime(SpellkitCommandContext host, string path, SpkObject value) =>
-        host.ExecutionContext.Handle(() => File.SetLastAccessTimeUtc(path, GetDateTimeUtc((SpkDateTime)value)));
+    internal static void SetLastAccessTime(SpellkitCommandContext host, string path, SpellkitObject value) =>
+        host.ExecutionContext.Handle(() => File.SetLastAccessTimeUtc(path, GetDateTimeUtc((SpellkitDateTime)value)));
 
     [SpellkitCommand(Type = "File")]
-    internal static SpkObject? GetLastWriteTime(SpellkitCommandContext host, string path) =>
+    internal static SpellkitObject? GetLastWriteTime(SpellkitCommandContext host, string path) =>
         host.ExecutionContext.Handle(() =>
-            new SpkDateTime(host.ExecutionContext.Type<SpkDateTimeTypeInfo>(), File.GetLastWriteTimeUtc(path).Ticks));
+            new SpellkitDateTime(host.ExecutionContext.Type<SpellkitDateTimeTypeInfo>(), File.GetLastWriteTimeUtc(path).Ticks));
 
     [SpellkitCommand(Type = "File")]
-    internal static void SetLastWriteTime(SpellkitCommandContext host, string path, SpkObject value) =>
-        host.ExecutionContext.Handle(() => File.SetLastWriteTimeUtc(path, GetDateTimeUtc((SpkDateTime)value)));
+    internal static void SetLastWriteTime(SpellkitCommandContext host, string path, SpellkitObject value) =>
+        host.ExecutionContext.Handle(() => File.SetLastWriteTimeUtc(path, GetDateTimeUtc((SpellkitDateTime)value)));
 
     [SpellkitCommand(Type = "Path")]
     internal static string GetFullPath(string path) => Path.GetFullPath(path);
@@ -207,10 +207,10 @@ public static class IoModule
     internal static object PathExists(SpellkitCommandContext host, string path) => ExistsPath(host, path);
 
     [SpellkitCommand(Type = "Path")]
-    internal static SpkObject EnumerateFiles(SpellkitCommandContext host, string path, object? mask = null)
+    internal static SpellkitObject EnumerateFiles(SpellkitCommandContext host, string path, object? mask = null)
     {
         var pattern = OptionalString(mask);
-        return SpkIterator.Create(EnumeratePaths(
+        return SpellkitIterator.Create(EnumeratePaths(
             host.ExecutionContext,
             () => pattern is null
                 ? Directory.EnumerateFiles(path)
@@ -218,10 +218,10 @@ public static class IoModule
     }
 
     [SpellkitCommand(Type = "Path")]
-    internal static SpkObject EnumerateDirectories(SpellkitCommandContext host, string path, object? mask = null)
+    internal static SpellkitObject EnumerateDirectories(SpellkitCommandContext host, string path, object? mask = null)
     {
         var pattern = OptionalString(mask);
-        return SpkIterator.Create(EnumeratePaths(
+        return SpellkitIterator.Create(EnumeratePaths(
             host.ExecutionContext,
             () => pattern is null
                 ? Directory.EnumerateDirectories(path)
@@ -286,11 +286,11 @@ public static class IoModule
         });
 
     [SpellkitCommand(Type = "Drive")]
-    internal static SpkObject[] GetDrives(SpellkitCommandContext host) =>
+    internal static SpellkitObject[] GetDrives(SpellkitCommandContext host) =>
         host.ExecutionContext.Handle(() =>
             DriveInfo.GetDrives().Select(drive =>
-                (SpkObject)new SpkDrive(host.ExecutionContext.Type<SpkDriveTypeInfo>(), drive)).ToArray())
-        ?? Array.Empty<SpkObject>();
+                (SpellkitObject)new SpellkitDrive(host.ExecutionContext.Type<SpellkitDriveTypeInfo>(), drive)).ToArray())
+        ?? Array.Empty<SpellkitObject>();
 
     private static Encoding GetEncoding(ExecutionContext context, object? encoding)
     {
@@ -318,7 +318,7 @@ public static class IoModule
 
     private static string? OptionalString(object? value) => value as string;
 
-    private static IEnumerable<SpkObject> EnumeratePaths(
+    private static IEnumerable<SpellkitObject> EnumeratePaths(
         ExecutionContext context,
         Func<IEnumerable<string>> source)
     {
@@ -372,7 +372,7 @@ public static class IoModule
                     yield break;
                 }
 
-                yield return new SpkString(current!);
+                yield return new SpellkitString(current!);
             }
         }
     }
@@ -389,24 +389,24 @@ public static class IoModule
         }
     }
 
-    private static DateTime GetDateTimeUtc(SpkDateTime value) =>
-        value is SpkLocalDateTime local
+    private static DateTime GetDateTimeUtc(SpellkitDateTime value) =>
+        value is SpellkitLocalDateTime local
             ? local.ToDateTimeOffset().ToUniversalTime().DateTime
             : value.ToDateTime();
 
-    private static SpkObject Nil => SpkNil.Instance;
+    private static SpellkitObject Nil => SpellkitNil.Instance;
 }
 
-internal sealed class SpkDrive : SpkForeignObject
+internal sealed class SpellkitDrive : SpellkitForeignObject
 {
-    internal SpkDrive(SpkDriveTypeInfo typeInfo, DriveInfo value) : base(typeInfo) =>
+    internal SpellkitDrive(SpellkitDriveTypeInfo typeInfo, DriveInfo value) : base(typeInfo) =>
         Value = value;
 
     internal DriveInfo Value { get; }
 
-    public override SpkObject Clone() => this;
+    public override SpellkitObject Clone() => this;
 
-    public override bool Equals(SpkObject? other) => other is SpkDrive drive && drive.Value == Value;
+    public override bool Equals(SpellkitObject? other) => other is SpellkitDrive drive && drive.Value == Value;
 
     public override int GetHashCode() => Value.GetHashCode();
 
@@ -415,11 +415,11 @@ internal sealed class SpkDrive : SpkForeignObject
     public override string ToString() => Value.ToString();
 }
 
-internal sealed class SpkDriveTypeInfo : SpkForeignTypeInfo
+internal sealed class SpellkitDriveTypeInfo : SpellkitForeignTypeInfo
 {
     public override string ReflectedTypeName => "Drive";
 
-    protected override SpkFunction? InitializeInstanceMember(SpkObject self, string name, ExecutionContext context) =>
+    protected override SpellkitFunction? InitializeInstanceMember(SpellkitObject self, string name, ExecutionContext context) =>
         name switch
         {
             "Name" => Property(name, drive => drive.Name),
@@ -434,12 +434,12 @@ internal sealed class SpkDriveTypeInfo : SpkForeignTypeInfo
             _ => base.InitializeInstanceMember(self, name, context)
         };
 
-    private static SpkFunction Property(string name, Func<DriveInfo, object?> getter) =>
-        new SpkExternalFunction(name, isPropertyGetter: true, (context, self, _) =>
+    private static SpellkitFunction Property(string name, Func<DriveInfo, object?> getter) =>
+        new SpellkitExternalFunction(name, isPropertyGetter: true, (context, self, _) =>
         {
             try
             {
-                return TypeConverter.ConvertFrom(getter(((SpkDrive)self!).Value));
+                return TypeConverter.ConvertFrom(getter(((SpellkitDrive)self!).Value));
             }
             catch (Exception ex)
             {

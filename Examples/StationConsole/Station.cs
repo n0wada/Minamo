@@ -25,12 +25,12 @@ public sealed class StationCommands
 
     [SpellkitCommand(Description = "Returns the instance-scoped reactor handle.",
         Capability = "station.read")]
-    public SpkObject Reactor(SpellkitCommandContext context) =>
+    public SpellkitObject Reactor(SpellkitCommandContext context) =>
         context.Resource(station.ReactorResource);
 
     [SpellkitCommand(Description = "Returns an instance-scoped handle for a named door.",
         Capability = "station.read")]
-    public SpkObject Door(SpellkitCommandContext context, string zone) =>
+    public SpellkitObject Door(SpellkitCommandContext context, string zone) =>
         context.Resource(station.GetDoorResource(zone));
 }
 
