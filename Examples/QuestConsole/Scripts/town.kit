@@ -1,8 +1,8 @@
 func questGame() {
-    mut courierQuestKnown = false
-    mut courierQuestAccepted = false
-
     select {
+        mut courierQuestKnown = false
+        mut courierQuestAccepted = false
+
         initial state "square" {
             choose "guard"
                 label "Talk to the guard"

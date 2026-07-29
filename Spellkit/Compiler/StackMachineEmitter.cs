@@ -311,6 +311,8 @@ internal sealed class StackMachineEmitter
     public void CreateIterator(int funHandle) => Emit(new(OpCode.CreateIterator, funHandle));
     public void CreateSelectFactory(SpkObject definition, int closureCount) =>
         Emit(new(OpCode.CreateSelectFactory, IndexObject(definition), closureCount), -closureCount + 1);
+    public void CreateSelectFactoryTemplate(SpkObject name) =>
+        Emit(new(OpCode.CreateSelectFactoryTemplate, IndexObject(name)));
     public void Jump(Label lab) => Emit(OpCode.Jump, lab);
     public void JumpIfTrue(Label lab) => Emit(OpCode.JumpIfTrue, lab);
     public void JumpIfFalse(Label lab) => Emit(OpCode.JumpIfFalse, lab);

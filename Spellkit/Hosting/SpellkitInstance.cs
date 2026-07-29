@@ -563,7 +563,31 @@ public sealed class SpellkitInstance : IDisposable
     {
         var factory = ResolveSelectFactory(name)
             ?? throw new ArgumentException($"No select named '{name}' is available.", nameof(name));
-        return new SpellkitSelectSession(this, factory.Create());
+        return new SpellkitSelectSession(this, CreateSelectInstance(factory));
+    }
+
+    private SelectInstance CreateSelectInstance(SpkSelectFactory factory)
+    {
+        var nested = active;
+        if (!nested)
+        {
+            BeginOperation();
+        }
+
+        try
+        {
+            var context = CreateExecutionContext(runtimeContext!, control: null);
+            var select = factory.Create(context);
+            context.ThrowIf();
+            return select;
+        }
+        finally
+        {
+            if (!nested)
+            {
+                active = false;
+            }
+        }
     }
 
     internal SpkSelectFactory? ResolveSelectFactory(string name)

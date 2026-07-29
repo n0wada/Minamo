@@ -4,9 +4,9 @@
 shops, quests, and similar flows: Script defines states and available actions, while the host owns
 the UI, input events, and game data.
 
-The feature supports named and anonymous factories, VM suspension at `do`, nested selects, guards,
-and host-driven choice selection. Dynamic choices, state entry/exit hooks, select-local declarations,
-and persistence of suspended executions remain deferred.
+The feature supports named and anonymous factories, select-local declarations, VM suspension at
+`do`, nested selects, guards, and host-driven choice selection. Dynamic choices, state entry/exit
+hooks, and persistence of suspended executions remain deferred.
 
 ## Mental model
 
@@ -16,22 +16,26 @@ instance.
 ```text
 SelectFactory
 ├─ static state and choice metadata
-└─ choice / guard closures with captured outer values
+├─ captured outer values
+└─ initializer template
    └─ Create()
       └─ SelectInstance
          ├─ current state and completion status
-         └─ one interaction's choice protocol
+         ├─ select-local cells
+         └─ choice / guard closures bound to those cells
 ```
 
-The factory owns its captured values. Each `OpenSelect` or `do` creates a fresh instance, so its
-current state is never shared with another run of the same factory. Select-local declarations are
-not available yet; put shared factory state in an enclosing function or module binding.
+The factory owns its captured outer values. Each `OpenSelect` or `do` creates a fresh instance,
+including its current state, select-local cells, and choice / guard closures. Select locals must
+appear before the state declarations.
 
 ```kit
 func createShop(items) {
     mut visits = 0
 
     select {
+        mut cartCount = 0
+
         initial state "open" {
             choose "leave" => exit
         }
@@ -41,8 +45,9 @@ func createShop(items) {
 let shop = createShop(weapons)
 ```
 
-Here `visits` belongs to `shop`'s factory closure. Multiple instances created from `shop` share it;
-their select states remain separate.
+Here `visits` belongs to `shop`'s factory closure, so multiple instances created from `shop` share
+it. `cartCount` belongs to each select instance, so every `OpenSelect` or `do shop` starts it at
+zero.
 
 ## Script syntax
 
@@ -51,6 +56,8 @@ factory; the anonymous form is an expression.
 
 ```kit
 select player {
+    mut selectedTrack = nil
+
     initial state "stopped" {
         choose "play" => {
             music.Play()
@@ -320,7 +327,6 @@ The current implementation deliberately excludes:
 
 - dynamic choice generation;
 - public `yield` / generic `resume` syntax;
-- select-local declarations;
 - state entry and exit hooks;
 - serializing suspended VM continuations or select instances;
 - concurrent `Select` calls and multiple suspended runs in one host instance.

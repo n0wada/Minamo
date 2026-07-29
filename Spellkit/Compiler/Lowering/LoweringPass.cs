@@ -93,6 +93,12 @@ internal sealed class LoweringPass
 
     public LoweredSelectDeclaration Lower(SelectDeclarationSyntax node, CompilerContext ctx)
     {
+        var locals = new LoweredBinding[node.Locals.Count];
+        for (var i = 0; i < node.Locals.Count; i++)
+        {
+            locals[i] = Lower(node.Locals[i], ctx);
+        }
+
         var states = new LoweredSelectState[node.States.Count];
         for (var i = 0; i < node.States.Count; i++)
         {
@@ -114,7 +120,7 @@ internal sealed class LoweringPass
             states[i] = new(state.Location, state.Name, state.IsInitial, choices);
         }
 
-        return new(node.Location, node.Name, states);
+        return new(node.Location, node.Name, locals, states);
     }
 
     public LoweredSelectInvocation Lower(SelectInvocationSyntax node, CompilerContext ctx) =>

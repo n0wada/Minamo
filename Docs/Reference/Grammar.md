@@ -188,7 +188,10 @@ current choices and sends a selected choice back to the session. See
 
 ```text
 select-declaration
-    ::= "select" identifier "{" state-declaration+ "}"
+    ::= "select" [ identifier ] "{" select-local* state-declaration+ "}"
+
+select-local
+    ::= ( "let" | "mut" ) pattern "=" expression
 
 state-declaration
     ::= [ "initial" ] "state" string "{" choice-declaration* "}"
@@ -210,14 +213,15 @@ exit-statement
     ::= "exit" [ expression ]
 
 select-alias
-    ::= "alias" "(" identifier "," string ")"
+    ::= "alias" "(" expression "," string ")"
 
 select-invocation
     ::= "do" expression
 ```
 
-Select declarations are permitted only at global (module) scope. Exactly one state is marked
-`initial`. `goto` changes the state in which the session next waits; without `goto`, a choice
+Named select declarations are permitted only at global (module) scope. Exactly one state is marked
+`initial`. Select locals are created for each select instance and must appear before the state
+declarations. `goto` changes the state in which the session next waits; without `goto`, a choice
 remains in its current state. `exit` completes the session. Choice names are unique within a
 state. A choice receives either no argument, one value, or a tuple whose elements bind to its
 parameters. `label` and `description` provide host-facing display text; `when` controls whether a

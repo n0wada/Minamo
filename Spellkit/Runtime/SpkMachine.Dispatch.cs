@@ -55,7 +55,7 @@ internal static partial class SpkMachine
             {
                 throw new InvalidOperationException("A select factory is required after 'do'.");
             }
-            var select = factory.Create();
+            var select = factory.Create(state.Context);
             return select.IsCompleted
                 ? VmDispatchResult.Continue
                 : new(VmStep.Suspend, Suspension: new(select));
@@ -223,6 +223,13 @@ internal static partial class SpkMachine
                         ?? throw new InvalidOperationException("A select closure is unavailable.");
                 }
                 state.EvalStack.Push(new SpkSelectFactory(definition, closures));
+                break;
+            case OpCode.CreateSelectFactoryTemplate:
+                var initializer = state.EvalStack.Pop() as SpkFunction
+                    ?? throw new InvalidOperationException("A select factory initializer is unavailable.");
+                var name = state.Unit.Objects[op.Data] as SpkString
+                    ?? throw new InvalidOperationException("The select factory name is unavailable.");
+                state.EvalStack.Push(new SpkSelectFactory(name.Value, initializer));
                 break;
             default:
                 throw UnexpectedOpcode(op);

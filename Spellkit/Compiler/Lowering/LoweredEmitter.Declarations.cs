@@ -578,12 +578,18 @@ internal sealed partial class LoweredEmitter
 
     private void EmitSelectDeclaration(LoweredSelectDeclaration node, bool keepResult, CompilerContext ctx)
     {
-        if (node.Name is not null && !target.IsGlobalScope)
+        if (node.Locals.Count > 0 && !node.IsInstanceFactory)
+        {
+            EmitSelectFactoryTemplate(node, keepResult, ctx);
+            return;
+        }
+
+        if (node.Name is not null && !node.IsInstanceFactory && !target.IsGlobalScope)
         {
             target.AddError(CompilerError.SelectOnlyGlobalScope, node.Location);
         }
 
-        var selectAddress = node.Name is null ? -1 : target.AddVariable(
+        var selectAddress = node.Name is null || node.IsInstanceFactory ? -1 : target.AddVariable(
             node.Name,
             node.Location,
             VarFlags.Const | VarFlags.Private,
@@ -690,6 +696,65 @@ internal sealed partial class LoweredEmitter
         }
 
         cw.CreateSelectFactory(new SpkSelectDefinitionValue(new SelectDefinition(node.Name, states), closureCount), closureCount);
+        if (node.Name is not null && !node.IsInstanceFactory)
+        {
+            if (keepResult)
+            {
+                cw.Duplicate();
+            }
+
+            cw.StoreVariable(selectAddress);
+        }
+        else if (!keepResult)
+        {
+            cw.Drop();
+        }
+    }
+
+    private void EmitSelectFactoryTemplate(LoweredSelectDeclaration node, bool keepResult, CompilerContext ctx)
+    {
+        if (node.Name is not null && !target.IsGlobalScope)
+        {
+            target.AddError(CompilerError.SelectOnlyGlobalScope, node.Location);
+        }
+
+        var selectAddress = node.Name is null ? -1 : target.AddVariable(
+            node.Name,
+            node.Location,
+            VarFlags.Const | VarFlags.Private,
+            args: 0);
+
+        var concreteSelect = node with
+        {
+            Locals = Array.Empty<LoweredBinding>(),
+            IsInstanceFactory = true
+        };
+        var initializerBody = new LoweredBlock(
+            node.Location,
+            [.. node.Locals, concreteSelect],
+            HasAutoClose: false,
+            NoScope: true);
+        var initializer = new LoweredFunctionDeclaration(
+            node.Location,
+            TypeName: null,
+            TargetTypeName: null,
+            Name: $"$select-factory:{node.Name ?? "anonymous"}",
+            IsStatic: false,
+            IsIndexer: false,
+            IsConstructor: false,
+            Getter: false,
+            Setter: false,
+            IsIterator: false,
+            IsImplInitializer: false,
+            IsPrivate: true,
+            Parameters: [],
+            Body: initializerBody,
+            NeedsValue: true,
+            IteratorBody: false,
+            IsStdCall: !target.NoOptimizations);
+        EmitFunctionBody(-1, initializer, ctx, iteratorBody: false);
+        cw.CreateSelectFactoryTemplate(SpkString.Get(node.Name ?? "<anonymous>"));
+
         if (node.Name is not null)
         {
             if (keepResult)

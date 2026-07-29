@@ -25,7 +25,9 @@ internal sealed class SpkSelectDefinitionValue(SelectDefinition definition, int 
 /// <summary>A reusable select factory. Its functions are ordinary closures and retain their captures.</summary>
 internal sealed class SpkSelectFactory : SpkObject
 {
-    private readonly IReadOnlyList<SpkFunction> closures;
+    private readonly IReadOnlyList<SpkFunction>? closures;
+    private readonly SpkFunction? initializer;
+    private readonly string name;
 
     internal SpkSelectFactory(SpkSelectDefinitionValue definition, IReadOnlyList<SpkFunction> closures)
         : base(Spk.Object)
@@ -37,21 +39,39 @@ internal sealed class SpkSelectFactory : SpkObject
 
         Definition = definition.Definition;
         this.closures = closures;
+        name = Definition.Name ?? "<anonymous>";
     }
 
-    internal SelectDefinition Definition { get; }
+    internal SpkSelectFactory(string name, SpkFunction initializer)
+        : base(Spk.Object)
+    {
+        this.name = name;
+        this.initializer = initializer;
+    }
 
-    internal SelectInstance Create() => new(this);
+    internal SelectDefinition? Definition { get; }
+
+    internal SelectInstance Create(ExecutionContext context)
+    {
+        if (initializer is not null)
+        {
+            var concrete = initializer.Call(context) as SpkSelectFactory
+                ?? throw new InvalidOperationException("The select factory initializer did not return a select factory.");
+            return concrete.Create(context);
+        }
+
+        return new(this);
+    }
 
     internal SelectStateDefinition InitialState =>
-        Definition.States.Single(candidate => candidate.IsInitial);
+        Definition!.States.Single(candidate => candidate.IsInitial);
 
-    internal string Name => Definition.Name ?? "<anonymous>";
+    internal string Name => name;
 
-    internal SpkFunction Choice(SelectChoiceDefinition choice) => closures[choice.FunctionSlot];
+    internal SpkFunction Choice(SelectChoiceDefinition choice) => closures![choice.FunctionSlot];
 
     internal SpkFunction? Guard(SelectChoiceDefinition choice) =>
-        choice.GuardFunctionSlot is int slot ? closures[slot] : null;
+        choice.GuardFunctionSlot is int slot ? closures![slot] : null;
 
     public override string TypeName => "SelectFactory";
 
@@ -99,7 +119,7 @@ internal sealed class SelectInstance
 
             if (marker.Value == SelectControlSignal.Goto && tuple[1] is SpkString target)
             {
-                state = factory.Definition.States.SingleOrDefault(candidate => candidate.Name == target.Value)
+                state = factory.Definition!.States.SingleOrDefault(candidate => candidate.Name == target.Value)
                     ?? throw new InvalidOperationException($"The select has no state named '{target.Value}'.");
             }
         }

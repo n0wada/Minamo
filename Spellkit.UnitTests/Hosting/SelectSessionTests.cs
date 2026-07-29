@@ -340,6 +340,34 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
+    public void SelectLocalsAreCreatedForEachSession()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = instance.Execute("""
+            select player {
+                mut ready = false
+
+                initial state "stopped" {
+                    choose "ready" when !ready => {
+                        ready = true
+                    }
+
+                    choose "exit" when ready => exit
+                }
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        using var first = instance.OpenSelect("player");
+        Assert.Equal("ready", Assert.Single(first.Choices).Id);
+        first.Select("ready");
+        Assert.Equal("exit", Assert.Single(first.Choices).Id);
+
+        using var second = instance.OpenSelect("player");
+        Assert.Equal("ready", Assert.Single(second.Choices).Id);
+    }
+
+    [Fact]
     public void DoEvaluatesAnAnonymousSelectFactoryExpression()
     {
         var output = new StringBuilder();
@@ -386,6 +414,31 @@ public sealed class SelectSessionTests
             """);
 
         Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
+        Assert.True(run.Select("exit").IsCompleted);
+    }
+
+    [Fact]
+    public void DoCreatesASelectLocalFrame()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            let player = select {
+                mut ready = false
+
+                initial state "stopped" {
+                    choose "ready" when !ready => {
+                        ready = true
+                    }
+
+                    choose "exit" when ready => exit
+                }
+            }
+
+            do player
+            """);
+
+        Assert.Equal("ready", Assert.Single(run.Choices).Id);
+        Assert.Equal("exit", Assert.Single(run.Select("ready").Choices).Id);
         Assert.True(run.Select("exit").IsCompleted);
     }
 

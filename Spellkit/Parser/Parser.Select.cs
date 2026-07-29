@@ -19,6 +19,16 @@ internal sealed partial class HandwrittenParser
             return null;
         }
 
+        while (Current.Kind is TokenKind.Let or TokenKind.Mut)
+        {
+            var local = ParseBinding() as BindingSyntax;
+            if (local is not null)
+            {
+                declaration.Locals.Add(local);
+                ExpectSeparator();
+            }
+        }
+
         selectDepth++;
         while (!Check(TokenKind.RightBrace) && !IsAtEnd)
         {

@@ -165,6 +165,8 @@ public sealed class SelectDeclarationSyntax : SyntaxNode
 
     public string? Name { get; set; }
 
+    public List<BindingSyntax> Locals { get; } = new();
+
     public List<SelectStateSyntax> States { get; } = new();
 
     internal override void ToString(StringBuilder sb)
@@ -176,6 +178,10 @@ public sealed class SelectDeclarationSyntax : SyntaxNode
             sb.Append(' ');
         }
         sb.Append(" {");
+        foreach (var local in Locals)
+        {
+            local.ToString(sb);
+        }
         foreach (var state in States)
         {
             state.ToString(sb);

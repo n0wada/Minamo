@@ -117,7 +117,9 @@ internal sealed record LoweredFunctionDeclaration(
 internal sealed record LoweredSelectDeclaration(
     Location Location,
     string? Name,
-    IReadOnlyList<LoweredSelectState> States) : LoweredNode(Location);
+    IReadOnlyList<LoweredBinding> Locals,
+    IReadOnlyList<LoweredSelectState> States,
+    bool IsInstanceFactory = false) : LoweredNode(Location);
 
 internal sealed record LoweredSelectInvocation(
     Location Location,
