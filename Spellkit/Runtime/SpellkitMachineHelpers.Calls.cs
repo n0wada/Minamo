@@ -128,8 +128,10 @@ internal static partial class SpellkitMachineHelpers
     }
 
     internal static bool ExecuteFunctionCall(EvalStack evalStack, ExecutionContext ctx, SpellkitNativeFunction function,
-        int offset, SpellkitObject[] locals, int argumentCount, out SpellkitNativeFunction? nextFunction, out SpellkitObject[]? nextLocals)
+        int offset, SpellkitObject[] locals, int argumentCount, out SpellkitNativeFunction? nextFunction,
+        out SpellkitObject[]? nextLocals, out SpellkitAwaitable? awaitable)
     {
+        awaitable = null;
         var callFun = (SpellkitFunction)evalStack.Pop();
 
         if (argumentCount != callFun.Parameters.Length || callFun.VarArgIndex > -1)
@@ -155,8 +157,15 @@ internal static partial class SpellkitMachineHelpers
         var result = CallExternalFunction(callFun, ctx);
         if (ctx.Error is null)
         {
-            evalStack.Push(result);
-            ctx.CallStack.Pop();
+            if (result is SpellkitAwaitable pending)
+            {
+                awaitable = pending;
+            }
+            else
+            {
+                evalStack.Push(result);
+                ctx.CallStack.Pop();
+            }
         }
 
         nextFunction = null;
@@ -166,7 +175,8 @@ internal static partial class SpellkitMachineHelpers
 
     internal static bool ExecutePositionalFunctionCall(EvalStack evalStack, FastList<SpellkitTypeInfo> types, ExecutionContext ctx,
         SpellkitNativeFunction function, int offset, SpellkitObject[] locals, int argumentCount,
-        out SpellkitNativeFunction? nextFunction, out SpellkitObject[]? nextLocals)
+        out SpellkitNativeFunction? nextFunction, out SpellkitObject[]? nextLocals,
+        out SpellkitAwaitable? awaitable)
     {
         var arguments = PopPositionalArguments(evalStack, argumentCount);
 
@@ -174,6 +184,7 @@ internal static partial class SpellkitMachineHelpers
         {
             nextFunction = null;
             nextLocals = null;
+            awaitable = null;
             return false;
         }
 
@@ -183,12 +194,15 @@ internal static partial class SpellkitMachineHelpers
             AssignIndexedArgument(container, arguments[i], i);
         }
 
-        return ExecuteFunctionCall(evalStack, ctx, function, offset, locals, argumentCount, out nextFunction, out nextLocals);
+        return ExecuteFunctionCall(
+            evalStack, ctx, function, offset, locals, argumentCount,
+            out nextFunction, out nextLocals, out awaitable);
     }
 
     internal static bool ExecuteNamedMemberCall(OpCode code, EvalStack evalStack, FastList<SpellkitTypeInfo> types,
         HashString memberName, ExecutionContext ctx, SpellkitNativeFunction function, int offset, SpellkitObject[] locals,
-        int argumentCount, out SpellkitNativeFunction? nextFunction, out SpellkitObject[]? nextLocals)
+        int argumentCount, out SpellkitNativeFunction? nextFunction, out SpellkitObject[]? nextLocals,
+        out SpellkitAwaitable? awaitable)
     {
         if (code is not (OpCode.CallMember or OpCode.CallStatic))
         {
@@ -201,6 +215,7 @@ internal static partial class SpellkitMachineHelpers
         {
             nextFunction = null;
             nextLocals = null;
+            awaitable = null;
             return false;
         }
 
@@ -208,6 +223,7 @@ internal static partial class SpellkitMachineHelpers
         {
             nextFunction = null;
             nextLocals = null;
+            awaitable = null;
             return false;
         }
 
@@ -217,7 +233,9 @@ internal static partial class SpellkitMachineHelpers
             AssignIndexedArgument(container, arguments[i], i);
         }
 
-        return ExecuteFunctionCall(evalStack, ctx, function, offset, locals, argumentCount, out nextFunction, out nextLocals);
+        return ExecuteFunctionCall(
+            evalStack, ctx, function, offset, locals, argumentCount,
+            out nextFunction, out nextLocals, out awaitable);
     }
 
     private static SpellkitObject[] PopPositionalArguments(EvalStack evalStack, int argumentCount)

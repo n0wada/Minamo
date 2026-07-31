@@ -13,7 +13,8 @@ internal sealed record SelectDefinition(string? Name, IReadOnlyList<SelectStateD
 internal sealed record SelectStateDefinition(
     string Name,
     bool IsInitial,
-    IReadOnlyList<SelectChoiceDefinition> Choices);
+    IReadOnlyList<SelectChoiceDefinition> Choices,
+    IReadOnlyList<SelectEventDefinition> Events);
 
 internal sealed record SelectChoiceDefinition(
     string Name,
@@ -21,4 +22,9 @@ internal sealed record SelectChoiceDefinition(
     string? Description,
     int FunctionSlot,
     int? GuardFunctionSlot,
+    int ParameterCount);
+
+internal sealed record SelectEventDefinition(
+    string Name,
+    int FunctionSlot,
     int ParameterCount);

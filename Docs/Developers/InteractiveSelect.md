@@ -5,8 +5,8 @@ shops, quests, and similar flows: Script defines states and available actions, w
 the UI, input events, and game data.
 
 The feature supports named and anonymous factories, select-local declarations, VM suspension at
-`do`, nested selects, guards, and host-driven choice selection. Dynamic choices, state entry/exit
-hooks, and persistence of suspended executions remain deferred.
+`do`, nested selects, guards, visible choices, and hidden host events. Dynamic
+choices, state exit hooks, and persistence of suspended executions remain deferred.
 
 ## Mental model
 
@@ -22,11 +22,11 @@ SelectFactory
       └─ SelectInstance
          ├─ current state and completion status
          ├─ select-local cells
-         └─ choice / guard closures bound to those cells
+         └─ choice / event / guard closures bound to those cells
 ```
 
 The factory owns its captured outer values. Each `OpenSelect` or `do` creates a fresh instance,
-including its current state, select-local cells, and choice / guard closures. Select locals must
+including its current state, select-local cells, and action / guard closures. Select locals must
 appear before the state declarations.
 
 ```kit
@@ -36,7 +36,7 @@ func createShop(items) {
     select {
         mut cartCount = 0
 
-        initial state "open" {
+        initial state open {
             choose "leave" => exit
         }
     }
@@ -58,10 +58,10 @@ factory; the anonymous form is an expression.
 select player {
     mut selectedTrack = nil
 
-    initial state "stopped" {
+    initial state stopped {
         choose "play" => {
             music.Play()
-            goto "playing"
+            goto playing
         }
 
         choose "set-volume" (value) => {
@@ -71,15 +71,15 @@ select player {
         choose "exit" => exit
     }
 
-    state "playing" {
-        choose "pause" => goto "paused"
-        choose "stop" => goto "stopped"
+    state playing {
+        choose "pause" => goto paused
+        choose "stop" => goto stopped
         choose "exit" => exit
     }
 
-    state "paused" {
-        choose "resume" => goto "playing"
-        choose "stop" => goto "stopped"
+    state paused {
+        choose "resume" => goto playing
+        choose "stop" => goto stopped
         choose "exit" => exit
     }
 }
@@ -87,7 +87,7 @@ select player {
 
 ```kit
 let player = select {
-    initial state "stopped" {
+    initial state stopped {
         choose "exit" => exit
     }
 }
@@ -100,7 +100,8 @@ select-expression
     ::= "select" [ identifier ] "{" state-declaration+ "}"
 
 state-declaration
-    ::= [ "initial" ] "state" string "{" choice-declaration* "}"
+    ::= [ "initial" ] "state" identifier
+        "{" { choice-declaration | event-declaration } "}"
 
 choice-declaration
     ::= "choose" string parameters?
@@ -109,26 +110,30 @@ choice-declaration
         [ "when" expression ]
         "=>" choice-body
 
+event-declaration
+    ::= "on" string parameters? "=>" choice-body
+
 parameters
     ::= "(" identifier { "," identifier } ")"
 
 choice-body
-    ::= block | "goto" string | "exit" [ expression ]
+    ::= block | "goto" identifier | "exit" [ expression ]
 
 select-invocation
     ::= "do" expression
 ```
 
-Exactly one state must be `initial`. State names are private implementation details. Choice IDs are
+Exactly one state must be `initial`. State identifiers are private implementation details. Choice IDs are
 the stable values sent by the host and must be unique within one state. `goto` targets must name a
 state in the same select.
 
-`goto "name"` changes the next waiting state. If a choice does not execute `goto`, the instance
-remains in its current state. `exit` completes the instance and optionally supplies its result.
-Entering a state with no choices completes immediately; `do` then continues without suspending.
+`goto name` changes the next waiting state. If an action does not execute `goto`, the instance
+remains in its current state. `exit` completes the instance and optionally supplies its result. A
+state with no choices or events completes immediately; an event-only state remains active with an
+empty `Choices` collection.
 
 ```kit
-choose "guard" label "Talk to the guard" => goto "guard"
+choose "guard" label "Talk to the guard" => goto guard
 choose "leave" label "Leave" => exit
 ```
 
@@ -143,7 +148,7 @@ choose "accept"
     description "Add the search to your active quests"
     when game.CanAcceptCourierQuest() => {
     game.AcceptCourierQuest()
-    goto "square"
+    goto square
 }
 ```
 
@@ -168,6 +173,12 @@ choose "set-volume" (trackId, value) => { }
 With zero parameters, no payload is accepted. With one parameter, the payload is that value. With
 two or more parameters, the payload must be one tuple whose elements bind to the parameters.
 
+## Host events
+
+`on` declares a host event that is not included in `Choices`. Its parameters use the same payload
+shape as choice parameters. The host delivers it with `Send`; state scope determines whether the
+event is currently handled.
+
 ## C#-initiated selects
 
 Use `OpenSelect` when C# owns the interaction's entry point. It resolves a named factory or alias,
@@ -175,7 +186,7 @@ then creates a new instance for this call.
 
 ```kit
 select town {
-    initial state "square" {
+    initial state square {
         choose "leave" => exit "goodbye"
     }
 }
@@ -208,27 +219,29 @@ public sealed class SpellkitSelectSession : IDisposable
 
     public SpellkitSelectResult Select(string choiceId);
     public SpellkitSelectResult Select(string choiceId, object? argument);
+    public SpellkitSelectResult Send(string eventId);
+    public SpellkitSelectResult Send(string eventId, object? argument);
     public void Cancel();
 }
 ```
 
 `State` is the current state name. `SpellkitChoice` exposes `Id`, `Label`, `Description`, and
-`ParameterCount`. `Select` returns the next available choices or an `IsCompleted` result. It reports an error for unavailable IDs,
-invalid argument shapes, or a completed session. Calls on one session are serialized; do not issue
-concurrent `Select` calls.
+`ParameterCount`. `Select` and `Send` return the next available choices or an `IsCompleted` result.
+They report an error for unavailable IDs, invalid argument shapes, or a completed session. Calls on
+one session are serialized; do not issue concurrent action calls.
 
 ## Script-initiated selects and VM continuations
 
 `do expression` evaluates a factory once, creates an instance, and suspends the Script VM until
 that instance exits. The continuation preserves the Script instruction position, locals, evaluation
-stack, function call path, and exception state. After `exit`, execution resumes immediately after
-the `do` statement.
+stack, function call path, and exception state. `do` is an expression whose value is supplied by
+`exit`; an exit without a value produces `nil`.
 
 ```kit
 func visitTown() {
     print("You arrive at the town square.")
-    do town
-    print("The town console closes.")
+    let result = do town
+    print("The town console closes: ", result)
 }
 
 visitTown()
@@ -251,20 +264,20 @@ while (!run.IsCompleted)
 }
 ```
 
-`SpellkitRunSession.Select` either exposes the next choices or resumes the suspended VM after the
-select exits. Disposing the run cancels its active select and releases the continuation.
+`SpellkitRunSession.Select` and `Send` either expose the next choices or resume the suspended VM
+after the select exits. Disposing the run cancels its active select and releases the continuation.
 
-For compatibility, a dotted external name remains valid after `do`:
+Pass a dotted external name as a string:
 
 ```kit
-do music.player
+do "music.player"
 ```
 
-This resolves an alias at runtime. When a property expression itself is a factory, parenthesize it
-to distinguish it from this shorthand:
+This resolves an alias at runtime. Every other target is an ordinary expression, so a property
+that contains a factory needs no special punctuation:
 
 ```kit
-do (ui.currentShop)
+do ui.currentShop
 ```
 
 When `do` is immediately followed by `{`, it is parsed as the existing do-while loop rather than
@@ -283,13 +296,14 @@ exposed to the host. When it exits, the parent choice resumes at the statement f
 
 ```kit
 choose "shop" => {
-    do town.shop
-    goto "square"
+    let purchase = do "town.shop"
+    recordPurchase(purchase)
+    goto square
 }
 ```
 
-Cancelling or disposing an outer session/run cancels its active inner select as well. The initial
-version does not pass an inner select's exit value back to the parent choice; `do` is a statement.
+Cancelling or disposing an outer session/run cancels its active inner select as well. An inner
+select's exit value becomes the value of the nested `do` expression.
 
 ## Synchronous adapter and console
 
@@ -308,6 +322,23 @@ var environment = new SpellkitEnvironment()
     });
 ```
 
+Asynchronous hosts can configure `UseSelectAsync` and use the session's asynchronous actions:
+
+```csharp
+var environment = new SpellkitEnvironment()
+    .UseSelectAsync(async select =>
+    {
+        while (!select.IsCompleted)
+        {
+            var choice = await ui.PickAsync(select.Choices);
+            await select.SelectAsync(choice.Id);
+        }
+    });
+```
+
+`ExecuteAsync` awaits this runner without occupying a worker thread. Configuring either runner
+replaces the previously configured runner.
+
 The `spell` console provides its own runner for direct startup and REPL use. The
 [Quest Console example](../../Examples/QuestConsole/README.md) demonstrates the event-driven
 `Start` / `SpellkitRunSession` form.
@@ -315,8 +346,8 @@ The `spell` console provides its own runner for direct startup and REPL use. The
 ## Host boundary and external names
 
 Script controls state transitions and available actions. The C# host controls rendering, input,
-event timing, and game facts such as inventory or active quests. A host may also send domain events
-through a choice ID, for example `town.Select("day-ended")`.
+event timing, and game facts such as inventory or active quests. Visible user actions use `choose`
+and `Select`; hidden domain events use `on` and `Send`, for example `town.Send("day-ended")`.
 
 `alias(factory, "dotted.name")` registers an external name during Script initialization. Alias names
 must be dotted Spellkit names and duplicates are rejected.
@@ -327,9 +358,9 @@ The current implementation deliberately excludes:
 
 - dynamic choice generation;
 - public `yield` / generic `resume` syntax;
-- state entry and exit hooks;
+- state exit hooks;
 - serializing suspended VM continuations or select instances;
-- concurrent `Select` calls and multiple suspended runs in one host instance.
+- concurrent action calls and multiple suspended runs in one host instance.
 
 These limitations keep the ownership boundary clear: the host provides UI and input, while Script
 defines the structured interaction flow.

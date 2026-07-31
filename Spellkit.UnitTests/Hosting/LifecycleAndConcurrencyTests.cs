@@ -117,6 +117,91 @@ public sealed class LifecycleAndConcurrencyTests
     }
 
     [Fact]
+    public async Task AwaitsHostTasksAndKeepsSameInstanceOperationsSerialized()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var instance = new SpellkitHost()
+            .Module("work", module => module.AsyncCommand(
+                "Wait",
+                async _ =>
+                {
+                    entered.SetResult();
+                    return await completion.Task.ConfigureAwait(false);
+                }))
+            .CreateInstance();
+
+        var first = instance.ExecuteAsync("import work\nwork.Wait() + 1");
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var second = instance.ExecuteAsync("40 + 2");
+        Assert.NotSame(second, await Task.WhenAny(second, Task.Delay(100)));
+
+        completion.SetResult(41);
+
+        Assert.Equal(42L, (await first).GetValue<long>());
+        Assert.Equal(42L, (await second).GetValue<long>());
+    }
+
+    [Fact]
+    public async Task PreservesAsyncHostFailuresAtTheVmCallSite()
+    {
+        using var instance = new SpellkitHost()
+            .Module("work", module => module.AsyncCommand(
+                "Fail",
+                async _ =>
+                {
+                    await Task.Yield();
+                    throw new InvalidOperationException("sensitive detail");
+                }))
+            .CreateInstance();
+
+        var result = await instance.ExecuteAsync("import work\nwork.Fail()");
+
+        Assert.False(result.Success);
+        Assert.Equal(SpellkitFailureKind.Runtime, result.Failure?.Kind);
+        Assert.DoesNotContain("sensitive detail", result.Failure?.Message);
+        Assert.Contains("host command failed", result.Failure?.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task KeepsCallbacksValidUntilAnAsyncHostCommandCompletes()
+    {
+        using var instance = new SpellkitHost()
+            .Module("work", module => module.AsyncCommand(
+                "Apply",
+                async context =>
+                {
+                    var callback = context.Callback<long, long>("callback");
+                    var value = context.Argument<long>("value");
+                    await Task.Yield();
+                    return callback(value);
+                },
+                SpellkitCommandParameter.Required<long>("value"),
+                SpellkitCommandParameter.Required<object>("callback")))
+            .CreateInstance();
+
+        var result = await instance.ExecuteAsync(
+            "import work\nwork.Apply(41, value => value + 1)");
+
+        Assert.True(result.Success, result.Failure?.Message);
+        Assert.Equal(42L, result.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task ExecutesCompiledProgramsAsynchronously()
+    {
+        var host = new SpellkitHost();
+        var program = host.Compile("40 + 2").GetValueOrThrow();
+        using var instance = host.CreateInstance(program);
+
+        var result = await instance.ExecuteAsync();
+
+        Assert.True(result.Success);
+        Assert.Equal(42L, result.GetValue<long>());
+    }
+
+    [Fact]
     public void DoesNotLeakCancellationIntoTheNextExecution()
     {
         using var instance = new SpellkitHost().CreateInstance();

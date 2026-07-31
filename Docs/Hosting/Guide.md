@@ -171,8 +171,9 @@ callbacks.Sum((a, b, c, d) => a + b + c + d)
 ```
 
 Callback arguments and return values use the same CLR conversion rules as host command arguments.
-Callbacks are valid only while the host command that received them is running. Do not retain a
-callback for later use or invoke it from background work after the command returns.
+Callbacks are valid only while the host command that received them is running. For an asynchronous
+command, that lifetime extends until its returned task completes. Do not retain a callback for later
+use or invoke it from detached background work after the command has completed.
 
 For other CLR objects, Spellkit exposes members from the command's declared return type. Use a
 typed command when the implementation object has additional public members that must remain hidden:
@@ -187,6 +188,9 @@ or a resource wrapper when more operations are required.
 
 Generated module and resource commands may return `Task`, `Task<T>`, `ValueTask`, or
 `ValueTask<T>`. Manual module registration provides `AsyncCommand(...)` for the same purpose.
+Spellkit does not add language-level `async` or `await` syntax. Calling one of these commands
+suspends the VM at the ordinary call expression; the hosting API waits for the CLR awaitable and
+then resumes the same VM continuation.
 
 Host module, service, signal, and resource type names use dotted Spellkit identifier segments
 such as `scene`, `scene.player`, or `audio.volume`. Command, static host type, and command
@@ -301,9 +305,30 @@ Missing or unreadable entry files produce an `Input` failure with the original I
 prevents further execution.
 
 `ExecuteAsync`, `ExecuteFileAsync`, and `DispatchSignalsAsync` provide non-blocking host-call
-surfaces. Instance operations remain serialized; concurrent calls wait for the active operation.
-Asynchronous host commands can return `Task`, `Task<T>`, `ValueTask`, or `ValueTask<T>`. Prefer the
-asynchronous instance methods when commands perform asynchronous work.
+surfaces. A pending host `Task` or `ValueTask` does not occupy a worker thread while the VM is
+suspended. Instance operations remain serialized; concurrent calls wait for the active operation.
+Use the synchronous methods when the caller deliberately needs to block, and prefer the asynchronous
+methods when commands perform asynchronous work.
+
+Program-backed instances also provide `ExecuteAsync(CancellationToken)`. Interactive execution has
+matching asynchronous surfaces:
+
+```csharp
+using var run = await instance.StartAsync(source);
+var step = await run.SelectAsync("continue");
+var eventResult = await run.SendAsync("loaded", payload);
+
+using var select = await instance.OpenSelectAsync("dialog");
+await select.SelectAsync("confirm");
+```
+
+`SelectAsync` and `SendAsync` await asynchronous work in `choose` and `on` actions, including work
+performed after a nested `do`. Their synchronous counterparts remain available and wait
+synchronously for the same VM continuations.
+
+For a script that executes `do` through `ExecuteAsync`, configure an asynchronous select runner
+with `SpellkitEnvironment.UseSelectAsync(...)`. `UseSelect(...)` remains the synchronous adapter;
+the last configured runner replaces the previous one.
 
 ## Host environment
 

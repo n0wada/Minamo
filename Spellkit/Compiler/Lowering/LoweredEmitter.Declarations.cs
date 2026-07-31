@@ -683,7 +683,43 @@ internal sealed partial class LoweredEmitter
                     choice.Parameters.Count));
             }
 
-            states.Add(new(state.Name, state.IsInitial, choices));
+            var eventNames = new HashSet<string>(StringComparer.Ordinal);
+            var events = new List<SelectEventDefinition>(state.Events.Count);
+            for (var j = 0; j < state.Events.Count; j++)
+            {
+                var handler = state.Events[j];
+                if (!eventNames.Add(handler.Name))
+                {
+                    target.AddError(
+                        CompilerError.SelectDuplicateEvent,
+                        handler.Location,
+                        handler.Name,
+                        state.Name);
+                }
+
+                var function = new LoweredFunctionDeclaration(
+                    handler.Location,
+                    TypeName: null,
+                    TargetTypeName: null,
+                    Name: $"$select-event:{node.Name ?? "anonymous"}:{i}:{j}",
+                    IsStatic: false,
+                    IsIndexer: false,
+                    IsConstructor: false,
+                    Getter: false,
+                    Setter: false,
+                    IsIterator: false,
+                    IsImplInitializer: false,
+                    IsPrivate: true,
+                    Parameters: handler.Parameters,
+                    Body: handler.Body,
+                    NeedsValue: false,
+                    IteratorBody: false,
+                    IsStdCall: !target.NoOptimizations);
+                EmitFunctionBody(-1, function, selectContext, iteratorBody: false);
+                events.Add(new(handler.Name, closureCount++, handler.Parameters.Count));
+            }
+
+            states.Add(new(state.Name, state.IsInitial, choices, events));
         }
 
         if (node.States.Count == 0)

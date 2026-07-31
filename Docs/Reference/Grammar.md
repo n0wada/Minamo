@@ -51,7 +51,7 @@ use when while with yield
 ```
 
 `const`, `struct`, `enum`, `trait`, `impl`, `guard`, `finally`, `select`, `initial`, `state`,
-`choose`, `goto`, `exit`, `label`, and `description` are contextual keywords.
+`choose`, `on`, `goto`, `exit`, `label`, and `description` are contextual keywords.
 
 ## Numeric literals
 
@@ -194,7 +194,8 @@ select-local
     ::= ( "let" | "mut" ) pattern "=" expression
 
 state-declaration
-    ::= [ "initial" ] "state" string "{" choice-declaration* "}"
+    ::= [ "initial" ] "state" identifier
+        "{" { choice-declaration | event-declaration } "}"
 
 choice-declaration
     ::= "choose" string [ "(" identifier { "," identifier } ")" ]
@@ -203,11 +204,15 @@ choice-declaration
         [ "when" expression ]
         "=>" choice-body
 
+event-declaration
+    ::= "on" string [ "(" identifier { "," identifier } ")" ]
+        "=>" choice-body
+
 choice-body
-    ::= block | "goto" string | "exit" [ expression ]
+    ::= block | "goto" identifier | "exit" [ expression ]
 
 goto-statement
-    ::= "goto" string
+    ::= "goto" identifier
 
 exit-statement
     ::= "exit" [ expression ]
@@ -221,26 +226,28 @@ select-invocation
 
 Named select declarations are permitted only at global (module) scope. Exactly one state is marked
 `initial`. Select locals are created for each select instance and must appear before the state
-declarations. `goto` changes the state in which the session next waits; without `goto`, a choice
-remains in its current state. `exit` completes the session. Choice names are unique within a
-state. A choice receives either no argument, one value, or a tuple whose elements bind to its
-parameters. `label` and `description` provide host-facing display text; `when` controls whether a
-choice is currently available. `goto` targets must name a state declared by the same select.
-`do expression` evaluates a select factory and invokes its new instance through the host's configured select runner.
+declarations. Without `goto`, an action remains in its current state. `goto` exposes the target
+state directly, and a state without choices or events completes immediately. `exit` completes the
+session. Choice and event names are unique within their respective channels in one state. Both receive either no
+argument, one value, or a tuple whose elements bind to their parameters. `choose` declarations are
+visible through `Choices`; `on` declarations are hidden and delivered through the host's `Send`
+API. `label` and `description` provide host-facing display text; `when` controls whether a choice
+is currently available. `goto` targets must name a state declared by the same select.
+`do expression` invokes a factory and evaluates to its exit value.
 
 ```swift
 select player {
-    initial state "stopped" {
+    initial state stopped {
         choose "play" label "Play" when music.HasSelectedTrack() => {
             music.Play()
-            goto "playing"
+            goto playing
         }
     }
 
-    state "playing" {
+    state playing {
         choose "stop" => {
             music.Stop()
-            goto "stopped"
+            goto stopped
         }
 
         choose "exit" => exit "done"

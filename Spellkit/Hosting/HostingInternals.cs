@@ -112,6 +112,8 @@ internal sealed class HostCommandFunction : SpellkitForeignFunction
     {
         var environment = ctx.GetContextVariable<SpellkitHostEnvironment>(SpellkitHostEnvironment.ContextKey);
         var traceStarted = 0L;
+        SpellkitCallbackScope? callbackScope = null;
+        var deferredCompletion = false;
         try
         {
             environment?.Capabilities.Demand(command.Capability);
@@ -122,8 +124,28 @@ internal sealed class HostCommandFunction : SpellkitForeignFunction
             }
 
             using var commandScope = environment?.Telemetry.EnterCommand(command.Name);
-            using var callbackScope = new SpellkitCallbackScope();
+            callbackScope = new SpellkitCallbackScope();
             var value = command.Invoke(new SpellkitCommandContext(ctx, command, args, callbackScope));
+            if (value is SpellkitAwaitable awaitable)
+            {
+                deferredCompletion = true;
+                return awaitable.Configure(
+                    (completionContext, result) =>
+                    {
+                        completionContext.Control?.Checkpoint();
+                        return completionContext.HasErrors
+                            ? SpellkitNil.Instance
+                            : SpellkitHostRootTypeInfo.Wrap(completionContext, result);
+                    },
+                    (completionContext, exception) =>
+                        CompleteFailure(completionContext, environment, exception),
+                    () =>
+                    {
+                        callbackScope.Dispose();
+                        WriteTrace(environment, traceStarted);
+                    });
+            }
+
             ctx.Control?.Checkpoint();
             if (ctx.HasErrors)
             {
@@ -148,12 +170,10 @@ internal sealed class HostCommandFunction : SpellkitForeignFunction
         }
         finally
         {
-            if (traceStarted != 0)
+            if (!deferredCompletion)
             {
-                environment!.Tracing.Write(
-                    SpellkitTraceKind.HostCommand,
-                    command.Name,
-                    Stopwatch.GetElapsedTime(traceStarted));
+                callbackScope?.Dispose();
+                WriteTrace(environment, traceStarted);
             }
         }
     }
@@ -183,6 +203,36 @@ internal sealed class HostCommandFunction : SpellkitForeignFunction
         catch
         {
             // Error reporting must not replace the original host command failure.
+        }
+    }
+
+    private SpellkitObject CompleteFailure(
+        ExecutionContext context,
+        SpellkitHostEnvironment? environment,
+        Exception exception)
+    {
+        if (exception is SpellkitExecutionLimitException)
+        {
+            throw exception;
+        }
+        if (exception is OperationCanceledException)
+        {
+            context.Control?.Checkpoint();
+            throw exception;
+        }
+
+        ReportFailure(environment, exception);
+        return context.ExternalFunctionFailure(this, HostFailureMessage);
+    }
+
+    private void WriteTrace(SpellkitHostEnvironment? environment, long traceStarted)
+    {
+        if (traceStarted != 0)
+        {
+            environment!.Tracing.Write(
+                SpellkitTraceKind.HostCommand,
+                command.Name,
+                Stopwatch.GetElapsedTime(traceStarted));
         }
     }
 

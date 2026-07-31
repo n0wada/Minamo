@@ -321,7 +321,9 @@ internal enum TerminationReason
     Suspended = 3
 }
 
-internal sealed record VmSuspension(SelectInstance? Select);
+internal sealed record VmSuspension(
+    SelectInstance? Select,
+    SpellkitAwaitable? Awaitable = null);
 
 internal sealed class ExecutionResult
 {

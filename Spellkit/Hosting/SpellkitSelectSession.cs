@@ -4,6 +4,7 @@ using Spellkit.Runtime.Types;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace Spellkit.Hosting;
 
@@ -48,6 +49,8 @@ public sealed class SpellkitSelectResult
 
     public bool IsCompleted { get; }
 
+    internal SpellkitObject Value => value ?? SpellkitNil.Instance;
+
     public T? GetValue<T>() => SpellkitHostValueConverter.Convert<T>(value, "Select result");
 
     public bool TryGetValue<T>(out T? result) =>
@@ -57,10 +60,11 @@ public sealed class SpellkitSelectResult
 public sealed class SpellkitSelectSession : IDisposable
 {
     private readonly object syncRoot = new();
+    private readonly System.Threading.SemaphoreSlim actionGate = new(1, 1);
     private readonly SpellkitInstance instance;
     private readonly SelectInstance selectInstance;
     private SpellkitSelectSession? nested;
-    private SpellkitMachine.VmContinuation? choiceContinuation;
+    private SpellkitMachine.VmContinuation? actionContinuation;
     private bool disposed;
 
     internal SpellkitSelectSession(SpellkitInstance instance, SelectInstance selectInstance)
@@ -107,41 +111,169 @@ public sealed class SpellkitSelectSession : IDisposable
         }
     }
 
+    internal SpellkitObject CompletionValue => selectInstance.Value;
+
     public SpellkitSelectResult Select(string choiceId) => SelectCore(choiceId, null, hasArgument: false);
 
     public SpellkitSelectResult Select(string choiceId, object? argument) => SelectCore(choiceId, argument, hasArgument: true);
 
+    public SpellkitSelectResult Send(string eventId) => SendCore(eventId, null, hasArgument: false);
+
+    public SpellkitSelectResult Send(string eventId, object? argument) => SendCore(eventId, argument, hasArgument: true);
+
+    public Task<SpellkitSelectResult> SelectAsync(string choiceId) =>
+        SelectCoreAsync(choiceId, null, hasArgument: false);
+
+    public Task<SpellkitSelectResult> SelectAsync(string choiceId, object? argument) =>
+        SelectCoreAsync(choiceId, argument, hasArgument: true);
+
+    public Task<SpellkitSelectResult> SendAsync(string eventId) =>
+        SendCoreAsync(eventId, null, hasArgument: false);
+
+    public Task<SpellkitSelectResult> SendAsync(string eventId, object? argument) =>
+        SendCoreAsync(eventId, argument, hasArgument: true);
+
     public void Cancel()
     {
-        lock (syncRoot)
+        actionGate.Wait();
+        try
         {
-            ThrowIfDisposed();
-            nested?.Cancel();
-            selectInstance.Cancel();
+            lock (syncRoot)
+            {
+                ThrowIfDisposed();
+                nested?.Cancel();
+                selectInstance.Cancel();
+            }
+        }
+        finally
+        {
+            actionGate.Release();
         }
     }
 
     public void Dispose()
     {
-        lock (syncRoot)
+        actionGate.Wait();
+        try
         {
-            if (disposed)
+            lock (syncRoot)
             {
-                return;
-            }
+                if (disposed)
+                {
+                    return;
+                }
 
-            nested?.Dispose();
-            nested = null;
-            choiceContinuation = null;
-            selectInstance.Cancel();
-            disposed = true;
+                nested?.Dispose();
+                nested = null;
+                actionContinuation = null;
+                selectInstance.Cancel();
+                disposed = true;
+            }
+        }
+        finally
+        {
+            actionGate.Release();
         }
     }
 
     private SpellkitSelectResult SelectCore(string choiceId, object? argument, bool hasArgument)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(choiceId);
-        lock (syncRoot)
+        actionGate.Wait();
+        try
+        {
+            lock (syncRoot)
+            {
+                ThrowIfDisposed();
+                if (selectInstance.IsCompleted)
+                {
+                    throw new InvalidOperationException($"Select session '{Name}' has already completed.");
+                }
+
+                if (nested is not null)
+                {
+                    return ResumeNested(choiceId, argument, hasArgument);
+                }
+
+                var choice = selectInstance.State.Choices.SingleOrDefault(candidate =>
+                    string.Equals(candidate.Name, choiceId, StringComparison.Ordinal));
+                if (choice is null)
+                {
+                    throw new ArgumentException(
+                        $"Choice '{choiceId}' is not available in select state '{selectInstance.State.Name}'.",
+                        nameof(choiceId));
+                }
+
+                if (!IsAvailable(choice))
+                {
+                    throw new ArgumentException(
+                        $"Choice '{choiceId}' is not currently available in select state '{selectInstance.State.Name}'.",
+                        nameof(choiceId));
+                }
+
+                var arguments = ConvertArguments(choice, argument, hasArgument);
+                var result = instance.InvokeSelectAction(selectInstance.Choice(choice), arguments);
+                return ApplyActionExecution(result);
+            }
+        }
+        finally
+        {
+            actionGate.Release();
+        }
+    }
+
+    private SpellkitSelectResult SendCore(string eventId, object? argument, bool hasArgument)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
+        actionGate.Wait();
+        try
+        {
+            lock (syncRoot)
+            {
+                ThrowIfDisposed();
+                if (selectInstance.IsCompleted)
+                {
+                    throw new InvalidOperationException($"Select session '{Name}' has already completed.");
+                }
+
+                if (nested is not null)
+                {
+                    return ResumeNestedEvent(eventId, argument, hasArgument);
+                }
+
+                var handler = selectInstance.State.Events.SingleOrDefault(candidate =>
+                    string.Equals(candidate.Name, eventId, StringComparison.Ordinal));
+                if (handler is null)
+                {
+                    throw new ArgumentException(
+                        $"Event '{eventId}' is not handled in select state '{selectInstance.State.Name}'.",
+                        nameof(eventId));
+                }
+
+                var arguments = ConvertArguments(
+                    handler.Name,
+                    handler.ParameterCount,
+                    "Event",
+                    argument,
+                    hasArgument);
+                var result = instance.InvokeSelectAction(selectInstance.Event(handler), arguments);
+                return ApplyActionExecution(result);
+            }
+        }
+        finally
+        {
+            actionGate.Release();
+        }
+    }
+
+    private async Task<SpellkitSelectResult> SelectCoreAsync(
+        string choiceId,
+        object? argument,
+        bool hasArgument)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(choiceId);
+        await actionGate.WaitAsync().ConfigureAwait(false);
+        try
         {
             ThrowIfDisposed();
             if (selectInstance.IsCompleted)
@@ -151,19 +283,17 @@ public sealed class SpellkitSelectSession : IDisposable
 
             if (nested is not null)
             {
-                return ResumeNested(choiceId, argument, hasArgument);
+                var nestedResult = hasArgument
+                    ? await nested.SelectAsync(choiceId, argument).ConfigureAwait(false)
+                    : await nested.SelectAsync(choiceId).ConfigureAwait(false);
+                return nestedResult.IsCompleted
+                    ? await ResumeCompletedNestedAsync().ConfigureAwait(false)
+                    : nestedResult;
             }
 
             var choice = selectInstance.State.Choices.SingleOrDefault(candidate =>
                 string.Equals(candidate.Name, choiceId, StringComparison.Ordinal));
-            if (choice is null)
-            {
-                throw new ArgumentException(
-                    $"Choice '{choiceId}' is not available in select state '{selectInstance.State.Name}'.",
-                    nameof(choiceId));
-            }
-
-            if (!IsAvailable(choice))
+            if (choice is null || !IsAvailable(choice))
             {
                 throw new ArgumentException(
                     $"Choice '{choiceId}' is not currently available in select state '{selectInstance.State.Name}'.",
@@ -171,8 +301,65 @@ public sealed class SpellkitSelectSession : IDisposable
             }
 
             var arguments = ConvertArguments(choice, argument, hasArgument);
-            var result = instance.InvokeSelectChoice(selectInstance.Choice(choice), arguments);
-            return ApplyChoiceExecution(result);
+            var result = await instance.InvokeSelectActionAsync(
+                selectInstance.Choice(choice),
+                arguments).ConfigureAwait(false);
+            return await ApplyActionExecutionAsync(result).ConfigureAwait(false);
+        }
+        finally
+        {
+            actionGate.Release();
+        }
+    }
+
+    private async Task<SpellkitSelectResult> SendCoreAsync(
+        string eventId,
+        object? argument,
+        bool hasArgument)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
+        await actionGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
+            if (selectInstance.IsCompleted)
+            {
+                throw new InvalidOperationException($"Select session '{Name}' has already completed.");
+            }
+
+            if (nested is not null)
+            {
+                var nestedResult = hasArgument
+                    ? await nested.SendAsync(eventId, argument).ConfigureAwait(false)
+                    : await nested.SendAsync(eventId).ConfigureAwait(false);
+                return nestedResult.IsCompleted
+                    ? await ResumeCompletedNestedAsync().ConfigureAwait(false)
+                    : nestedResult;
+            }
+
+            var handler = selectInstance.State.Events.SingleOrDefault(candidate =>
+                string.Equals(candidate.Name, eventId, StringComparison.Ordinal));
+            if (handler is null)
+            {
+                throw new ArgumentException(
+                    $"Event '{eventId}' is not handled in select state '{selectInstance.State.Name}'.",
+                    nameof(eventId));
+            }
+
+            var arguments = ConvertArguments(
+                handler.Name,
+                handler.ParameterCount,
+                "Event",
+                argument,
+                hasArgument);
+            var result = await instance.InvokeSelectActionAsync(
+                selectInstance.Event(handler),
+                arguments).ConfigureAwait(false);
+            return await ApplyActionExecutionAsync(result).ConfigureAwait(false);
+        }
+        finally
+        {
+            actionGate.Release();
         }
     }
 
@@ -186,42 +373,143 @@ public sealed class SpellkitSelectSession : IDisposable
             return nestedResult;
         }
 
-        nested.Dispose();
-        nested = null;
-        var continuation = choiceContinuation
-            ?? throw new InvalidOperationException("The nested select has no parent continuation.");
-        choiceContinuation = null;
-        return ApplyChoiceExecution(SpellkitMachine.Resume(continuation));
+        return ResumeCompletedNested();
     }
 
-    private SpellkitSelectResult ApplyChoiceExecution(ExecutionResult result)
+    private SpellkitSelectResult ResumeNestedEvent(string eventId, object? argument, bool hasArgument)
     {
-        if (result.Reason is TerminationReason.Suspended)
+        var nestedResult = hasArgument
+            ? nested!.Send(eventId, argument)
+            : nested!.Send(eventId);
+        if (!nestedResult.IsCompleted)
         {
-            if (result.Continuation is null
-                || result.Suspension is not { Select: not null } suspension)
+            return nestedResult;
+        }
+
+        return ResumeCompletedNested();
+    }
+
+    private SpellkitSelectResult ResumeCompletedNested()
+    {
+        var completedNested = nested
+            ?? throw new InvalidOperationException("The nested select is unavailable.");
+        var value = completedNested.CompletionValue;
+        completedNested.Dispose();
+        nested = null;
+        var continuation = actionContinuation
+            ?? throw new InvalidOperationException("The nested select has no parent continuation.");
+        actionContinuation = null;
+        return ApplyActionExecution(
+            instance.ResumeSelectContinuation(continuation, value));
+    }
+
+    private async Task<SpellkitSelectResult> ResumeCompletedNestedAsync()
+    {
+        var completedNested = nested
+            ?? throw new InvalidOperationException("The nested select is unavailable.");
+        var value = completedNested.CompletionValue;
+        completedNested.Dispose();
+        nested = null;
+        var continuation = actionContinuation
+            ?? throw new InvalidOperationException("The nested select has no parent continuation.");
+        actionContinuation = null;
+        return await ApplyActionExecutionAsync(
+            await instance.ResumeSelectContinuationAsync(
+                continuation,
+                value).ConfigureAwait(false)).ConfigureAwait(false);
+    }
+
+    private SpellkitSelectResult ApplyActionExecution(ExecutionResult result)
+    {
+        while (true)
+        {
+            if (result.Reason is TerminationReason.Suspended)
             {
-                throw new InvalidOperationException("A select choice suspended without a select request.");
+                if (result.Continuation is null
+                    || result.Suspension is not { Select: not null } suspension)
+                {
+                    throw new InvalidOperationException("A select action suspended without a select request.");
+                }
+
+                actionContinuation = result.Continuation;
+                nested = instance.CreateSelectSession(suspension.Select);
+                if (!nested.IsCompleted)
+                {
+                    return WaitingResult();
+                }
+
+                var value = nested.CompletionValue;
+                nested.Dispose();
+                nested = null;
+                actionContinuation = null;
+                result = instance.ResumeSelectContinuation(result.Continuation, value);
+                continue;
             }
 
-            choiceContinuation = result.Continuation;
-            nested = instance.CreateSelectSession(suspension.Select);
-            return new(nested.Choices, isCompleted: false);
-        }
+            if (result.Reason is not TerminationReason.Complete)
+            {
+                throw new InvalidOperationException("The select action did not complete successfully.");
+            }
 
-        if (result.Reason is not TerminationReason.Complete)
-        {
-            throw new InvalidOperationException("The select choice did not complete successfully.");
-        }
-
-        var outcome = selectInstance.Apply(result.Value ?? SpellkitNil.Instance);
+            var outcome = selectInstance.Apply(result.Value ?? SpellkitNil.Instance);
             if (outcome.IsCompleted)
             {
-                return new(Array.Empty<SpellkitChoice>(), isCompleted: true, outcome.Value);
+                return CompletedResult(outcome.Value);
             }
 
-            return new(GetChoices(), isCompleted: false);
+            return WaitingResult();
+        }
     }
+
+    private async Task<SpellkitSelectResult> ApplyActionExecutionAsync(ExecutionResult result)
+    {
+        while (true)
+        {
+            if (result.Reason is TerminationReason.Suspended)
+            {
+                if (result.Continuation is null
+                    || result.Suspension is not { Select: not null } suspension)
+                {
+                    throw new InvalidOperationException("A select action suspended without a select request.");
+                }
+
+                actionContinuation = result.Continuation;
+                nested = await instance.CreateSelectSessionAsync(suspension.Select).ConfigureAwait(false);
+                if (!nested.IsCompleted)
+                {
+                    return WaitingResult();
+                }
+
+                var value = nested.CompletionValue;
+                nested.Dispose();
+                nested = null;
+                actionContinuation = null;
+                result = await instance.ResumeSelectContinuationAsync(
+                    result.Continuation,
+                    value).ConfigureAwait(false);
+                continue;
+            }
+
+            if (result.Reason is not TerminationReason.Complete)
+            {
+                throw new InvalidOperationException("The select action did not complete successfully.");
+            }
+
+            var outcome = selectInstance.Apply(result.Value ?? SpellkitNil.Instance);
+            if (outcome.IsCompleted)
+            {
+                return CompletedResult(outcome.Value);
+            }
+
+            return WaitingResult();
+        }
+    }
+
+    private SpellkitSelectResult WaitingResult() =>
+        new(nested?.Choices ?? GetChoices(), isCompleted: false);
+
+    private static SpellkitSelectResult CompletedResult(SpellkitObject value) =>
+        new(Array.Empty<SpellkitChoice>(), isCompleted: true, value);
 
     private IReadOnlyList<SpellkitChoice> GetChoices() => selectInstance.IsCompleted
         ? Array.Empty<SpellkitChoice>()
@@ -240,13 +528,21 @@ public sealed class SpellkitSelectSession : IDisposable
     private static SpellkitObject[] ConvertArguments(
         SelectChoiceDefinition choice,
         object? argument,
+        bool hasArgument) =>
+        ConvertArguments(choice.Name, choice.ParameterCount, "Choice", argument, hasArgument);
+
+    private static SpellkitObject[] ConvertArguments(
+        string name,
+        int parameterCount,
+        string actionKind,
+        object? argument,
         bool hasArgument)
     {
-        if (choice.ParameterCount == 0)
+        if (parameterCount == 0)
         {
             if (hasArgument)
             {
-                throw new ArgumentException($"Choice '{choice.Name}' does not accept an argument.", nameof(argument));
+                throw new ArgumentException($"{actionKind} '{name}' does not accept an argument.", nameof(argument));
             }
 
             return Array.Empty<SpellkitObject>();
@@ -254,18 +550,18 @@ public sealed class SpellkitSelectSession : IDisposable
 
         if (!hasArgument)
         {
-            throw new ArgumentException($"Choice '{choice.Name}' requires an argument.", nameof(argument));
+            throw new ArgumentException($"{actionKind} '{name}' requires an argument.", nameof(argument));
         }
 
-        if (choice.ParameterCount == 1)
+        if (parameterCount == 1)
         {
             return [TypeConverter.ConvertFrom(argument)];
         }
 
-        if (argument is not ITuple tuple || tuple.Length != choice.ParameterCount)
+        if (argument is not ITuple tuple || tuple.Length != parameterCount)
         {
             throw new ArgumentException(
-                $"Choice '{choice.Name}' requires one tuple with {choice.ParameterCount} elements.",
+                $"{actionKind} '{name}' requires one tuple with {parameterCount} elements.",
                 nameof(argument));
         }
 
@@ -320,6 +616,24 @@ public sealed class SpellkitRunSession : IDisposable
     public SpellkitSelectResult Select(string choiceId, object? argument) =>
         instance.Select(this, choiceId, argument, hasArgument: true);
 
+    public SpellkitSelectResult Send(string eventId) =>
+        instance.Send(this, eventId, null, hasArgument: false);
+
+    public SpellkitSelectResult Send(string eventId, object? argument) =>
+        instance.Send(this, eventId, argument, hasArgument: true);
+
+    public Task<SpellkitSelectResult> SelectAsync(string choiceId) =>
+        instance.SelectAsync(this, choiceId, null, hasArgument: false);
+
+    public Task<SpellkitSelectResult> SelectAsync(string choiceId, object? argument) =>
+        instance.SelectAsync(this, choiceId, argument, hasArgument: true);
+
+    public Task<SpellkitSelectResult> SendAsync(string eventId) =>
+        instance.SendAsync(this, eventId, null, hasArgument: false);
+
+    public Task<SpellkitSelectResult> SendAsync(string eventId, object? argument) =>
+        instance.SendAsync(this, eventId, argument, hasArgument: true);
+
     public T? GetValue<T>() => SpellkitHostValueConverter.Convert<T>(value, "Run result");
 
     public void Dispose()
@@ -344,25 +658,79 @@ public sealed class SpellkitRunSession : IDisposable
 
     internal void Advance(ExecutionResult result)
     {
-        if (result.Reason is TerminationReason.Complete)
-        {
-            completed = true;
-            continuation = null;
-            select = null;
-            value = result.Value;
-            return;
-        }
+        select?.Dispose();
+        select = null;
 
-        if (result.Reason is TerminationReason.Suspended
-            && result.Continuation is not null
-            && result.Suspension is { Select: not null } suspension)
+        while (true)
         {
-            continuation = result.Continuation;
-            select = instance.CreateSelectSession(suspension.Select);
-            return;
-        }
+            if (result.Reason is TerminationReason.Complete)
+            {
+                completed = true;
+                continuation = null;
+                value = result.Value;
+                return;
+            }
 
-        throw new InvalidOperationException("The VM suspended without a select request.");
+            if (result.Reason is TerminationReason.Suspended
+                && result.Continuation is not null
+                && result.Suspension is { Select: not null } suspension)
+            {
+                continuation = result.Continuation;
+                select = instance.CreateSelectSession(suspension.Select);
+                if (!select.IsCompleted)
+                {
+                    return;
+                }
+
+                var selectValue = select.CompletionValue;
+                select.Dispose();
+                select = null;
+                result = instance.ResumeSelectContinuation(continuation, selectValue);
+                continue;
+            }
+
+            throw new InvalidOperationException("The VM suspended without a select request.");
+        }
+    }
+
+    internal async Task AdvanceAsync(ExecutionResult result)
+    {
+        select?.Dispose();
+        select = null;
+
+        while (true)
+        {
+            if (result.Reason is TerminationReason.Complete)
+            {
+                completed = true;
+                continuation = null;
+                value = result.Value;
+                return;
+            }
+
+            if (result.Reason is TerminationReason.Suspended
+                && result.Continuation is not null
+                && result.Suspension is { Select: not null } suspension)
+            {
+                continuation = result.Continuation;
+                select = await instance.CreateSelectSessionAsync(
+                    suspension.Select).ConfigureAwait(false);
+                if (!select.IsCompleted)
+                {
+                    return;
+                }
+
+                var selectValue = select.CompletionValue;
+                select.Dispose();
+                select = null;
+                result = await instance.ResumeSelectContinuationAsync(
+                    continuation,
+                    selectValue).ConfigureAwait(false);
+                continue;
+            }
+
+            throw new InvalidOperationException("The VM suspended without a select request.");
+        }
     }
 
     internal void Fail(Exception exception)

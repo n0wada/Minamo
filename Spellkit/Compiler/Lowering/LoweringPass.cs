@@ -117,7 +117,23 @@ internal sealed class LoweringPass
                     LowerNode(choice.Body, new CompilerContext()));
             }
 
-            states[i] = new(state.Location, state.Name, state.IsInitial, choices);
+            var events = new LoweredSelectEvent[state.Events.Count];
+            for (var j = 0; j < state.Events.Count; j++)
+            {
+                var handler = state.Events[j];
+                events[j] = new(
+                    handler.Location,
+                    handler.Name,
+                    LowerParameters(handler.Parameters),
+                    LowerNode(handler.Body, new CompilerContext()));
+            }
+
+            states[i] = new(
+                state.Location,
+                state.Name,
+                state.IsInitial,
+                choices,
+                events);
         }
 
         return new(node.Location, node.Name, locals, states);

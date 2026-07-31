@@ -34,19 +34,66 @@ public static class SpellkitCommandConvert
     [EditorBrowsable(EditorBrowsableState.Never)]
     public static SpellkitObject FromAwaitable(Task task)
     {
-        Task.Run(async () => await task.ConfigureAwait(false)).GetAwaiter().GetResult();
-        return SpellkitNil.Instance;
+        ArgumentNullException.ThrowIfNull(task);
+        return FromAwaitableCore(
+            task,
+            () =>
+            {
+                task.GetAwaiter().GetResult();
+                return SpellkitNil.Instance;
+            });
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SpellkitObject FromAwaitable<T>(Task<T> task) =>
-        FromObject(Task.Run(async () => await task.ConfigureAwait(false)).GetAwaiter().GetResult());
+    public static SpellkitObject FromAwaitable<T>(Task<T> task)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        return FromAwaitableCore(task, () => FromObject(task.GetAwaiter().GetResult()));
+    }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SpellkitObject FromAwaitable(ValueTask task) => FromAwaitable(task.AsTask());
+    public static SpellkitObject FromAwaitable(ValueTask task)
+    {
+        if (task.IsCompletedSuccessfully)
+        {
+            task.GetAwaiter().GetResult();
+            return SpellkitNil.Instance;
+        }
+
+        return FromAwaitable(task.AsTask());
+    }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SpellkitObject FromAwaitable<T>(ValueTask<T> task) => FromAwaitable(task.AsTask());
+    public static SpellkitObject FromAwaitable<T>(ValueTask<T> task)
+    {
+        if (task.IsCompletedSuccessfully)
+        {
+            return FromObject(task.GetAwaiter().GetResult());
+        }
+
+        return FromAwaitable(task.AsTask());
+    }
+
+    internal static SpellkitObject FromAwaitable(Task task, Type resultType)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        ArgumentNullException.ThrowIfNull(resultType);
+        return FromAwaitableCore(
+            task,
+            () =>
+            {
+                task.GetAwaiter().GetResult();
+                var value = task.GetType().GetProperty(nameof(Task<object>.Result))!.GetValue(task);
+                return FromObject(value, resultType);
+            });
+    }
+
+    private static SpellkitObject FromAwaitableCore(
+        Task task,
+        Func<SpellkitObject> getResult) =>
+        task.IsCompleted
+            ? getResult()
+            : new SpellkitAwaitable(task, getResult);
 
     public static T? ToObject<T>(ExecutionContext context, SpellkitObject value) =>
         TypeConverter.ConvertTo<T>(context, value);

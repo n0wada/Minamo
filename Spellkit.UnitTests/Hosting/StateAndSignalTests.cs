@@ -72,4 +72,45 @@ public sealed class StateAndSignalTests
             Signals = null!
         }));
     }
+
+    [Fact]
+    public async Task DispatchesScriptSignalHandlersAsynchronously()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var instance = new SpellkitHost()
+            .AddCapabilities("state.*")
+            .AddSignal("tick")
+            .Module("work", module => module.AsyncCommand(
+                "Wait",
+                async _ =>
+                {
+                    entered.SetResult();
+                    await completion.Task.ConfigureAwait(false);
+                }))
+            .CreateInstance();
+
+        var initialization = instance.Execute("""
+            import work
+
+            func receive(value) {
+                work.Wait()
+                host.State["last"] = value
+            }
+
+            host.Signals.On("tick", receive)
+            """);
+        Assert.True(initialization.Success, initialization.Failure?.Message);
+
+        instance.Environment.Signals.Emit("tick", 42);
+        var dispatch = instance.DispatchSignalsAsync();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(dispatch.IsCompleted);
+
+        completion.SetResult();
+        var result = await dispatch;
+
+        Assert.True(result.Success);
+        Assert.Equal(42L, instance.Environment.State.Get<long>("last"));
+    }
 }

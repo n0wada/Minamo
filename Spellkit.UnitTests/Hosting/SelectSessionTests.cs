@@ -7,12 +7,108 @@ namespace Spellkit.UnitTesting;
 public sealed class SelectSessionTests
 {
     [Fact]
+    public async Task AsyncRunActionsAwaitHostCommands()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var instance = new SpellkitHost()
+            .Module("work", module => module.AsyncCommand(
+                "Value",
+                async _ =>
+                {
+                    entered.SetResult();
+                    return await completion.Task.ConfigureAwait(false);
+                }))
+            .CreateInstance();
+        using var run = await instance.StartAsync("""
+            import work
+
+            let flow = select {
+                initial state waiting {
+                    choose "finish" => exit work.Value()
+                }
+            }
+
+            do flow
+            """);
+
+        var selection = run.SelectAsync("finish");
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(selection.IsCompleted);
+
+        completion.SetResult(42);
+        Assert.True((await selection).IsCompleted);
+        Assert.True(run.IsCompleted);
+        Assert.Equal(42L, run.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task OpenSelectAsyncCreatesAReadySession()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialization = await instance.ExecuteAsync("""
+            select flow {
+                initial state ready {
+                    choose "finish" => exit 42
+                }
+            }
+            """);
+        Assert.True(initialization.Success, initialization.Failure?.Message);
+
+        using var session = await instance.OpenSelectAsync("flow");
+        Assert.Equal("ready", session.State);
+        Assert.True((await session.SelectAsync("finish")).IsCompleted);
+    }
+
+    [Fact]
+    public async Task ExecuteAsyncAwaitsAnAsynchronousSelectRunner()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var environment = new SpellkitEnvironment()
+            .UseSelectAsync(async select =>
+            {
+                entered.SetResult();
+                await completion.Task.ConfigureAwait(false);
+                await select.SelectAsync("finish").ConfigureAwait(false);
+            });
+        using var instance = new SpellkitHost().CreateInstance(environment);
+
+        var execution = instance.ExecuteAsync("""
+            let flow = select {
+                initial state waiting {
+                    choose "finish" => exit 42
+                }
+            }
+
+            do flow
+            """);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(execution.IsCompleted);
+
+        completion.SetResult();
+        var result = await execution;
+
+        Assert.True(result.Success, result.Failure?.Message);
+        Assert.Equal(42L, result.GetValue<long>());
+    }
+
+    [Fact]
     public void SelectRequiresExactlyOneInitialStateAndUniqueChoices()
     {
         var host = new SpellkitHost();
+        var stringState = host.Compile("""
+            select player {
+                initial state "stopped" {
+                    choose "play" => { }
+                }
+            }
+            """);
+        Assert.False(stringState.Success);
+
         var missingInitial = host.Compile("""
             select player {
-                state "stopped" {
+                state stopped {
                     choose "play" => { }
                 }
             }
@@ -23,7 +119,7 @@ public sealed class SelectSessionTests
 
         var duplicateChoice = host.Compile("""
             select player {
-                initial state "stopped" {
+                initial state stopped {
                     choose "play" => { }
                     choose "play" => { }
                 }
@@ -35,8 +131,8 @@ public sealed class SelectSessionTests
 
         var unknownState = host.Compile("""
             select player {
-                initial state "stopped" {
-                    choose "play" => goto "missing"
+                initial state stopped {
+                    choose "play" => goto missing
                 }
             }
             """);
@@ -72,8 +168,8 @@ public sealed class SelectSessionTests
             import music
 
             select player {
-                initial state "stopped" {
-                    choose "play" => goto "playing"
+                initial state stopped {
+                    choose "play" => goto playing
 
                     choose "set-volume" (value) => {
                         music.SetVolume(value)
@@ -90,11 +186,11 @@ public sealed class SelectSessionTests
                     }
                 }
 
-                state "playing" {
-                    choose "pause" => goto "paused"
+                state playing {
+                    choose "pause" => goto paused
                 }
 
-            state "paused" {
+            state paused {
                     choose "exit" => exit "done"
                 }
             }
@@ -157,19 +253,19 @@ public sealed class SelectSessionTests
 
         var result = instance.Execute("""
             select player {
-                initial state "stopped" {
-                    choose "exit" => exit
+                initial state stopped {
+                    choose "exit" => exit "done"
                 }
             }
 
             alias(player, "music.player")
-            do music.player
-            print("after", terminator: nil)
+            let selectResult = do "music.player"
+            print(selectResult + " after", terminator: nil)
             """);
 
         Assert.True(result.Success, result.Failure?.Message);
         Assert.Equal(1, invoked);
-        Assert.Equal("after", output.ToString());
+        Assert.Equal("done after", output.ToString());
     }
 
     [Fact]
@@ -181,7 +277,7 @@ public sealed class SelectSessionTests
 
         using var run = instance.Start("""
             select player {
-                initial state "stopped" {
+                initial state stopped {
                     choose "exit" => exit
                 }
             }
@@ -212,16 +308,16 @@ public sealed class SelectSessionTests
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
             select shop {
-                initial state "open" {
+                initial state open {
                     choose "leave" => exit
                 }
             }
 
             select town {
-                initial state "square" {
+                initial state square {
                     choose "shop" => {
                         do shop
-                        goto "square"
+                        goto square
                     }
 
                     choose "exit" => exit
@@ -268,7 +364,7 @@ public sealed class SelectSessionTests
         var result = instance.Execute("""
             func createPlayer(volume) {
                 select {
-                    initial state "stopped" {
+                    initial state stopped {
                         choose "louder" => {
                             print(volume)
                         }
@@ -291,7 +387,7 @@ public sealed class SelectSessionTests
                 mut known = false
 
                 select {
-                    initial state "square" {
+                    initial state square {
                         choose "learn" when !known => {
                             known = true
                         }
@@ -319,11 +415,11 @@ public sealed class SelectSessionTests
         using var instance = new SpellkitHost().CreateInstance();
         var initialized = instance.Execute("""
             select player {
-                initial state "stopped" {
-                    choose "play" => goto "playing"
+                initial state stopped {
+                    choose "play" => goto playing
                 }
 
-                state "playing" {
+                state playing {
                     choose "exit" => exit
                 }
             }
@@ -347,7 +443,7 @@ public sealed class SelectSessionTests
             select player {
                 mut ready = false
 
-                initial state "stopped" {
+                initial state stopped {
                     choose "ready" when !ready => {
                         ready = true
                     }
@@ -376,7 +472,7 @@ public sealed class SelectSessionTests
         using var run = instance.Start("""
             func createShop(name) {
                 select {
-                    initial state "open" {
+                    initial state open {
                         choose "leave" => {
                             print(name, terminator: nil)
                             exit
@@ -405,7 +501,7 @@ public sealed class SelectSessionTests
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
             let player = select {
-                initial state "stopped" {
+                initial state stopped {
                     choose "exit" => exit
                 }
             }
@@ -425,7 +521,7 @@ public sealed class SelectSessionTests
             let player = select {
                 mut ready = false
 
-                initial state "stopped" {
+                initial state stopped {
                     choose "ready" when !ready => {
                         ready = true
                     }
@@ -449,7 +545,7 @@ public sealed class SelectSessionTests
         using var run = instance.Start("""
             let available = true
             let player = select {
-                initial state "stopped" {
+                initial state stopped {
                     choose "exit" when available => exit
                 }
             }
@@ -469,7 +565,7 @@ public sealed class SelectSessionTests
             new SpellkitEnvironment().UseOutput(value => output.Append(value)));
         using var run = instance.Start("""
             let empty = select {
-                initial state "empty" {
+                initial state empty {
                 }
             }
 
@@ -483,21 +579,43 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
+    public void GotoAnEmptyStateCompletesImmediately()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            let flow = select {
+                initial state open {
+                    choose "finish" => goto done
+                }
+
+                state done {
+                }
+            }
+
+            do flow
+            """);
+
+        Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
+        Assert.True(run.Select("finish").IsCompleted);
+        Assert.True(run.IsCompleted);
+    }
+
+    [Fact]
     public void NestedDoCanUseAnAnonymousFactoryVariable()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
             let shop = select {
-                initial state "open" {
+                initial state open {
                     choose "leave" => exit
                 }
             }
 
             select town {
-                initial state "square" {
+                initial state square {
                     choose "shop" => {
                         do shop
-                        goto "square"
+                        goto square
                     }
 
                     choose "exit" => exit
@@ -522,5 +640,159 @@ public sealed class SelectSessionTests
         Assert.True(run.IsCompleted);
         Assert.NotNull(run.Failure);
         Assert.Contains("select factory", run.Failure!.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DoExpressionReturnsTheSelectExitValue()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            let quest = select {
+                initial state open {
+                    choose "finish" => exit 41
+                }
+            }
+
+            let result = do quest
+            result + 1
+            """);
+
+        Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
+        Assert.True(run.Select("finish").IsCompleted);
+        Assert.True(run.IsCompleted);
+        Assert.Equal(42L, run.GetValue<long>());
+    }
+
+    [Fact]
+    public void DoTreatsPropertyAccessAsAnOrdinaryFactoryExpression()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            let ui = (
+                currentShop: select {
+                    initial state open {
+                        choose "leave" => exit "closed"
+                    }
+                }
+            )
+
+            do ui.currentShop
+            """);
+
+        Assert.Equal("leave", Assert.Single(run.Choices).Id);
+        Assert.True(run.Select("leave").IsCompleted);
+        Assert.Equal("closed", run.GetValue<string>());
+    }
+
+    [Fact]
+    public void EnterIsNotASelectStateDeclaration()
+    {
+        var compiled = new SpellkitHost().Compile("""
+            select flow {
+                initial state start {
+                    enter {
+                        goto done
+                    }
+                }
+
+                state done {
+                    choose "finish" => exit
+                }
+            }
+            """);
+
+        Assert.False(compiled.Success);
+    }
+
+    [Fact]
+    public void NestedDoReturnsItsExitValueToTheOuterAction()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            let shop = select {
+                initial state open {
+                    choose "buy" => exit 41
+                }
+            }
+
+            let town = select {
+                initial state square {
+                    choose "shop" => {
+                        let purchase = do shop
+                        exit purchase + 1
+                    }
+                }
+            }
+
+            do town
+            """);
+
+        Assert.Equal("shop", Assert.Single(run.Choices).Id);
+        Assert.Equal("buy", Assert.Single(run.Select("shop").Choices).Id);
+        Assert.True(run.Select("buy").IsCompleted);
+        Assert.Equal(42L, run.GetValue<long>());
+    }
+
+    [Fact]
+    public void EventsAreHiddenAndCanCarryArguments()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            let flow = select {
+                initial state waiting {
+                    on "completed" (value) => exit value
+                }
+            }
+
+            do flow
+            """);
+
+        Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
+        Assert.Empty(run.Choices);
+
+        var result = run.Send("completed", 42);
+
+        Assert.True(result.IsCompleted);
+        Assert.True(run.IsCompleted);
+        Assert.Equal(42L, run.GetValue<long>());
+    }
+
+    [Fact]
+    public void OpenSelectAcceptsHostEvents()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = instance.Execute("""
+            select flow {
+                initial state ready {
+                    on "completed" (value) => exit value
+                }
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        using var session = instance.OpenSelect("flow");
+
+        Assert.Equal("ready", session.State);
+        Assert.Empty(session.Choices);
+        var result = session.Send("completed", 42);
+        Assert.True(result.IsCompleted);
+        Assert.Equal(42L, result.GetValue<long>());
+    }
+
+    [Fact]
+    public void DuplicateEventsAreRejected()
+    {
+        var compiled = new SpellkitHost().Compile("""
+            select flow {
+                initial state waiting {
+                    on "tick" => { }
+                    on "tick" => { }
+                }
+            }
+            """);
+
+        Assert.False(compiled.Success);
+        Assert.Contains(compiled.Errors, error =>
+            error.Code == (int)Spellkit.Compiler.CompilerError.SelectDuplicateEvent);
     }
 }

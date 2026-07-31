@@ -53,27 +53,7 @@ internal sealed partial class HandwrittenParser
         var keyword = Consume();
         if (!Check(TokenKind.LeftBrace))
         {
-            if (IsIdentifier(Current.Kind) && Peek(1).Kind == TokenKind.Dot)
-            {
-                var name = Consume().Text;
-                while (Match(TokenKind.Dot))
-                {
-                    if (!IsIdentifier(Current.Kind))
-                    {
-                        Report(ParserError.InvalidExpression, Current);
-                        return null;
-                    }
-
-                    name += "." + Consume().Text;
-                }
-
-                return new SelectInvocationSyntax(keyword.Location)
-                {
-                    Target = new StringLiteralSyntax(keyword.Location) { Value = name }
-                };
-            }
-
-            var target = ParseExpression();
+            var target = ParsePrefix();
             return target is null ? null : new SelectInvocationSyntax(keyword.Location) { Target = target };
         }
 

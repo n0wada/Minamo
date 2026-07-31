@@ -56,9 +56,13 @@ internal static partial class SpellkitMachine
                 throw new InvalidOperationException("A select factory is required after 'do'.");
             }
             var select = factory.Create(state.Context);
-            return select.IsCompleted
-                ? VmDispatchResult.Continue
-                : new(VmStep.Suspend, Suspension: new(select));
+            if (select.IsCompleted)
+            {
+                state.EvalStack.Push(select.Value);
+                return VmDispatchResult.Continue;
+            }
+
+            return new(VmStep.Suspend, Suspension: new(select));
         }
 
         if (op.Code is not (OpCode.NoOperation or OpCode.Debug))
@@ -416,11 +420,15 @@ internal static partial class SpellkitMachine
                 if (SpellkitMachineHelpers.ExecutePositionalFunctionCall(
                     state.EvalStack, state.Types, state.Context, state.Function,
                     state.Offset, state.Locals, argumentCount,
-                    out var nextFunction, out var nextLocals))
+                    out var nextFunction, out var nextLocals, out var awaitable))
                 {
                     state.Function = nextFunction!;
                     state.Locals = nextLocals!;
                     return new(VmStep.EnterFunction);
+                }
+                if (awaitable is not null)
+                {
+                    return new(VmStep.Suspend, Suspension: new(null, awaitable));
                 }
                 return state.Context.Error is null
                     ? VmDispatchResult.Continue
@@ -430,11 +438,15 @@ internal static partial class SpellkitMachine
                 if (SpellkitMachineHelpers.ExecuteNamedMemberCall(
                     op.Code, state.EvalStack, state.Types, state.Unit.Strings[op.Data],
                     state.Context, state.Function, state.Offset, state.Locals, op.Data2,
-                    out nextFunction, out nextLocals))
+                    out nextFunction, out nextLocals, out awaitable))
                 {
                     state.Function = nextFunction!;
                     state.Locals = nextLocals!;
                     return new(VmStep.EnterFunction);
+                }
+                if (awaitable is not null)
+                {
+                    return new(VmStep.Suspend, Suspension: new(null, awaitable));
                 }
                 return state.Context.Error is null
                     ? VmDispatchResult.Continue
@@ -442,11 +454,15 @@ internal static partial class SpellkitMachine
             case OpCode.InvokePreparedCall:
                 if (SpellkitMachineHelpers.ExecuteFunctionCall(
                     state.EvalStack, state.Context, state.Function, state.Offset,
-                    state.Locals, op.Data, out nextFunction, out nextLocals))
+                    state.Locals, op.Data, out nextFunction, out nextLocals, out awaitable))
                 {
                     state.Function = nextFunction!;
                     state.Locals = nextLocals!;
                     return new(VmStep.EnterFunction);
+                }
+                if (awaitable is not null)
+                {
+                    return new(VmStep.Suspend, Suspension: new(null, awaitable));
                 }
                 return state.Context.Error is null
                     ? VmDispatchResult.Continue

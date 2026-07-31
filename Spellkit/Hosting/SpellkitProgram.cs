@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Spellkit.Hosting;
 
@@ -35,6 +36,7 @@ public sealed class SpellkitEnvironment
     private Func<CancellationToken, string?>? input;
     private Action<string>? output;
     private Action<SpellkitSelectSession>? selectRunner;
+    private Func<SpellkitSelectSession, ValueTask>? asyncSelectRunner;
 
     public SpellkitEnvironment(object? hostContext = null) => HostContext = hostContext;
 
@@ -68,6 +70,15 @@ public sealed class SpellkitEnvironment
     public SpellkitEnvironment UseSelect(Action<SpellkitSelectSession> run)
     {
         selectRunner = run ?? throw new ArgumentNullException(nameof(run));
+        asyncSelectRunner = null;
+        return this;
+    }
+
+    public SpellkitEnvironment UseSelectAsync(
+        Func<SpellkitSelectSession, ValueTask> run)
+    {
+        asyncSelectRunner = run ?? throw new ArgumentNullException(nameof(run));
+        selectRunner = null;
         return this;
     }
 
@@ -89,9 +100,44 @@ public sealed class SpellkitEnvironment
 
     internal void RunSelect(SpellkitSelectSession session)
     {
-        var run = selectRunner ?? throw new InvalidOperationException(
-            "No select runner is configured for this Spellkit environment.");
-        run(session);
+        if (selectRunner is { } run)
+        {
+            run(session);
+        }
+        else if (asyncSelectRunner is { } runAsync)
+        {
+            runAsync(session).AsTask().GetAwaiter().GetResult();
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "No select runner is configured for this Spellkit environment.");
+        }
+
+        EnsureSelectCompleted(session);
+    }
+
+    internal async ValueTask RunSelectAsync(SpellkitSelectSession session)
+    {
+        if (asyncSelectRunner is { } runAsync)
+        {
+            await runAsync(session).ConfigureAwait(false);
+        }
+        else if (selectRunner is { } run)
+        {
+            run(session);
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "No select runner is configured for this Spellkit environment.");
+        }
+
+        EnsureSelectCompleted(session);
+    }
+
+    private static void EnsureSelectCompleted(SpellkitSelectSession session)
+    {
         if (!session.IsCompleted)
         {
             throw new InvalidOperationException(

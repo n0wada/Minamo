@@ -3,10 +3,10 @@ func questGame() {
         mut courierQuestKnown = false
         mut courierQuestAccepted = false
 
-        initial state "square" {
+        initial state square {
             choose "guard"
                 label "Talk to the guard"
-                description "Ask about work near the old bridge" => goto "guard"
+                description "Ask about work near the old bridge" => goto guard
 
             choose "board"
                 label "Check the quest board"
@@ -28,7 +28,7 @@ func questGame() {
             choose "leave" label "Leave the town square" => exit
         }
 
-        state "guard" {
+        state guard {
             choose "ask"
                 label "Ask about the missing courier"
                 description "Learn why the guard needs help"
@@ -43,11 +43,11 @@ func questGame() {
                 when courierQuestKnown && !courierQuestAccepted => {
                 courierQuestAccepted = true
                 print("\nQuest accepted: Find the missing courier.")
-                goto "square"
+                goto square
             }
 
             choose "back"
-                label "Return to the town square" => goto "square"
+                label "Return to the town square" => goto square
         }
     }
 }

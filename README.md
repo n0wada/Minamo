@@ -64,7 +64,7 @@ Start an interactive select declared by the file:
 .\bin\spell.exe .\Player.kit --do music.player
 ```
 
-Inside the REPL, use `do music.player`. The console displays the currently available choices;
+Inside the REPL, use `do "music.player"`. The console displays the currently available choices;
 enter their number or stable choice ID.
 
 Use `--help` or `--version` for command-line information; enter `#help` in the REPL for

@@ -173,7 +173,11 @@ internal static class SpellkitResourceDefinition
             }
             if (result is Task task)
             {
-                return AwaitTask(task, Method.ReturnType);
+                return Method.ReturnType.IsGenericType
+                    ? SpellkitCommandConvert.FromAwaitable(
+                        task,
+                        Method.ReturnType.GetGenericArguments()[0])
+                    : SpellkitCommandConvert.FromAwaitable(task);
             }
             if (Method.ReturnType == typeof(ValueTask))
             {
@@ -183,21 +187,12 @@ internal static class SpellkitResourceDefinition
                 && Method.ReturnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
             {
                 var asTask = Method.ReturnType.GetMethod(nameof(ValueTask<int>.AsTask))!.Invoke(result, null)!;
-                return AwaitTask((Task)asTask, asTask.GetType());
+                return SpellkitCommandConvert.FromAwaitable(
+                    (Task)asTask,
+                    Method.ReturnType.GetGenericArguments()[0]);
             }
 
             return SpellkitCommandConvert.FromObject(result, Method.ReturnType);
-        }
-
-        private static SpellkitObject AwaitTask(Task task, Type taskType)
-        {
-            SpellkitCommandConvert.FromAwaitable(task);
-            if (!taskType.IsGenericType)
-            {
-                return SpellkitNil.Instance;
-            }
-            var value = taskType.GetProperty(nameof(Task<object>.Result))!.GetValue(task);
-            return SpellkitCommandConvert.FromObject(value, taskType.GetGenericArguments()[0]);
         }
     }
 }

@@ -210,6 +210,8 @@ public enum CompilerError
 
     SelectStateNotFound = 291,
 
+    SelectDuplicateEvent = 292,
+
     IfExpressionRequiresElse = 279,
 
     TraitMixinNotAllowed = 280,

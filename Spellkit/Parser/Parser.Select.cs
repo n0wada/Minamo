@@ -1,4 +1,5 @@
 using Spellkit.Parser.Model;
+using System.Collections.Generic;
 
 namespace Spellkit.Parser;
 
@@ -55,17 +56,31 @@ internal sealed partial class HandwrittenParser
             Consume();
         }
 
-        if (!IsContextualKeyword("state") || Peek(1).Kind != TokenKind.String)
+        if (!IsContextualKeyword("state"))
         {
-            ReportExpected(TokenKind.String);
+            ReportExpected(TokenKind.LowerIdentifier);
+            if (!Check(TokenKind.RightBrace) && !IsAtEnd)
+            {
+                Consume();
+            }
             return null;
         }
         Consume();
 
-        var name = (StringLiteralSyntax)ParseString();
+        if (!IsIdentifier(Current.Kind))
+        {
+            ReportExpected(TokenKind.LowerIdentifier);
+            if (!Check(TokenKind.RightBrace) && !IsAtEnd)
+            {
+                Consume();
+            }
+            return null;
+        }
+
+        var name = Consume();
         var state = new SelectStateSyntax(name.Location)
         {
-            Name = name.Value ?? string.Empty,
+            Name = name.Text,
             IsInitial = initial
         };
 
@@ -76,15 +91,37 @@ internal sealed partial class HandwrittenParser
 
         while (!Check(TokenKind.RightBrace) && !IsAtEnd)
         {
-            var choice = ParseSelectChoice();
-            if (choice is not null)
+            if (IsContextualKeyword("choose"))
             {
-                state.Choices.Add(choice);
+                var choice = ParseSelectChoice();
+                if (choice is not null)
+                {
+                    state.Choices.Add(choice);
+                }
+                else
+                {
+                    SynchronizeStatement();
+                }
+                continue;
             }
-            else
+
+            if (IsContextualKeyword("on"))
             {
-                SynchronizeStatement();
+                var handler = ParseSelectEvent();
+                if (handler is not null)
+                {
+                    state.Events.Add(handler);
+                }
+                else
+                {
+                    SynchronizeStatement();
+                }
+                continue;
             }
+
+            Report(ParserError.InvalidStatement, Current);
+            Consume();
+            SynchronizeStatement();
         }
 
         Expect(TokenKind.RightBrace);
@@ -102,23 +139,7 @@ internal sealed partial class HandwrittenParser
 
         var name = (StringLiteralSyntax)ParseString();
         var choice = new SelectChoiceSyntax(name.Location) { Name = name.Value ?? string.Empty };
-        if (Match(TokenKind.LeftParen))
-        {
-            while (!Check(TokenKind.RightParen) && !IsAtEnd)
-            {
-                var parameter = ParseSelectParameter();
-                if (parameter is null)
-                {
-                    return null;
-                }
-                choice.Parameters.Add(parameter);
-                if (!Match(TokenKind.Comma))
-                {
-                    break;
-                }
-            }
-            Expect(TokenKind.RightParen);
-        }
+        ParseSelectParameters(choice.Parameters);
 
         while (true)
         {
@@ -161,6 +182,64 @@ internal sealed partial class HandwrittenParser
             break;
         }
 
+        var body = ParseSelectActionBody();
+        if (body is null)
+        {
+            return null;
+        }
+
+        choice.Body = body;
+        return choice;
+    }
+
+    private SelectEventSyntax? ParseSelectEvent()
+    {
+        Consume();
+        if (!Check(TokenKind.String))
+        {
+            ReportExpected(TokenKind.String);
+            return null;
+        }
+
+        var name = (StringLiteralSyntax)ParseString();
+        var handler = new SelectEventSyntax(name.Location) { Name = name.Value ?? string.Empty };
+        ParseSelectParameters(handler.Parameters);
+        var body = ParseSelectActionBody();
+        if (body is null)
+        {
+            return null;
+        }
+
+        handler.Body = body;
+        return handler;
+    }
+
+    private void ParseSelectParameters(List<ParameterSyntax> parameters)
+    {
+        if (!Match(TokenKind.LeftParen))
+        {
+            return;
+        }
+
+        while (!Check(TokenKind.RightParen) && !IsAtEnd)
+        {
+            var parameter = ParseSelectParameter();
+            if (parameter is null)
+            {
+                break;
+            }
+
+            parameters.Add(parameter);
+            if (!Match(TokenKind.Comma))
+            {
+                break;
+            }
+        }
+        Expect(TokenKind.RightParen);
+    }
+
+    private SyntaxNode? ParseSelectActionBody()
+    {
         if (!Expect(TokenKind.Arrow))
         {
             return null;
@@ -168,22 +247,21 @@ internal sealed partial class HandwrittenParser
 
         if (Check(TokenKind.LeftBrace))
         {
-            choice.Body = ParseBlock()!;
-            return choice;
+            return ParseBlock();
         }
 
         if (IsContextualKeyword("exit"))
         {
-            choice.Body = ParseExit();
+            var body = ParseExit();
             ExpectSeparator();
-            return choice;
+            return body;
         }
 
         if (IsContextualKeyword("goto"))
         {
-            choice.Body = ParseGoto();
+            var body = ParseGoto();
             ExpectSeparator();
-            return choice;
+            return body;
         }
 
         ReportExpected(TokenKind.LeftBrace);
@@ -193,14 +271,14 @@ internal sealed partial class HandwrittenParser
     private SyntaxNode ParseGoto()
     {
         var token = Consume();
-        if (!Check(TokenKind.String))
+        if (!IsIdentifier(Current.Kind))
         {
-            ReportExpected(TokenKind.String);
+            ReportExpected(TokenKind.LowerIdentifier);
             return new GotoSyntax(token.Location) { State = string.Empty };
         }
 
-        var state = (StringLiteralSyntax)ParseString();
-        return new GotoSyntax(token.Location) { State = state.Value ?? string.Empty };
+        var state = Consume();
+        return new GotoSyntax(token.Location) { State = state.Text };
     }
 
     private ParameterSyntax? ParseSelectParameter()

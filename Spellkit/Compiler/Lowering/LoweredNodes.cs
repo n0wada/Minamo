@@ -129,7 +129,8 @@ internal sealed record LoweredSelectState(
     Location Location,
     string Name,
     bool IsInitial,
-    IReadOnlyList<LoweredSelectChoice> Choices);
+    IReadOnlyList<LoweredSelectChoice> Choices,
+    IReadOnlyList<LoweredSelectEvent> Events);
 
 internal sealed record LoweredSelectChoice(
     Location Location,
@@ -138,6 +139,12 @@ internal sealed record LoweredSelectChoice(
     string Label,
     string? Description,
     LoweredNode? Guard,
+    LoweredNode Body);
+
+internal sealed record LoweredSelectEvent(
+    Location Location,
+    string Name,
+    IReadOnlyList<LoweredParameter> Parameters,
     LoweredNode Body);
 
 internal sealed record LoweredParameter(

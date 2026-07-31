@@ -191,7 +191,7 @@ public enum OpCode
     LoadPrivateMember, //0
     StorePrivateMember, //-1
     Suspend, //0
-    SuspendSelect, //-1
+    SuspendSelect, //0
     CreateSelectFactory, //Dynamic
     CreateSelectFactoryTemplate, //0
 }
@@ -382,7 +382,7 @@ public sealed class Op
         new(OpCode.LoadPrivateMember, OperandShape.One, 0, OpCategory.Member),
         new(OpCode.StorePrivateMember, OperandShape.One, -1, OpCategory.Member),
         new(OpCode.Suspend, OperandShape.None, 0, OpCategory.Infrastructure),
-        new(OpCode.SuspendSelect, OperandShape.None, -1, OpCategory.Infrastructure),
+        new(OpCode.SuspendSelect, OperandShape.None, 0, OpCategory.Infrastructure),
         new(OpCode.CreateSelectFactory, OperandShape.One, null, OpCategory.Function),
         new(OpCode.CreateSelectFactoryTemplate, OperandShape.One, 0, OpCategory.Function)
     };

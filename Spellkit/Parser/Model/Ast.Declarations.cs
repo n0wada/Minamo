@@ -200,6 +200,8 @@ public sealed class SelectStateSyntax : SyntaxNode
 
     public List<SelectChoiceSyntax> Choices { get; } = new();
 
+    public List<SelectEventSyntax> Events { get; } = new();
+
     internal override void ToString(StringBuilder sb)
     {
         if (IsInitial)
@@ -207,12 +209,16 @@ public sealed class SelectStateSyntax : SyntaxNode
             sb.Append("initial ");
         }
 
-        sb.Append("state \"");
+        sb.Append("state ");
         sb.Append(Name);
-        sb.Append("\" {");
+        sb.Append(" {");
         foreach (var choice in Choices)
         {
             choice.ToString(sb);
+        }
+        foreach (var handler in Events)
+        {
+            handler.ToString(sb);
         }
         sb.Append('}');
     }
@@ -265,6 +271,33 @@ public sealed class SelectChoiceSyntax : SyntaxNode
             sb.Append(" when ");
             Guard.ToString(sb);
         }
+        sb.Append(" => ");
+        Body.ToString(sb);
+    }
+}
+
+public sealed class SelectEventSyntax : SyntaxNode
+{
+    public SelectEventSyntax(Location loc) : base(NodeType.SelectEvent, loc) { }
+
+    public string Name { get; set; } = null!;
+
+    public List<ParameterSyntax> Parameters { get; } = new();
+
+    public SyntaxNode Body { get; set; } = null!;
+
+    internal override void ToString(StringBuilder sb)
+    {
+        sb.Append("on \"");
+        sb.Append(Name);
+        sb.Append('"');
+        if (Parameters.Count > 0)
+        {
+            sb.Append('(');
+            Parameters.ToString(sb);
+            sb.Append(')');
+        }
+
         sb.Append(" => ");
         Body.ToString(sb);
     }

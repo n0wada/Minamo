@@ -73,6 +73,8 @@ internal sealed class SpellkitSelectFactory : SpellkitObject
     internal SpellkitFunction? Guard(SelectChoiceDefinition choice) =>
         choice.GuardFunctionSlot is int slot ? closures![slot] : null;
 
+    internal SpellkitFunction Event(SelectEventDefinition handler) => closures![handler.FunctionSlot];
+
     public override string TypeName => "SelectFactory";
 
     public override object ToObject() => this;
@@ -92,7 +94,7 @@ internal sealed class SelectInstance
     {
         this.factory = factory;
         state = factory.InitialState;
-        completed = state.Choices.Count == 0;
+        CompleteIfIdle();
     }
 
     internal SelectStateDefinition State => state;
@@ -101,35 +103,56 @@ internal sealed class SelectInstance
 
     internal bool IsCompleted => completed;
 
-    internal void Cancel() => completed = true;
+    internal SpellkitObject Value { get; private set; } = SpellkitNil.Instance;
+
+    internal void Cancel()
+    {
+        completed = true;
+        Value = SpellkitNil.Instance;
+    }
 
     internal SpellkitFunction Choice(SelectChoiceDefinition choice) => factory.Choice(choice);
 
     internal SpellkitFunction? Guard(SelectChoiceDefinition choice) => factory.Guard(choice);
 
-    internal (bool IsCompleted, SpellkitObject? Value) Apply(SpellkitObject result)
+    internal SpellkitFunction Event(SelectEventDefinition handler) => factory.Event(handler);
+
+    internal SelectActionOutcome Apply(SpellkitObject result)
     {
         if (result is SpellkitTuple { Count: 2 } tuple && tuple[0] is SpellkitString marker)
         {
             if (marker.Value == SelectControlSignal.Exit)
             {
                 completed = true;
-                return (true, tuple[1]);
+                Value = tuple[1];
+                return new(IsCompleted: true, Value);
             }
 
             if (marker.Value == SelectControlSignal.Goto && tuple[1] is SpellkitString target)
             {
                 state = factory.Definition!.States.SingleOrDefault(candidate => candidate.Name == target.Value)
                     ?? throw new InvalidOperationException($"The select has no state named '{target.Value}'.");
+                CompleteIfIdle();
+                return new(IsCompleted, Value);
             }
         }
 
-        if (state.Choices.Count == 0)
+        return new(IsCompleted: false, SpellkitNil.Instance);
+    }
+
+    private bool CompleteIfIdle()
+    {
+        if (state.Choices.Count == 0
+            && state.Events.Count == 0)
         {
             completed = true;
-            return (true, null);
+            Value = SpellkitNil.Instance;
         }
 
-        return (false, null);
+        return completed;
     }
 }
+
+internal readonly record struct SelectActionOutcome(
+    bool IsCompleted,
+    SpellkitObject Value);

@@ -260,6 +260,7 @@ internal sealed partial class HandwrittenParser
             TokenKind.Throw => ParseThrow(),
             TokenKind.If => ParseIf(isExpression: false),
             TokenKind.While => ParseWhile(),
+            TokenKind.Do when Peek(1).Kind != TokenKind.LeftBrace => ParseAssignment(),
             TokenKind.Do => ParseDoWhile(),
             TokenKind.For => ParseFor(),
             TokenKind.Try => ParseTryCatch(),
@@ -1115,7 +1116,7 @@ internal sealed partial class HandwrittenParser
             or TokenKind.True or TokenKind.False or TokenKind.Nil
             or TokenKind.LeftParen or TokenKind.LeftBracket or TokenKind.LeftBrace
             or TokenKind.Range or TokenKind.ExclusiveRange
-            or TokenKind.Bang or TokenKind.Minus or TokenKind.Plus;
+            or TokenKind.Bang or TokenKind.Minus or TokenKind.Plus or TokenKind.Do;
 
     private static bool IsExceptionTarget(SyntaxNode node) =>
         node is NameSyntax { Value: "Exception" };

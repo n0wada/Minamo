@@ -36,6 +36,52 @@ internal static partial class SpellkitMachine
         }
     }
 
+    internal static ExecutionResult Resume(VmContinuation continuation, SpellkitObject value)
+    {
+        ArgumentNullException.ThrowIfNull(continuation);
+        ArgumentNullException.ThrowIfNull(value);
+        var state = continuation.Take();
+        state.EvalStack.Push(value);
+        try
+        {
+            return Run(state, continuation);
+        }
+        catch
+        {
+            continuation.Complete();
+            throw;
+        }
+    }
+
+    internal static ExecutionResult Resume(
+        VmContinuation continuation,
+        SpellkitAwaitable awaitable)
+    {
+        ArgumentNullException.ThrowIfNull(continuation);
+        ArgumentNullException.ThrowIfNull(awaitable);
+        var state = continuation.Take();
+        try
+        {
+            var value = awaitable.Complete(state.Context);
+            if (state.Context.Error is null)
+            {
+                state.EvalStack.Push(value);
+                state.Context.CallStack.Pop();
+            }
+            else
+            {
+                HandleError(state);
+            }
+
+            return Run(state, continuation);
+        }
+        catch
+        {
+            continuation.Complete();
+            throw;
+        }
+    }
+
     private static ExecutionResult ExecuteModule(int unitId, ExecutionContext ctx)
     {
         var unit = ctx.RuntimeContext.Composition.Units[unitId];

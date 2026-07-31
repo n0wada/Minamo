@@ -14,9 +14,9 @@ internal sealed partial class LoweredEmitter
     {
         EmitValue(node.Target, ctx);
         cw.SuspendSelect();
-        if (keepResult)
+        if (!keepResult)
         {
-            cw.LoadNil();
+            cw.Drop();
         }
     }
 

@@ -232,8 +232,17 @@ internal static class HostingScenarios
         AssertHasMethod<SpellkitInstance>("ExecuteAsync", "asynchronous instance execution");
         AssertHasMethod<SpellkitInstance>("ExecuteFile", "explicit script file execution");
         AssertHasMethod<SpellkitInstance>("ExecuteFileAsync", "asynchronous file execution");
+        AssertHasMethod<SpellkitInstance>("OpenSelect", "interactive select creation");
+        AssertHasMethod<SpellkitInstance>("OpenSelectAsync", "asynchronous interactive select creation");
+        AssertHasMethod<SpellkitInstance>("StartAsync", "asynchronous suspended run creation");
         AssertHasMethod<SpellkitInstance>("DispatchSignals", "pending signal dispatch");
         AssertHasMethod<SpellkitInstance>("DispatchSignalsAsync", "asynchronous signal dispatch");
+        AssertHasMethod<SpellkitSelectSession>("Send", "select host event delivery");
+        AssertHasMethod<SpellkitSelectSession>("SelectAsync", "asynchronous select choice");
+        AssertHasMethod<SpellkitSelectSession>("SendAsync", "asynchronous select host event delivery");
+        AssertHasMethod<SpellkitRunSession>("Send", "suspended run host event delivery");
+        AssertHasMethod<SpellkitRunSession>("SelectAsync", "asynchronous suspended run choice");
+        AssertHasMethod<SpellkitRunSession>("SendAsync", "asynchronous suspended run host event delivery");
         AssertHasMethod<SpellkitExecutionResult>("GetValue", "typed execution result");
         AssertHasMethod<SpellkitExecutionResult>("TryGetValue", "optional typed execution result");
         AssertNoProperty<SpellkitExecutionResult>("Value", "removed raw execution result");
@@ -244,6 +253,7 @@ internal static class HostingScenarios
         AssertHasMethod<SpellkitEnvironment>("Set", "environment bindings");
         AssertHasMethod<SpellkitEnvironment>("UseInput", "instance input setup");
         AssertHasMethod<SpellkitEnvironment>("UseOutput", "instance output setup");
+        AssertHasMethod<SpellkitEnvironment>("UseSelectAsync", "asynchronous select runner setup");
 
         AssertHasProperty<SpellkitExecutionLimits>("MaxExecutionTime", "operation time limit");
         AssertNoProperty<SpellkitExecutionLimits>("MaxTime", "old time limit name");

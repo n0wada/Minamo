@@ -159,28 +159,29 @@ new interaction instance.
 
 ```swift
 let shop = select {
-    initial state "open" {
+    initial state open {
         choose "browse" => {
             print("You browse the shelves.")
-            goto "browsing"
+            goto browsing
         }
 
-        choose "leave" => exit
+        choose "leave" => exit "closed"
     }
 
-    state "browsing" {
-        choose "back" => goto "open"
-        choose "leave" => exit
+    state browsing {
+        choose "back" => goto open
+        choose "leave" => exit "closed"
     }
 }
 
-do shop
-print("The shop is closed.")
+let result = do shop
+print("The shop is ", result, ".")
 ```
 
-`do shop` suspends the script while the host presents choices. Selecting `"browse"` runs its
-choice body and moves the same interaction instance to `"browsing"`; selecting `"leave"` exits
-and resumes execution after `do`. Named selects can also be opened from C#.
+`do shop` suspends the script while the host presents choices and evaluates to the value supplied
+by `exit`. Selecting `"browse"` runs its choice body and moves the same interaction instance to
+`browsing`; selecting `"leave"` exits and resumes execution after `do`. Hidden host events may be
+declared with `on` and delivered from C# with `Send`. Named selects can also be opened from C#.
 
 See [Interactive selects](../Developers/InteractiveSelect.md) for factory lifetime, guards,
 nesting, aliases, and the C# session API.
@@ -366,9 +367,11 @@ app.greet("Spellkit")
 ```
 
 Instances are incremental, so definitions from successful executions remain available to later
-calls. `ExecuteAsync` and `ExecuteFileAsync` provide asynchronous host-call surfaces. The selected
-entry file can always be executed, while additional file imports remain disabled unless the host
-supplies an explicit `FileLookup`.
+calls. `ExecuteAsync` and `ExecuteFileAsync` provide asynchronous host-call surfaces. Spellkit has
+no language-level `async` or `await` syntax: an ordinary call to an asynchronous host command
+suspends the VM, and the C# hosting surface resumes it when the returned `Task` or `ValueTask`
+completes. The selected entry file can always be executed, while additional file imports remain
+disabled unless the host supplies an explicit `FileLookup`.
 
 When the same script should be shared by many actors, compile it once and create separate
 instances:
