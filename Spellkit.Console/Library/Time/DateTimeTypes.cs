@@ -264,7 +264,7 @@ public class SpellkitDateTime : SpellkitForeignObject, IDateTime, IFormattable
     internal SpellkitDateTime(SpanTypeInfo<SpellkitDateTime> typeInfo, long ticks) : base(typeInfo) =>
         this.ticks = ticks;
 
-    public DateTime ToDateTime() => new(ticks);
+    public DateTime ToDateTime() => new(ticks, DateTimeKind.Utc);
 
     public override object ToObject() => ToDateTime();
 
@@ -371,8 +371,10 @@ public sealed class SpellkitLocalDateTime : SpellkitDateTime, ILocalDateTime
     internal SpellkitLocalDateTime(SpellkitLocalDateTimeTypeInfo typeInfo, long ticks, SpellkitTimeDelta offset)
         : base(typeInfo, ticks) => this.Offset = offset;
 
-    public override bool Equals(SpellkitObject? other) => other is SpellkitLocalDateTime dt
-        && dt.ticks == ticks && dt.Offset.Equals(Offset);
+    public long UtcTicks => ticks - Offset.TotalTicks;
+
+    public override bool Equals(SpellkitObject? other) =>
+        other is SpellkitLocalDateTime dt && dt.UtcTicks == UtcTicks;
 
     public static new SpellkitDateTime Parse(SpellkitForeignTypeInfo typeInfo, string format, string value)
     {
@@ -389,7 +391,7 @@ public sealed class SpellkitLocalDateTime : SpellkitDateTime, ILocalDateTime
     public override SpellkitObject Clone() =>
         new SpellkitLocalDateTime((SpellkitLocalDateTimeTypeInfo)TypeInfo, ticks, Offset);
 
-    public override int GetHashCode() => ticks.GetHashCode();
+    public override int GetHashCode() => UtcTicks.GetHashCode();
 
     public override string ToString() => ToString(FORMAT);
 
@@ -878,7 +880,15 @@ public sealed partial class SpellkitDateTimeTypeInfo : SpanTypeInfo<SpellkitDate
     internal static SpellkitDateTime Max(ExecutionContext ctx) => new(ctx.Type<SpellkitDateTimeTypeInfo>(), DateTime.MaxValue.Ticks);
 
     [SpellkitStaticMethod]
-    internal static SpellkitDateTime Now(ExecutionContext ctx) => new(ctx.Type<SpellkitDateTimeTypeInfo>(), DateTime.UtcNow.Ticks);
+    internal static SpellkitDateTime UtcNow(ExecutionContext ctx) =>
+        new(ctx.Type<SpellkitDateTimeTypeInfo>(), DateTime.UtcNow.Ticks);
+
+    [SpellkitMethod]
+    internal static SpellkitObject ToLocal(
+        ExecutionContext ctx,
+        SpellkitDateTime self,
+        SpellkitTimeDelta? offset = null) =>
+        SpellkitLocalDateTimeTypeInfo.FromUtc(ctx, self, offset);
 }
 
 [SpellkitType]
@@ -891,6 +901,30 @@ public sealed partial class SpellkitLocalDateTimeTypeInfo : SpanTypeInfo<Spellki
     public SpellkitLocalDateTimeTypeInfo() : base(LocalDateTime) { }
 
     #region Operations
+    private static long GetUtcTicks(SpellkitObject value) => ((SpellkitLocalDateTime)value).UtcTicks;
+
+    protected override SpellkitObject EqOp(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
+        right.TypeId == left.TypeId && GetUtcTicks(left) == GetUtcTicks(right) ? True : False;
+
+    protected override SpellkitObject NeqOp(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
+        right.TypeId != left.TypeId || GetUtcTicks(left) != GetUtcTicks(right) ? True : False;
+
+    protected override SpellkitObject GtOp(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
+        right.TypeId != left.TypeId ? ctx.InvalidType(left.TypeId, right) :
+        GetUtcTicks(left) > GetUtcTicks(right) ? True : False;
+
+    protected override SpellkitObject LtOp(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
+        right.TypeId != left.TypeId ? ctx.InvalidType(left.TypeId, right) :
+        GetUtcTicks(left) < GetUtcTicks(right) ? True : False;
+
+    protected override SpellkitObject GteOp(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
+        right.TypeId != left.TypeId ? ctx.InvalidType(left.TypeId, right) :
+        GetUtcTicks(left) >= GetUtcTicks(right) ? True : False;
+
+    protected override SpellkitObject LteOp(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
+        right.TypeId != left.TypeId ? ctx.InvalidType(left.TypeId, right) :
+        GetUtcTicks(left) <= GetUtcTicks(right) ? True : False;
+
     protected override SpellkitObject SubOp(ExecutionContext ctx, SpellkitObject left, SpellkitObject right)
     {
         var self = (SpellkitLocalDateTime)left;
@@ -899,12 +933,7 @@ public sealed partial class SpellkitLocalDateTimeTypeInfo : SpanTypeInfo<Spellki
         {
             try
             {
-                if (!self.Offset.Equals(dt.Offset))
-                {
-                    return ctx.InvalidValue(right);
-                }
-
-                return new SpellkitTimeDelta(DeclaringUnit.TimeDelta, self.Ticks - dt.Ticks);
+                return new SpellkitTimeDelta(DeclaringUnit.TimeDelta, self.UtcTicks - dt.UtcTicks);
             }
             catch (Exception)
             {
@@ -915,11 +944,14 @@ public sealed partial class SpellkitLocalDateTimeTypeInfo : SpanTypeInfo<Spellki
         {
             try
             {
-                return new SpellkitLocalDateTime(this, self.Ticks - td.TotalTicks, self.Offset);
+                var ticks = checked(self.TotalTicks - td.TotalTicks);
+                return ticks < 0 || ticks > DateTime.MaxValue.Ticks
+                    ? ctx.Overflow()
+                    : new SpellkitLocalDateTime(this, ticks, self.Offset);
             }
-            catch (Exception)
+            catch (OverflowException)
             {
-                return ctx.InvalidValue(right);
+                return ctx.Overflow();
             }
         }
 
@@ -934,16 +966,14 @@ public sealed partial class SpellkitLocalDateTimeTypeInfo : SpanTypeInfo<Spellki
         {
             try
             {
-                if (self.Offset.Ticks != td.TotalTicks)
-                {
-                    return ctx.InvalidValue(right);
-                }
-
-                return new SpellkitLocalDateTime(this, self.Ticks + td.TotalTicks, self.Offset);
+                var ticks = checked(self.TotalTicks + td.TotalTicks);
+                return ticks < 0 || ticks > DateTime.MaxValue.Ticks
+                    ? ctx.Overflow()
+                    : new SpellkitLocalDateTime(this, ticks, self.Offset);
             }
-            catch (ArgumentOutOfRangeException)
+            catch (OverflowException)
             {
-                return ctx.InvalidValue(right);
+                return ctx.Overflow();
             }
         }
 
@@ -1055,6 +1085,9 @@ public sealed partial class SpellkitLocalDateTimeTypeInfo : SpanTypeInfo<Spellki
     internal static long TotalTicks(SpellkitLocalDateTime self) => self.TotalTicks;
 
     [SpellkitProperty]
+    internal static long UtcTicks(SpellkitLocalDateTime self) => self.UtcTicks;
+
+    [SpellkitProperty]
     internal static SpellkitObject Date(ExecutionContext ctx, SpellkitDateTime self) => new SpellkitDate(ctx.Type<SpellkitDateTypeInfo>(), new DateTime(self.TotalTicks));
 
     [SpellkitProperty]
@@ -1080,12 +1113,27 @@ public sealed partial class SpellkitLocalDateTimeTypeInfo : SpanTypeInfo<Spellki
         }
     }
 
+    private static bool ValidateOffset(ExecutionContext ctx, SpellkitTimeDelta offset)
+    {
+        var ticks = offset.TotalTicks;
+        if (ticks < -14 * DT.TicksPerHour
+            || ticks > 14 * DT.TicksPerHour
+            || ticks % DT.TicksPerMinute != 0)
+        {
+            ctx.InvalidValue(offset);
+            return false;
+        }
+        return true;
+    }
+
     [SpellkitStaticMethod]
     internal static SpellkitObject Parse(ExecutionContext ctx, string input, string format)
     {
         try
         {
-            return SpellkitLocalDateTime.Parse(ctx.Type<SpellkitLocalDateTimeTypeInfo>(), format, input);
+            var result = (SpellkitLocalDateTime)SpellkitLocalDateTime.Parse(
+                ctx.Type<SpellkitLocalDateTimeTypeInfo>(), format, input);
+            return ValidateOffset(ctx, result.Offset) ? result : Nil;
         }
         catch (FormatException)
         {
@@ -1103,26 +1151,65 @@ public sealed partial class SpellkitLocalDateTimeTypeInfo : SpanTypeInfo<Spellki
     {
         var dt = new DateTime(year, month, day, hour, minute, second, millisecond, DateTimeKind.Unspecified);
         var delta = GetOffset(ctx, offset, dt);
-        return new SpellkitLocalDateTime(ctx.Type<SpellkitLocalDateTimeTypeInfo>(), dt.Ticks, delta);
+        return ValidateOffset(ctx, delta)
+            ? new SpellkitLocalDateTime(ctx.Type<SpellkitLocalDateTimeTypeInfo>(), dt.Ticks, delta)
+            : Nil;
     }
 
     [SpellkitStaticMethod]
     internal static SpellkitObject FromTicks(ExecutionContext ctx, long ticks, SpellkitTimeDelta? offset = null)
     {
-        var delta = GetOffset(ctx, offset, new DateTime(ticks, DateTimeKind.Unspecified));
-        return new SpellkitLocalDateTime(ctx.Type<SpellkitLocalDateTimeTypeInfo>(), ticks, delta);
+        try
+        {
+            var delta = GetOffset(ctx, offset, new DateTime(ticks, DateTimeKind.Unspecified));
+            return ValidateOffset(ctx, delta)
+                ? new SpellkitLocalDateTime(ctx.Type<SpellkitLocalDateTimeTypeInfo>(), ticks, delta)
+                : Nil;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return ctx.InvalidValue(ticks);
+        }
     }
 
     [SpellkitStaticMethod]
-    internal static SpellkitObject FromDateTime(ExecutionContext ctx, SpellkitDateTime dateTime, SpellkitTimeDelta? offset = null)
+    internal static SpellkitObject FromUtc(ExecutionContext ctx, SpellkitDateTime dateTime, SpellkitTimeDelta? offset = null)
     {
-        var dt = dateTime.ToDateTime();
-        offset = GetOffset(ctx, offset, dt);
-        var td = offset.ToTimeSpan();
-        var targetZone = TimeZoneInfo.CreateCustomTimeZone(Guid.NewGuid().ToString(), td, null, null);
-        var dat = TimeZoneInfo.ConvertTimeFromUtc(dt, targetZone);
-        return new SpellkitLocalDateTime(ctx.Type<SpellkitLocalDateTimeTypeInfo>(), dat.Ticks,
-            new SpellkitTimeDelta(ctx.Type<SpellkitTimeDeltaTypeInfo>(), targetZone.BaseUtcOffset));
+        var utc = dateTime.ToDateTime();
+        offset ??= new SpellkitTimeDelta(
+            ctx.Type<SpellkitTimeDeltaTypeInfo>(),
+            TimeZoneInfo.Local.GetUtcOffset(utc));
+
+        if (!ValidateOffset(ctx, offset))
+        {
+            return Nil;
+        }
+
+        try
+        {
+            var localTicks = checked(dateTime.TotalTicks + offset.TotalTicks);
+            if (localTicks < 0 || localTicks > DateTime.MaxValue.Ticks)
+            {
+                return ctx.Overflow();
+            }
+            return new SpellkitLocalDateTime(
+                ctx.Type<SpellkitLocalDateTimeTypeInfo>(),
+                localTicks,
+                offset);
+        }
+        catch (OverflowException)
+        {
+            return ctx.Overflow();
+        }
+    }
+
+    [SpellkitMethod]
+    internal static SpellkitObject ToUtc(ExecutionContext ctx, SpellkitLocalDateTime self)
+    {
+        var utcTicks = self.UtcTicks;
+        return utcTicks < 0 || utcTicks > DateTime.MaxValue.Ticks
+            ? ctx.Overflow()
+            : new SpellkitDateTime(ctx.Type<SpellkitDateTimeTypeInfo>(), utcTicks);
     }
 
     [SpellkitStaticMethod]
@@ -1130,8 +1217,8 @@ public sealed partial class SpellkitLocalDateTimeTypeInfo : SpanTypeInfo<Spellki
         CreateNow(ctx);
 
     [SpellkitStaticProperty]
-    internal static SpellkitTimeDelta LocalOffset(ExecutionContext ctx) =>
-        new(ctx.Type<SpellkitTimeDeltaTypeInfo>(), TimeZoneInfo.Local.GetUtcOffset(DateTime.Now));
+    internal static SpellkitTimeDelta SystemOffset(ExecutionContext ctx) =>
+        new(ctx.Type<SpellkitTimeDeltaTypeInfo>(), DateTimeOffset.Now.Offset);
 
     [SpellkitStaticProperty]
     internal static SpellkitLocalDateTime Default(ExecutionContext ctx) => Min(ctx);
@@ -1139,17 +1226,20 @@ public sealed partial class SpellkitLocalDateTimeTypeInfo : SpanTypeInfo<Spellki
     [SpellkitStaticProperty]
     internal static SpellkitLocalDateTime Min(ExecutionContext ctx) =>
         new(ctx.Type<SpellkitLocalDateTimeTypeInfo>(), DateTime.MinValue.Ticks,
-            GetOffset(ctx, null, DateTime.MinValue));
+            new SpellkitTimeDelta(ctx.Type<SpellkitTimeDeltaTypeInfo>(), TimeSpan.Zero));
 
     [SpellkitStaticProperty]
     internal static SpellkitLocalDateTime Max(ExecutionContext ctx) =>
         new(ctx.Type<SpellkitLocalDateTimeTypeInfo>(), DateTime.MaxValue.Ticks,
-            GetOffset(ctx, null, DateTime.MaxValue));
+            new SpellkitTimeDelta(ctx.Type<SpellkitTimeDeltaTypeInfo>(), TimeSpan.Zero));
 
     private static SpellkitLocalDateTime CreateNow(ExecutionContext ctx)
     {
-        var now = DateTime.Now;
-        return new(ctx.Type<SpellkitLocalDateTimeTypeInfo>(), now.Ticks, GetOffset(ctx, null, now));
+        var now = DateTimeOffset.Now;
+        return new(
+            ctx.Type<SpellkitLocalDateTimeTypeInfo>(),
+            now.DateTime.Ticks,
+            new SpellkitTimeDelta(ctx.Type<SpellkitTimeDeltaTypeInfo>(), now.Offset));
     }
 }
 

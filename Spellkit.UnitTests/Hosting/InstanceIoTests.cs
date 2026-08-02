@@ -12,7 +12,10 @@ public sealed class InstanceIoTests
     public void RoutesInputAndOutputThroughTheInstanceEnvironment()
     {
         var output = new StringBuilder();
-        using var instance = new SpellkitHost().AddStandardLibrary().CreateInstance(
+        using var instance = new SpellkitHost()
+            .AddStandardLibrary()
+            .AddHostLibrary()
+            .CreateInstance(
             new SpellkitEnvironment()
                 .UseInput(_ => "instance input")
                 .UseOutput(value => output.Append(value)));
@@ -39,7 +42,9 @@ public sealed class InstanceIoTests
         using var rendezvous = new Barrier(2);
         var firstOutput = new StringBuilder();
         var secondOutput = new StringBuilder();
-        var host = new SpellkitHost().AddStandardLibrary();
+        var host = new SpellkitHost()
+            .AddStandardLibrary()
+            .AddHostLibrary();
         using var first = host.CreateInstance(
             Environment("first", firstOutput, rendezvous));
         using var second = host.CreateInstance(

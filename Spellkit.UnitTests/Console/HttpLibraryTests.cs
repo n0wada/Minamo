@@ -20,12 +20,15 @@ public sealed class HttpLibraryTests
             let res = Get("{{server.BaseUrl}}users",
                 params: [q: "spell kit", page: 2],
                 headers: ["X-Test": "yes"])
-            let body = res.json()
+            let body = res.Json()
 
-            fmt("{0}|{1}|{2}|{3}|{4}|{5}|{6}", res.ok, res.statusCode, body["method"], body["path"], body["query"]["q"], body["query"]["page"], body["headers"]["X-Test"])
+            fmt("{0}|{1}|{2}|{3}|{4}|{5}|{6}", res.Ok, res.StatusCode, body["method"], body["path"], body["query"]["q"], body["query"]["page"], body["headers"]["X-Test"])
             """;
 
-        using var instance = new SpellkitHost().AddStandardLibrary().CreateInstance();
+        using var instance = new SpellkitHost()
+            .AddStandardLibrary()
+            .AddExtendedLibrary()
+            .CreateInstance();
         var result = instance.Execute(script);
 
         Assert.True(result.Success, result.Failure?.Message);
@@ -44,12 +47,15 @@ public sealed class HttpLibraryTests
                 headers: ["Accept": "application/json"],
                 auth: [bearer: "secret-token"])
             let res = session.Post("orders", json: [id: 42, customer: "Ada"])
-            let body = res.raiseForStatus().json()
+            let body = res.RaiseForStatus().Json()
 
             fmt("{0}|{1}|{2}|{3}|{4}|{5}", body["method"], body["path"], body["headers"]["Accept"], body["headers"]["Authorization"], body["body"]["id"], body["body"]["customer"])
             """;
 
-        using var instance = new SpellkitHost().AddStandardLibrary().CreateInstance();
+        using var instance = new SpellkitHost()
+            .AddStandardLibrary()
+            .AddExtendedLibrary()
+            .CreateInstance();
         var result = instance.Execute(script);
 
         Assert.True(result.Success, result.Failure?.Message);

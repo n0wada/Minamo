@@ -156,10 +156,11 @@ print(constructorName(Ok(42)))
 uses the process console. See [Hosting API guide](../Hosting/Guide.md#instance-input-and-output)
 for host-controlled input and output.
 
-## Standard-library modules
+## Bundled library modules
 
-The `spell` console registers the standard library. In an embedded host, modules are optional and
-must be registered deliberately. Import a module before using its public names.
+The `spell` console registers portable standard modules, basic host modules, and the currently
+bundled extended modules. In an embedded host, all modules are optional and must be registered
+deliberately. Import a module before using its public names.
 
 ```swift
 import * from math
@@ -167,17 +168,11 @@ import * from math
 print(sqrt(81))
 ```
 
-| Module | Main capabilities |
-| --- | --- |
-| `binary` | Byte arrays and binary data helpers. |
-| `collections` | `SortedDictionary` and collection-oriented types. |
-| `console` | `readLine()` and console-oriented helpers. |
-| `http` | HTTP requests, responses, and sessions. |
-| `io` | `File`, `Path`, `Directory`, and `Drive` operations. |
-| `math` | `sqrt`, `pow`, `min`, `max`, `abs`, `round`, and `sign`. |
-| `text` | Regular expressions and string-builder types. |
-| `time` | Date, time, calendar, and duration types. |
-| `uuid` | UUID / GUID values. |
+| Layer | Modules | Main capabilities |
+| --- | --- | --- |
+| Standard | `binary`, `collections`, `json`, `math`, `random`, `text`, `time`, `uuid` | Portable foundational values and data processing. |
+| Host | `console`, `io` | Console input and file-system access supplied by the running host. |
+| Extended | `http` | Higher-level HTTP requests, responses, and sessions. This is planned to become a separately loaded library. |
 
 For example, `console` provides input while `print` remains a core function:
 
@@ -187,8 +182,38 @@ import * from console
 print(readLine(), terminator: nil)
 ```
 
-The `io` and `http` modules can access external resources. Hosts that need a restricted scripting
-surface should omit them, or expose narrower host commands and capabilities instead.
+The `console`, `io`, and `http` modules can access host or external resources. Hosts that need a
+restricted scripting surface should omit them, or expose narrower host commands and capabilities
+instead. The precise admission criteria and current classification are documented in the
+[standard library policy](../Developers/StandardLibrary.md).
+
+The portable modules include explicit conversions for common data formats:
+
+```swift
+import * from binary
+import * from json
+
+let bytes = ByteArray.FromString("Spellkit")
+print(bytes.ToHex())
+
+let value = parse("""{"ready":true,"ports":[8080,8081]}""")
+print(stringify(value, indented: true))
+```
+
+Seeded random generators are independent and reproducible within the running Spellkit version:
+
+```swift
+import * from random
+
+let generator = Random(42)
+print(generator.Next(min: 1, max: 7))
+print(generator.Shuffle(("red", "green", "blue")))
+```
+
+`DateTime` represents UTC values and reads the clock through `DateTime.UtcNow()`. `LocalDateTime`
+stores local clock fields together with a fixed offset; use `ToLocal(...)`, `FromUtc(...)`, and
+`ToUtc()` for explicit conversion. Only `LocalDateTime.Now()`, `LocalDateTime.SystemOffset`, and an
+omitted local offset consult the system time zone.
 
 ## Next steps
 

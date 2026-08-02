@@ -224,7 +224,7 @@ internal sealed class TestRunner
                 }
             })
                 .UseFileLookup(lookup)
-                .AddStandardLibrary();
+                .AddBundledLibraries();
             using var session = host.CreateInstance();
             var execution = session.Execute(ast);
             warns.AddRange(execution.Diagnostics

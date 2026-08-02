@@ -1043,17 +1043,30 @@ public sealed partial class EntityTypeInfo : SpellkitForeignTypeInfo
 attributes bind instance and static members on a `SpellkitForeignTypeInfo`. Operators and conversions stay
 as explicit `SpellkitForeignTypeInfo` overrides because they participate in the runtime type protocol.
 
-The optional library modules can be enabled explicitly with their generated extensions:
+The optional library modules can be enabled explicitly with their generated extensions. Portable
+standard modules are independent of host resources:
 
 ```csharp
 host.AddBinaryModule()
     .AddCollectionsModule()
-    .AddHttpModule()
+    .AddJsonModule()
+    .AddMathModule()
+    .AddRandomModule()
     .AddTextModule()
     .AddTimeModule()
-    .AddUuidModule()
-    .AddIoModule();
+    .AddUuidModule();
 ```
+
+Host-resource modules and higher-level extended modules are registered separately:
+
+```csharp
+host.AddConsoleModule()
+    .AddIoModule()
+    .AddHttpModule();
+```
+
+See the [standard library policy](../Developers/StandardLibrary.md) for the admission criteria and
+current module classification.
 
 The console library's `http` module follows a requests-style shape while keeping Spellkit keyword
 rules intact:
@@ -1066,8 +1079,8 @@ let res = Get("https://api.example.test/users",
     headers: ["Accept": "application/json"],
     timeout: 5)
 
-if res.ok {
-    print(res.json()["items"])
+if res.Ok {
+    print(res.Json()["items"])
 }
 ```
 
@@ -1080,7 +1093,7 @@ let api = Session(
     auth: [bearer: token],
     timeout: 10)
 
-let created = api.Post("orders", json: [id: 42, customer: "Ada"]).raiseForStatus()
+let created = api.Post("orders", json: [id: 42, customer: "Ada"]).RaiseForStatus()
 ```
 
 The `collections` module adds ordered maps backed by .NET's sorted dictionary behavior:

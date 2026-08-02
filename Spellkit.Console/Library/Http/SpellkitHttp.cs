@@ -1,8 +1,8 @@
+using Spellkit.Library.Json;
 using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json;
 
 namespace Spellkit.Library.Http;
 
@@ -74,24 +74,6 @@ internal static class SpellkitHttp
         }
     }
 
-    internal static SpellkitObject JsonToSpellkit(JsonElement value) =>
-        value.ValueKind switch
-        {
-            JsonValueKind.Object => SpellkitTuple.Create(value.EnumerateObject()
-                .Select(property => new SpellkitLabel(property.Name, JsonToSpellkit(property.Value)))
-                .ToArray()),
-            JsonValueKind.Array => new SpellkitArray(value.EnumerateArray()
-                .Select(JsonToSpellkit)
-                .ToArray()),
-            JsonValueKind.String => SpellkitString.Get(value.GetString()),
-            JsonValueKind.Number when value.TryGetInt64(out var integer) => SpellkitInteger.Get(integer),
-            JsonValueKind.Number => new SpellkitFloat(value.GetDouble()),
-            JsonValueKind.True => True,
-            JsonValueKind.False => False,
-            JsonValueKind.Null => Nil,
-            _ => Nil
-        };
-
     private static HttpRequestMessage CreateRequest(
         ExecutionContext ctx,
         string method,
@@ -117,8 +99,9 @@ internal static class SpellkitHttp
 
         if (options.Json is not null)
         {
+            var content = SpellkitJson.Stringify(ctx, options.Json);
             request.Content = new StringContent(
-                JsonSerializer.Serialize(SpellkitToPlain(ctx, options.Json)),
+                content ?? string.Empty,
                 Encoding.UTF8,
                 "application/json");
         }
@@ -203,51 +186,6 @@ internal static class SpellkitHttp
 
     private static string AppendSlash(string value) =>
         value.EndsWith('/') ? value : value + "/";
-
-    private static object? SpellkitToPlain(ExecutionContext ctx, SpellkitObject value)
-    {
-        if (value.TypeId == SpellkitTypeCodes.Nil)
-        {
-            return null;
-        }
-
-        if (value is SpellkitString text)
-        {
-            return text.Value;
-        }
-
-        if (value is SpellkitChar character)
-        {
-            return character.Value.ToString();
-        }
-
-        if (value is SpellkitInteger integer)
-        {
-            return integer.Value;
-        }
-
-        if (value is SpellkitFloat number)
-        {
-            return number.Value;
-        }
-
-        if (value is SpellkitBool boolean)
-        {
-            return (bool)boolean;
-        }
-
-        if (value is SpellkitDictionary && TryConvertDictionary(ctx, value, out var map))
-        {
-            return map.ToDictionary(kv => kv.Key, kv => SpellkitToPlain(ctx, kv.Value), StringComparer.Ordinal);
-        }
-
-        if (value is SpellkitArray array)
-        {
-            return array.Select(item => SpellkitToPlain(ctx, item)).ToArray();
-        }
-
-        return value.ToString(ctx).Value;
-    }
 
     internal static bool TryConvertDictionary(
         ExecutionContext ctx,

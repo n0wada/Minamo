@@ -1,11 +1,47 @@
 #region "Initialize"
     import * from binary
+    import * from json
+    import * from math
+    import * from random
     import * from text
     import * from time
     import * from uuid
     func testParseAndFormat(format, value) {
         assert(value, TimeDelta.Parse(value, format).ToString(value))
     }
+#endregion
+
+#region "Math: constants and elementary functions"
+    assert(pi, acos(-1))
+    assert(tau, pi * 2)
+    assert(2.0, floor(2.9))
+    assert(3.0, ceiling(2.1))
+    assert(-2.0, truncate(-2.9))
+    assert(3.0, clamp(5, 1, 3))
+    assert(1.0, round(sin(pi / 2), 10))
+    assert(180.0, round(radiansToDegrees(pi), 10))
+    assert(pi, degreesToRadians(180))
+    assert(true, isFinite(log(e)))
+#endregion
+
+#region "Json: parse and stringify"
+    let value = parse("""{"name":"Ada","active":true,"scores":[1,2.5,null]}""")
+    assert("Ada", value["name"])
+    assert(true, value["active"])
+    assert(2.5, value["scores"][1])
+    assert(nil, value["scores"][2])
+    assert("{\"name\":\"Ada\",\"active\":true,\"scores\":[1,2.5,null]}", stringify(value))
+#endregion
+
+#region "Random: seeded generators are reproducible"
+    let first = Random(12345)
+    let second = Random(12345)
+    assert(first.Next(), second.Next())
+    assert(first.Next(min: -10, max: 10), second.Next(min: -10, max: 10))
+    assert(first.NextFloat(), second.NextFloat())
+    assert(first.NextBool(), second.NextBool())
+    assert(first.Choose(("a", "b", "c")), second.Choose(("a", "b", "c")))
+    assert(first.Shuffle((1, 2, 3, 4)), second.Shuffle((1, 2, 3, 4)))
 #endregion
 
 #region "LocalDateTime: Explicit UTC offset"
@@ -269,6 +305,22 @@ fox is the red fox."""
     assert(value, bar.Read(String))
 #endregion
 
+#region "ByteArray: encodings and raw conversion"
+    let utf8 = ByteArray.FromString("Spellkit ✓")
+    assert("Spellkit ✓", utf8.Decode())
+    assert("5370656C6C6B697420E29C93", utf8.ToHex())
+    assert(utf8.ToHex(), ByteArray.FromHex(utf8.ToHex()).ToHex())
+    assert(utf8.ToHex(), ByteArray.FromBase64(utf8.ToBase64()).ToHex())
+    assert([0, 1, 127, 255], ByteArray.FromArray([0, 1, 127, 255]).ToArray())
+#endregion
+
+#region "ByteArray: explicit byte order"
+    let encoded = ByteArray()
+    encoded.Write(72623859790382856, littleEndian: false)
+    assert("0102030405060708", encoded.ToHex())
+    assert(72623859790382856, encoded.Read(Integer, littleEndian: false))
+#endregion
+
 #region "TimeDelta: GetType"
     let td = TimeDelta(days: 1)
     assert(TimeDelta, td.GetType())
@@ -364,7 +416,7 @@ fox is the red fox."""
 #endregion
 
 #region "DateTime: GetType"
-    let dt = DateTime.Now()
+    let dt = DateTime.UtcNow()
     assert(DateTime, dt.GetType())
     assert("DateTime", typeName(dt.GetType()))
 #endregion
@@ -506,7 +558,7 @@ fox is the red fox."""
     assert("2012-03-21 15:33:59.0000000-03:00", dt.ToString())
 #endregion
 
-#region "LocalDateTime: LocalOffset"
+#region "LocalDateTime: explicit offset"
     let dt = LocalDateTime(offset: -TimeDelta(hours: 3), year: 2012, month: 3, day: 21,
         hour: 15, minute: 33, second: 59)
     assert(-3, dt.Offset.Hours)
@@ -534,17 +586,31 @@ fox is the red fox."""
     assert(true, dt.TotalTicks == ndt.TotalTicks)
 #endregion
 
-#region "LocalDateTime: LocalOffset"
-    let offset = LocalDateTime.LocalOffset
-    assert(true, offset.Hours != 0)
+#region "LocalDateTime: system offset"
+    let offset = LocalDateTime.SystemOffset
     let dt = LocalDateTime.Now()
     assert(true, offset == dt.Offset)
 #endregion
 
-#region "LocalDateTime: FromDateTime"
+#region "LocalDateTime: UTC conversion"
     let dt = DateTime(year: 2012, month: 2, day: 3, hour: 12, minute: 30)
-    let loc = LocalDateTime.FromDateTime(dt, offset: -TimeDelta(hours: 2))
+    let loc = LocalDateTime.FromUtc(dt, offset: -TimeDelta(hours: 2))
     assert("2012-02-03 10:30", loc.ToString("yyyy-MM-dd hh:mm"))
+    assert(dt, loc.ToUtc())
+    assert(loc, dt.ToLocal(offset: -TimeDelta(hours: 2)))
+#endregion
+
+#region "LocalDateTime: instant comparison and arithmetic"
+    let utc = LocalDateTime(
+        year: 2024, month: 1, day: 1, hour: 12,
+        offset: TimeDelta())
+    let east = LocalDateTime(
+        year: 2024, month: 1, day: 1, hour: 21,
+        offset: TimeDelta(hours: 9))
+    assert(true, utc == east)
+    assert(0, (east - utc).TotalTicks)
+    assert("2024-01-01 22:00", east.Add(hours: 1).ToString("yyyy-MM-dd HH:mm"))
+    assert("2024-01-01 22:00", (east + TimeDelta(hours: 1)).ToString("yyyy-MM-dd HH:mm"))
 #endregion
 
 #region "LocalDateTime: Date and Time"

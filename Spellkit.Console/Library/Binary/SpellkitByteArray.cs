@@ -1,6 +1,7 @@
 using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System;
+using System.Buffers.Binary;
 using System.Text;
 
 namespace Spellkit.Library.Binary;
@@ -76,27 +77,34 @@ public sealed class SpellkitByteArray : SpellkitForeignObject
         buffer = dest;
     }
 
-    public void Write(ExecutionContext ctx, SpellkitObject obj)
+    public void Write(ExecutionContext ctx, SpellkitObject obj, bool littleEndian)
     {
         Reset();
 
         switch (obj.TypeId)
         {
             case SpellkitTypeCodes.Integer:
-                Write(((SpellkitInteger)obj).Value);
+                Write(((SpellkitInteger)obj).Value, littleEndian);
                 break;
             case SpellkitTypeCodes.Float:
-                Write(((SpellkitFloat)obj).Value);
+                Write(((SpellkitFloat)obj).Value, littleEndian);
                 break;
             case SpellkitTypeCodes.Bool:
                 Write(obj.IsTrue());
                 break;
             case SpellkitTypeCodes.Char:
             case SpellkitTypeCodes.String:
-                Write(obj.ToString());
+                Write(obj.ToString(), littleEndian);
                 break;
             default:
-                ctx.InvalidType(obj);
+                if (obj is SpellkitByteArray bytes)
+                {
+                    Write(bytes.GetBytes());
+                }
+                else
+                {
+                    ctx.InvalidType(obj);
+                }
                 break;
         }
     }
@@ -108,50 +116,79 @@ public sealed class SpellkitByteArray : SpellkitForeignObject
         size += cz.Length;
     }
 
-    private void Write(long value) => Write(BitConverter.GetBytes(value));
+    private void Write(long value, bool littleEndian)
+    {
+        Span<byte> bytes = stackalloc byte[sizeof(long)];
+        if (littleEndian)
+        {
+            BinaryPrimitives.WriteInt64LittleEndian(bytes, value);
+        }
+        else
+        {
+            BinaryPrimitives.WriteInt64BigEndian(bytes, value);
+        }
+        Write(bytes.ToArray());
+    }
 
-    private void Write(double value) => Write(BitConverter.GetBytes(value));
+    private void Write(double value, bool littleEndian) =>
+        Write(BitConverter.DoubleToInt64Bits(value), littleEndian);
 
     private void Write(bool value) => Write(BitConverter.GetBytes(value));
 
-    private void Write(string value)
+    private void Write(string value, bool littleEndian)
     {
         var cz = Encoding.UTF8.GetBytes(value);
-        Write(BitConverter.GetBytes(cz.Length));
+        Span<byte> length = stackalloc byte[sizeof(int)];
+        if (littleEndian)
+        {
+            BinaryPrimitives.WriteInt32LittleEndian(length, cz.Length);
+        }
+        else
+        {
+            BinaryPrimitives.WriteInt32BigEndian(length, cz.Length);
+        }
+        Write(length.ToArray());
         Write(cz);
     }
 
-    public SpellkitObject Read(ExecutionContext ctx, SpellkitTypeInfo type) =>
+    public SpellkitObject Read(ExecutionContext ctx, SpellkitTypeInfo type, bool littleEndian) =>
         type.ReflectedTypeId switch
         {
-            SpellkitTypeCodes.Integer => ReadInt64(ctx),
-            SpellkitTypeCodes.Float => ReadDouble(ctx),
+            SpellkitTypeCodes.Integer => ReadInt64(ctx, littleEndian),
+            SpellkitTypeCodes.Float => ReadDouble(ctx, littleEndian),
             SpellkitTypeCodes.Bool => ReadBool(ctx),
-            SpellkitTypeCodes.Char => ReadChar(ctx),
-            SpellkitTypeCodes.String => ReadString(ctx),
+            SpellkitTypeCodes.Char => ReadChar(ctx, littleEndian),
+            SpellkitTypeCodes.String => ReadString(ctx, littleEndian),
             _ => ctx.InvalidType(type.ReflectedTypeName)
         };
 
-    private SpellkitObject ReadInt64(ExecutionContext ctx)
+    private SpellkitObject ReadInt64(ExecutionContext ctx, bool littleEndian)
     {
         if (readPosition > size - sizeof(long))
         {
             return ctx.IndexOutOfRange();
         }
 
-        var cz = BitConverter.ToInt64(buffer, readPosition);
+        var source = buffer.AsSpan(readPosition, sizeof(long));
+        var cz = littleEndian
+            ? BinaryPrimitives.ReadInt64LittleEndian(source)
+            : BinaryPrimitives.ReadInt64BigEndian(source);
         readPosition += sizeof(long);
         return SpellkitInteger.Get(cz);
     }
 
-    private SpellkitObject ReadDouble(ExecutionContext ctx)
+    private SpellkitObject ReadDouble(ExecutionContext ctx, bool littleEndian)
     {
         if (readPosition > size - sizeof(double))
         {
             return ctx.IndexOutOfRange();
         }
 
-        var cz = BitConverter.ToDouble(buffer, readPosition);
+        var source = buffer.AsSpan(readPosition, sizeof(double));
+        var bits = littleEndian
+            ? BinaryPrimitives.ReadInt64LittleEndian(source)
+            : BinaryPrimitives.ReadInt64BigEndian(source);
+        var cz = BitConverter.Int64BitsToDouble(bits);
         readPosition += sizeof(double);
         return new SpellkitFloat(cz);
     }
@@ -168,26 +205,29 @@ public sealed class SpellkitByteArray : SpellkitForeignObject
         return cz is 1 ? True : False;
     }
 
-    private SpellkitObject ReadChar(ExecutionContext ctx)
+    private SpellkitObject ReadChar(ExecutionContext ctx, bool littleEndian)
     {
-        var ret = ReadRawString();
+        var ret = ReadRawString(littleEndian);
         return ret is null || ret.Length == 0 ? ctx.IndexOutOfRange() : new SpellkitChar(ret[0]);
     }
 
-    private SpellkitObject ReadString(ExecutionContext ctx)
+    private SpellkitObject ReadString(ExecutionContext ctx, bool littleEndian)
     {
-        var ret = ReadRawString();
+        var ret = ReadRawString(littleEndian);
         return ret is null ? ctx.IndexOutOfRange() : new SpellkitString(ret);
     }
 
-    private string? ReadRawString()
+    private string? ReadRawString(bool littleEndian)
     {
         if (readPosition > size - sizeof(int))
         {
             return null;
         }
 
-        var len = BitConverter.ToInt32(buffer, readPosition);
+        var source = buffer.AsSpan(readPosition, sizeof(int));
+        var len = littleEndian
+            ? BinaryPrimitives.ReadInt32LittleEndian(source)
+            : BinaryPrimitives.ReadInt32BigEndian(source);
         readPosition += sizeof(int);
 
         if (len < 0 || len > size - readPosition)
