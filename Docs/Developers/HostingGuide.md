@@ -1058,8 +1058,6 @@ using Spellkit.Hosting;
 
 public sealed class ExampleLibrary : ISpellkitLibrary
 {
-    public string Id => "example";
-
     public void Register(SpellkitHost host)
     {
         host.AddExampleModule();

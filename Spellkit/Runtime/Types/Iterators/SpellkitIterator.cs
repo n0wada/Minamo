@@ -64,7 +64,7 @@ internal sealed partial class SpellkitIteratorTypeInfo : SpellkitTypeInfo
 
     public override int ReflectedTypeId => SpellkitTypeCodes.Iterator;
 
-    public SpellkitIteratorTypeInfo() => AddMixins(SpellkitTypeCodes.Lookup);
+    public SpellkitIteratorTypeInfo() => AddMixins(SpellkitTypeCodes.Lookup, SpellkitTypeCodes.Sequence);
 
     #region Operations
     protected override SpellkitObject AddOp(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) => SpellkitIterator.Create(Concat(ctx, left, right));
@@ -118,16 +118,13 @@ internal sealed partial class SpellkitIteratorTypeInfo : SpellkitTypeInfo
             return Nil;
         }
 
-        return ToSet(seq);
+        return new SpellkitSet(new HashSet<SpellkitObject>(seq));
     }
     #endregion
 
     [SpellkitMethod]
     internal static bool Contains(ExecutionContext ctx, IEnumerable<SpellkitObject> self, SpellkitObject item) =>
         self.Any(o => o.Equals(item, ctx));
-
-    [SpellkitMethod(BuiltinMethodNames.ToArray)]
-    internal static SpellkitObject ToArray(IEnumerable<SpellkitObject> self) => new SpellkitArray(self.ToArray());
 
     [SpellkitMethod(BuiltinMethodNames.ToTuple)]
     internal static SpellkitObject ToTuple(IEnumerable<SpellkitObject> self) => new SpellkitTuple(self.ToArray());
@@ -161,12 +158,6 @@ internal sealed partial class SpellkitIteratorTypeInfo : SpellkitTypeInfo
             return self.Aggregate((seed, val) => accumulator.Call(ctx, seed, val));
         }
     }
-
-    [SpellkitMethod(BuiltinMethodNames.Take)]
-    internal static IEnumerable<SpellkitObject> Take(IEnumerable<SpellkitObject> self, int count) => self.Take(count < 0 ? 0 : count);
-
-    [SpellkitMethod(BuiltinMethodNames.Skip)]
-    internal static IEnumerable<SpellkitObject> Skip(IEnumerable<SpellkitObject> self, int count) => self.Skip(count < 0 ? 0 : count);
 
     [SpellkitMethod(BuiltinMethodNames.First)]
     internal static SpellkitObject First(IEnumerable<SpellkitObject> self) => self.FirstOrDefault() ?? Nil;
@@ -292,14 +283,6 @@ internal sealed partial class SpellkitIteratorTypeInfo : SpellkitTypeInfo
         return count;
     }
 
-    [SpellkitMethod(BuiltinMethodNames.Map)]
-    internal static IEnumerable<SpellkitObject> Map(ExecutionContext ctx, IEnumerable<SpellkitObject> self, SpellkitFunction converter) =>
-        new MapEnumerable(ctx, self, converter);
-
-    [SpellkitMethod(BuiltinMethodNames.Filter)]
-    internal static IEnumerable<SpellkitObject> Filter(ExecutionContext ctx, IEnumerable<SpellkitObject> self, SpellkitFunction predicate) =>
-        new FilterEnumerable(ctx, self, predicate);
-
     [SpellkitMethod(BuiltinMethodNames.TakeWhile)]
     internal static IEnumerable<SpellkitObject> TakeWhile(ExecutionContext ctx, IEnumerable<SpellkitObject> self, SpellkitFunction predicate) =>
         new TakeWhileEnumerable(ctx, self, predicate);
@@ -308,58 +291,6 @@ internal sealed partial class SpellkitIteratorTypeInfo : SpellkitTypeInfo
     internal static IEnumerable<SpellkitObject> SkipWhile(ExecutionContext ctx, IEnumerable<SpellkitObject> self, SpellkitFunction predicate) =>
         new SkipWhileEnumerable(ctx, self, predicate);
 
-    [SpellkitMethod(BuiltinMethodNames.Reduce)]
-    internal static SpellkitObject Reduce(ExecutionContext ctx, IEnumerable<SpellkitObject> self, SpellkitFunction converter, [Default(0)]SpellkitObject initial)
-    {
-        var result = initial;
-
-        foreach (var item in self)
-        {
-            result = converter.Call(ctx, result, item);
-            if (ctx.HasErrors)
-            {
-                return Nil;
-            }
-        }
-
-        return result;
-    }
-
-    [SpellkitMethod(BuiltinMethodNames.Any)]
-    internal static bool Any(ExecutionContext ctx, IEnumerable<SpellkitObject> self, SpellkitFunction predicate)
-    {
-        foreach (var item in self)
-        {
-            var result = predicate.Call(ctx, item);
-            if (ctx.HasErrors)
-            {
-                return false;
-            }
-
-            if (result.IsTrue())
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    [SpellkitMethod(BuiltinMethodNames.All)]
-    internal static bool All(ExecutionContext ctx, IEnumerable<SpellkitObject> self, SpellkitFunction predicate)
-    {
-        foreach (var item in self)
-        {
-            var result = predicate.Call(ctx, item);
-            if (ctx.HasErrors || !result.IsTrue())
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     [SpellkitMethod(BuiltinMethodNames.ForEach)]
     internal static void ForEach(ExecutionContext ctx, IEnumerable<SpellkitObject> self, SpellkitFunction action)
     {
@@ -367,14 +298,6 @@ internal sealed partial class SpellkitIteratorTypeInfo : SpellkitTypeInfo
         {
             action.Call(ctx, o);
         }
-    }
-
-    [SpellkitMethod(BuiltinMethodNames.ToSet)]
-    internal static SpellkitObject ToSet(IEnumerable<SpellkitObject> self)
-    {
-        var set = new HashSet<SpellkitObject>();
-        set.UnionWith(self);
-        return new SpellkitSet(set);
     }
 
     [SpellkitMethod(BuiltinMethodNames.Distinct)]

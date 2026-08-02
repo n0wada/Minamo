@@ -1,5 +1,7 @@
 using Spellkit.Compiler;
+using Spellkit.Debug;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Spellkit.Runtime.Types;
 
@@ -206,9 +208,143 @@ internal sealed class SpellkitSequenceMixin : SpellkitMixin<SpellkitSequenceMixi
     public SpellkitSequenceMixin() : base(SpellkitTypeCodes.Sequence)
     {
         Members.Add(Builtins.Iterate, Unary(Builtins.Iterate, Iterate));
+        Members.Add(BuiltinMethodNames.Map, new SpellkitExternalFunction(BuiltinMethodNames.Map, false, Map, new Par("converter")));
+        Members.Add(BuiltinMethodNames.Filter, new SpellkitExternalFunction(BuiltinMethodNames.Filter, false, Filter, new Par("predicate")));
+        Members.Add(BuiltinMethodNames.Take, new SpellkitExternalFunction(BuiltinMethodNames.Take, false, Take, new Par("count")));
+        Members.Add(BuiltinMethodNames.Skip, new SpellkitExternalFunction(BuiltinMethodNames.Skip, false, Skip, new Par("count")));
+        Members.Add(BuiltinMethodNames.Reduce, new SpellkitExternalFunction(BuiltinMethodNames.Reduce, false, Reduce, new Par("converter"), new Par("initial", 0)));
+        Members.Add(BuiltinMethodNames.Any, new SpellkitExternalFunction(BuiltinMethodNames.Any, false, Any, new Par("predicate")));
+        Members.Add(BuiltinMethodNames.All, new SpellkitExternalFunction(BuiltinMethodNames.All, false, All, new Par("predicate")));
+        Members.Add(BuiltinMethodNames.ToArray, new SpellkitExternalFunction(BuiltinMethodNames.ToArray, false, ToArray));
+        Members.Add(BuiltinMethodNames.ToSet, new SpellkitExternalFunction(BuiltinMethodNames.ToSet, false, ToSet));
         SetSupportedOperations(Ops.Iter);
     }
 
-    private static SpellkitObject Iterate(ExecutionContext ctx, SpellkitObject self) =>
-        SpellkitIterator.Create(((SpellkitClass)self).Fields);
+    private static SpellkitObject Iterate(ExecutionContext _, SpellkitObject self) => self switch
+    {
+        SpellkitIterator iterator => iterator,
+        IEnumerable<SpellkitObject> sequence => SpellkitIterator.Create(sequence),
+        SpellkitClass instance => SpellkitIterator.Create(instance.Fields),
+        _ => Nil
+    };
+
+    private static SpellkitObject Map(ExecutionContext ctx, SpellkitObject? self, SpellkitObject[] args)
+    {
+        var converter = args[0].ToFunction(ctx);
+        return converter is null
+            ? Nil
+            : SpellkitIterator.Create(new MapEnumerable(ctx, Source(ctx, self), converter));
+    }
+
+    private static SpellkitObject Filter(ExecutionContext ctx, SpellkitObject? self, SpellkitObject[] args)
+    {
+        var predicate = args[0].ToFunction(ctx);
+        return predicate is null
+            ? Nil
+            : SpellkitIterator.Create(new FilterEnumerable(ctx, Source(ctx, self), predicate));
+    }
+
+    private static SpellkitObject Take(ExecutionContext ctx, SpellkitObject? self, SpellkitObject[] args)
+    {
+        if (args[0] is not SpellkitInteger count || !count.TryGetInt32(out var value))
+        {
+            return ctx.InvalidType(args[0]);
+        }
+
+        return SpellkitIterator.Create(Source(ctx, self).Take(value < 0 ? 0 : value));
+    }
+
+    private static SpellkitObject Skip(ExecutionContext ctx, SpellkitObject? self, SpellkitObject[] args)
+    {
+        if (args[0] is not SpellkitInteger count || !count.TryGetInt32(out var value))
+        {
+            return ctx.InvalidType(args[0]);
+        }
+
+        return SpellkitIterator.Create(Source(ctx, self).Skip(value < 0 ? 0 : value));
+    }
+
+    private static SpellkitObject Reduce(ExecutionContext ctx, SpellkitObject? self, SpellkitObject[] args)
+    {
+        var converter = args[0].ToFunction(ctx);
+        if (converter is null)
+        {
+            return Nil;
+        }
+
+        var result = args[1];
+        foreach (var item in Source(ctx, self))
+        {
+            result = converter.Call(ctx, result, item);
+            if (ctx.HasErrors)
+            {
+                return Nil;
+            }
+        }
+
+        return result;
+    }
+
+    private static SpellkitObject Any(ExecutionContext ctx, SpellkitObject? self, SpellkitObject[] args)
+    {
+        var predicate = args[0].ToFunction(ctx);
+        if (predicate is null)
+        {
+            return Nil;
+        }
+
+        foreach (var item in Source(ctx, self))
+        {
+            var result = predicate.Call(ctx, item);
+            if (ctx.HasErrors)
+            {
+                return Nil;
+            }
+
+            if (result.IsTrue())
+            {
+                return True;
+            }
+        }
+
+        return False;
+    }
+
+    private static SpellkitObject All(ExecutionContext ctx, SpellkitObject? self, SpellkitObject[] args)
+    {
+        var predicate = args[0].ToFunction(ctx);
+        if (predicate is null)
+        {
+            return Nil;
+        }
+
+        foreach (var item in Source(ctx, self))
+        {
+            var result = predicate.Call(ctx, item);
+            if (ctx.HasErrors)
+            {
+                return Nil;
+            }
+
+            if (!result.IsTrue())
+            {
+                return False;
+            }
+        }
+
+        return True;
+    }
+
+    private static SpellkitObject ToArray(ExecutionContext ctx, SpellkitObject? self, SpellkitObject[] _) =>
+        new SpellkitArray(Source(ctx, self).ToArray());
+
+    private static SpellkitObject ToSet(ExecutionContext ctx, SpellkitObject? self, SpellkitObject[] _)
+    {
+        var values = new HashSet<SpellkitObject>();
+        values.UnionWith(Source(ctx, self));
+        return new SpellkitSet(values);
+    }
+
+    private static IEnumerable<SpellkitObject> Source(ExecutionContext ctx, SpellkitObject? self) =>
+        SpellkitIterator.ToEnumerable(ctx, self!);
 }

@@ -1,9 +1,9 @@
 # Built-in types and functions
 
 Spellkit provides a small set of core values, types, and functions to every script. The `spell`
-console also registers optional standard-library modules. An embedding host can choose which
-modules and commands to expose, so a script must not assume that console modules are available in
-every hosted environment.
+console also registers the standard-library modules shipped with the executable. An embedding host
+can choose which modules and commands to expose, so a script must not assume that console modules
+are available in every hosted environment.
 
 This page is a practical guide to the built-ins that are part of the current runtime. See the
 [grammar reference](../Reference/Grammar.md) for syntax and the [Hosting API guide](../Developers/HostingGuide.md)
@@ -18,6 +18,7 @@ The core runtime includes these commonly used values and types:
 | `nil` / `Nil` | Absence of a value |
 | `true`, `false` / `Boolean` | Boolean values |
 | `Integer`, `Float`, `Char`, `String`, `ByteArray` | Primitive values |
+| `Json` | JSON parsing and serialization |
 | `Array`, `Tuple`, `Dictionary`, `Set` | Collection values |
 | `Range`, `Iterator` | Lazy or bounded sequences |
 | `Option` | A value that may be present (`Some`) or absent (`None`) |
@@ -45,7 +46,7 @@ complete API catalog.
 
 ```swift
 let names = ["ada", "lin", "mira"]
-let upper = Iterator(names).Map(name => name.Upper()).ToArray()
+let upper = names.Map(name => name.Upper()).ToArray()
 
 mut settings = ["theme": "dark"]
 let theme = settings.TryGet("theme") ?? "system"
@@ -156,9 +157,9 @@ print(constructorName(Ok(42)))
 uses the process console. See [Hosting API guide](../Developers/HostingGuide.md#instance-input-and-output)
 for host-controlled input and output.
 
-## Bundled library modules
+## Standard library modules
 
-The `spell` console registers its bundled library modules. Import a module before using its public
+The `spell` console registers its standard library modules. Import a module before using its public
 names. `ByteArray` and `Json` are core types and are available without an import.
 
 ```swift
@@ -167,11 +168,16 @@ import * from math
 print(sqrt(81))
 ```
 
-| Layer | Modules | Main capabilities |
-| --- | --- | --- |
-| Standard | `collections`, `math`, `random`, `text`, `time`, `uuid` | Foundational values and data processing. |
-| Host | `readline`, `io` | Console input and file-system access supplied by the running host. |
-| Extended | `http` | Higher-level HTTP requests, responses, and sessions. This is planned to become a separately loaded library. |
+| Modules | Main capabilities |
+| --- | --- |
+| `collections` | Collection types beyond the core collection types. |
+| `readline` | Console input through `readLine`. |
+| `io` | Files, directories, paths, drives, and file attributes. |
+| `math` | General numeric functions and constants. |
+| `random` | Independent pseudo-random generators. |
+| `text` | Text-processing types such as regular expressions and string builders. |
+| `time` | UTC and local date-time values, durations, and fixed offsets. |
+| `uuid` | UUID parsing, formatting, and generation. |
 
 For example, `readline` provides input while `print` remains a core function:
 
@@ -187,7 +193,7 @@ module is an external extension of the `spell` distribution; see the
 [Hosting API guide](../Developers/HostingGuide.md#external-extension-libraries) for its loading
 contract.
 
-The portable modules include explicit conversions for common data formats:
+Core types provide explicit conversions for common data formats:
 
 ```swift
 let bytes = ByteArray.FromString("Spellkit")

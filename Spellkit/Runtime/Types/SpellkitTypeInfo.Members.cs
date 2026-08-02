@@ -432,6 +432,14 @@ public abstract partial class SpellkitTypeInfo : SpellkitObject
         var ti = SpellkitTypeCodes.GetMixinByCode(typeId);
         mixins.Add(ti.ReflectedTypeId);
 
+        if (typeId == SpellkitTypeCodes.Sequence)
+        {
+            foreach (var member in ti.Members)
+            {
+                Members.TryAdd(member.Key, member.Value);
+            }
+        }
+
         foreach (var mj in ti.mixins)
         {
             if (mj != SpellkitTypeCodes.Object)

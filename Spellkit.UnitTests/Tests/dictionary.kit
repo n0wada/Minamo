@@ -5,6 +5,11 @@
     assert(33, xs["long key"])
 #endregion
 
+#region "Sequence operations"
+    let labels = ["ada": 1, "lin": 2].Map(entry => entry.key + ":" + entry.value).ToArray()
+    assert(["ada:1", "lin:2"], labels)
+#endregion
+
 #region "Constructor 1"
     let xs = Dictionary(
         (x: 1, y: 2, z: "foo")

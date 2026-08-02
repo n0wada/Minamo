@@ -248,6 +248,15 @@
     assert([1,2,3,4,5], res)
 #endregion
 
+#region "Sequence operations"
+    let upper = ["ada", "lin", "mira"].Map(name => name.Upper()).ToArray()
+    assert(["ADA", "LIN", "MIRA"], upper)
+    assert([3, 4], [1, 2, 3, 4, 5].Filter(value => value > 2).Take(2).ToArray())
+    assert(6, [1, 2, 3].Reduce((sum, value) => sum + value))
+    assert(true, [1, 2, 3].Any(value => value == 2))
+    assert(true, [1, 2, 3].All(value => value > 0))
+#endregion
+
 #region "Ranges"
     mut xs = [1..10]
     assert([1,2,3,4,5,6,7,8,9,10], xs)
