@@ -9,9 +9,9 @@ public sealed class JsonLibraryTests
     [Fact]
     public void RejectsInvalidJsonText()
     {
-        using var instance = new SpellkitHost().AddStandardLibrary().CreateInstance();
+        using var instance = new SpellkitHost().CreateInstance();
 
-        var result = instance.Execute("import * from json\nparse(\"{\")");
+        var result = instance.Execute("Json.Parse(\"{\")");
 
         Assert.False(result.Success);
     }
@@ -19,13 +19,12 @@ public sealed class JsonLibraryTests
     [Fact]
     public void RejectsNonStringObjectKeys()
     {
-        using var instance = new SpellkitHost().AddStandardLibrary().CreateInstance();
+        using var instance = new SpellkitHost().CreateInstance();
 
         const string source = """
-            import * from json
             mut values = Dictionary()
             values.Add(1, "one")
-            stringify(values)
+            Json.Stringify(values)
             """;
 
         var result = instance.Execute(source);
@@ -36,12 +35,11 @@ public sealed class JsonLibraryTests
     [Fact]
     public void RejectsCyclicCollections()
     {
-        using var instance = new SpellkitHost().AddStandardLibrary().CreateInstance();
+        using var instance = new SpellkitHost().CreateInstance();
         const string source = """
-            import * from json
             mut values = []
             values.Add(values)
-            stringify(values)
+            Json.Stringify(values)
             """;
 
         var result = instance.Execute(source);

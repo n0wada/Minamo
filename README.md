@@ -115,7 +115,7 @@ app.greet("Spellkit")
 
 Hosts can expose selected commands and resources, supply capabilities and limits, and keep
 CLR objects behind opaque handles. For the complete lifecycle and API contract, see the
-[Hosting guide](Docs/Hosting/Guide.md). The [Public API layers](Docs/Developers/PublicApiLayers.md) guide explains
+[Hosting guide](Docs/Developers/HostingGuide.md). The [Public API layers](Docs/Developers/PublicApiLayers.md) guide explains
 the application, tooling, and runtime-extension surfaces.
 
 ## Examples
@@ -197,7 +197,7 @@ language test corpus remain authoritative for current behavior.
 
 ### Host integration
 
-- [Hosting API guide](Docs/Hosting/Guide.md)
+- [Hosting API guide](Docs/Developers/HostingGuide.md)
 
 The Hosting guide covers host setup, commands, resources, state, signals, execution limits,
 observability, and security defaults.

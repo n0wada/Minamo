@@ -14,13 +14,12 @@ public sealed class InstanceIoTests
         var output = new StringBuilder();
         using var instance = new SpellkitHost()
             .AddStandardLibrary()
-            .AddHostLibrary()
             .CreateInstance(
             new SpellkitEnvironment()
                 .UseInput(_ => "instance input")
                 .UseOutput(value => output.Append(value)));
 
-        var result = instance.Execute("import * from console\nprint(readLine(), terminator: nil)");
+        var result = instance.Execute("import * from readline\nprint(readLine(), terminator: nil)");
 
         Assert.True(result.Success, result.Failure?.Message);
         Assert.Equal("instance input", output.ToString());
@@ -43,15 +42,14 @@ public sealed class InstanceIoTests
         var firstOutput = new StringBuilder();
         var secondOutput = new StringBuilder();
         var host = new SpellkitHost()
-            .AddStandardLibrary()
-            .AddHostLibrary();
+            .AddStandardLibrary();
         using var first = host.CreateInstance(
             Environment("first", firstOutput, rendezvous));
         using var second = host.CreateInstance(
             Environment("second", secondOutput, rendezvous));
 
-        var firstRun = first.ExecuteAsync("import * from console\nprint(readLine(), terminator: nil)");
-        var secondRun = second.ExecuteAsync("import * from console\nprint(readLine(), terminator: nil)");
+        var firstRun = first.ExecuteAsync("import * from readline\nprint(readLine(), terminator: nil)");
+        var secondRun = second.ExecuteAsync("import * from readline\nprint(readLine(), terminator: nil)");
         var results = await Task.WhenAll(firstRun, secondRun);
 
         Assert.All(results, result => Assert.True(result.Success, result.Failure?.Message));

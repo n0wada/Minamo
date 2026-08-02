@@ -6,7 +6,7 @@ modules and commands to expose, so a script must not assume that console modules
 every hosted environment.
 
 This page is a practical guide to the built-ins that are part of the current runtime. See the
-[grammar reference](../Reference/Grammar.md) for syntax and the [Hosting API guide](../Hosting/Guide.md)
+[grammar reference](../Reference/Grammar.md) for syntax and the [Hosting API guide](../Developers/HostingGuide.md)
 for controlling a script's environment.
 
 ## Core values and types
@@ -17,7 +17,7 @@ The core runtime includes these commonly used values and types:
 | --- | --- |
 | `nil` / `Nil` | Absence of a value |
 | `true`, `false` / `Boolean` | Boolean values |
-| `Integer`, `Float`, `Char`, `String` | Primitive values |
+| `Integer`, `Float`, `Char`, `String`, `ByteArray` | Primitive values |
 | `Array`, `Tuple`, `Dictionary`, `Set` | Collection values |
 | `Range`, `Iterator` | Lazy or bounded sequences |
 | `Option` | A value that may be present (`Some`) or absent (`None`) |
@@ -153,14 +153,13 @@ print(constructorName(Ok(42)))
 ```
 
 `print` writes through an instance-specific output stream when the host supplies one. Otherwise it
-uses the process console. See [Hosting API guide](../Hosting/Guide.md#instance-input-and-output)
+uses the process console. See [Hosting API guide](../Developers/HostingGuide.md#instance-input-and-output)
 for host-controlled input and output.
 
 ## Bundled library modules
 
-The `spell` console registers portable standard modules, basic host modules, and the currently
-bundled extended modules. In an embedded host, all modules are optional and must be registered
-deliberately. Import a module before using its public names.
+The `spell` console registers its bundled library modules. Import a module before using its public
+names. `ByteArray` and `Json` are core types and are available without an import.
 
 ```swift
 import * from math
@@ -170,34 +169,32 @@ print(sqrt(81))
 
 | Layer | Modules | Main capabilities |
 | --- | --- | --- |
-| Standard | `binary`, `collections`, `json`, `math`, `random`, `text`, `time`, `uuid` | Portable foundational values and data processing. |
-| Host | `console`, `io` | Console input and file-system access supplied by the running host. |
+| Standard | `collections`, `math`, `random`, `text`, `time`, `uuid` | Foundational values and data processing. |
+| Host | `readline`, `io` | Console input and file-system access supplied by the running host. |
 | Extended | `http` | Higher-level HTTP requests, responses, and sessions. This is planned to become a separately loaded library. |
 
-For example, `console` provides input while `print` remains a core function:
+For example, `readline` provides input while `print` remains a core function:
 
 ```swift
-import * from console
+import * from readline
 
 print(readLine(), terminator: nil)
 ```
 
-The `console`, `io`, and `http` modules can access host or external resources. Hosts that need a
-restricted scripting surface should omit them, or expose narrower host commands and capabilities
-instead. The precise admission criteria and current classification are documented in the
-[standard library policy](../Developers/StandardLibrary.md).
+The `readline` and `io` modules can access host resources. An embedding host chooses which
+modules to register and can instead expose narrower host commands and capabilities. The `http`
+module is an external extension of the `spell` distribution; see the
+[Hosting API guide](../Developers/HostingGuide.md#external-extension-libraries) for its loading
+contract.
 
 The portable modules include explicit conversions for common data formats:
 
 ```swift
-import * from binary
-import * from json
-
 let bytes = ByteArray.FromString("Spellkit")
 print(bytes.ToHex())
 
-let value = parse("""{"ready":true,"ports":[8080,8081]}""")
-print(stringify(value, indented: true))
+let value = Json.Parse("""{"ready":true,"ports":[8080,8081]}""")
+print(Json.Stringify(value, indented: true))
 ```
 
 Seeded random generators are independent and reproducible within the running Spellkit version:
@@ -220,4 +217,4 @@ omitted local offset consult the system time zone.
 - [Syntax](Syntax.md)
 - [Operators](Operators.md)
 - [Types and traits](TypesAndTraits.md)
-- [Hosting API guide](../Hosting/Guide.md)
+- [Hosting API guide](../Developers/HostingGuide.md)

@@ -35,7 +35,7 @@ The Hosting API uses a small set of names consistently on the C# side and the Sp
 | Resources | `host.AddResourceType<T>()`, `context.Resource(...)` | Returned handles | Instance-scoped opaque CLR objects |
 | State | `Environment.State.Set/SetScript` | `host.State` | Instance memory with host-owned and script-owned keys |
 | Signals | `host.AddSignal(...)`, `Environment.Signals` | `host.Signals` | Queued events delivered by `DispatchSignals()` |
-| Input and output | `SpellkitEnvironment.UseInput/UseOutput` | `readLine` (console library), `print` | Instance-local text I/O selected by the host |
+| Input and output | `SpellkitEnvironment.UseInput/UseOutput` | `readLine` (`readline` library), `print` | Instance-local text I/O selected by the host |
 | Capabilities | `host.AddCapabilities(...)`, `Environment.Capabilities` | None | Host-owned allow-list for protected features |
 | Logging | `SpellkitHostOptions.Log` | `host.Log` | User-facing structured log events |
 | Tracing | `SpellkitHostOptions.Trace` | None | Observational diagnostics for the embedding host |
@@ -285,9 +285,9 @@ var result = instance.Execute("print(\"ready\", terminator: nil)");
 ```
 
 The input delegate receives the current operation's cancellation token. Returning `null` represents
-end of input and produces an empty Spellkit string. The optional console library exposes that input
-as `readLine` after `import * from console`; the output delegate receives the text chunks that
-`print` writes: values, separators, and terminators. Without delegates, the console library and
+end of input and produces an empty Spellkit string. The optional `readline` library exposes that input
+as `readLine` after `import * from readline`; the output delegate receives the text chunks that
+`print` writes: values, separators, and terminators. Without delegates, the `readline` library and
 `print` retain their process Console behavior.
 
 Use `ExecuteFile` when the host has explicitly selected an entry script:
@@ -1043,67 +1043,42 @@ public sealed partial class EntityTypeInfo : SpellkitForeignTypeInfo
 attributes bind instance and static members on a `SpellkitForeignTypeInfo`. Operators and conversions stay
 as explicit `SpellkitForeignTypeInfo` overrides because they participate in the runtime type protocol.
 
-The optional library modules can be enabled explicitly with their generated extensions. Portable
-standard modules are independent of host resources:
+## External extension libraries
+
+The `spell` executable can load optional extension assemblies listed in its
+`spellkit.json` file. This is a command-line distribution feature; embedding
+applications choose their own module registrations and do not inherit those
+extensions automatically.
+
+An extension assembly exposes one or more public implementations of
+`ISpellkitLibrary`:
 
 ```csharp
-host.AddBinaryModule()
-    .AddCollectionsModule()
-    .AddJsonModule()
-    .AddMathModule()
-    .AddRandomModule()
-    .AddTextModule()
-    .AddTimeModule()
-    .AddUuidModule();
-```
+using Spellkit.Hosting;
 
-Host-resource modules and higher-level extended modules are registered separately:
+public sealed class ExampleLibrary : ISpellkitLibrary
+{
+    public string Id => "example";
 
-```csharp
-host.AddConsoleModule()
-    .AddIoModule()
-    .AddHttpModule();
-```
-
-See the [standard library policy](../Developers/StandardLibrary.md) for the admission criteria and
-current module classification.
-
-The console library's `http` module follows a requests-style shape while keeping Spellkit keyword
-rules intact:
-
-```kit
-import * from http
-
-let res = Get("https://api.example.test/users",
-    params: [active: true],
-    headers: ["Accept": "application/json"],
-    timeout: 5)
-
-if res.Ok {
-    print(res.Json()["items"])
+    public void Register(SpellkitHost host)
+    {
+        host.AddExampleModule();
+    }
 }
 ```
 
-Use `Session` when several requests share a base URL, headers, auth, or timeout:
+`spellkit.json` contains an `extensions` array of assembly paths. Each path may
+be absolute or relative to the directory containing the configuration file:
 
-```kit
-let api = Session(
-    baseUrl: "https://api.example.test",
-    headers: ["Accept": "application/json"],
-    auth: [bearer: token],
-    timeout: 10)
-
-let created = api.Post("orders", json: [id: 42, customer: "Ada"]).RaiseForStatus()
+```json
+{
+  "extensions": [
+    "Spellkit.Extra.Http.dll"
+  ]
+}
 ```
 
-The `collections` module adds ordered maps backed by .NET's sorted dictionary behavior:
-
-```kit
-import * from collections
-
-let scores = SortedDictionary()
-scores.Add("ben", 82)
-scores.Add("ada", 98)
-
-print(scores.First().key) // ada
-```
+`spell` loads each assembly, creates its `ISpellkitLibrary` implementations, and
+invokes `Register`. An extension should reference `Spellkit.dll`, not
+`spell.exe`; `ISpellkitLibrary` is the public contract between the executable
+and an extension.

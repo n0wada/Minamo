@@ -1,18 +1,40 @@
-using Spellkit.Runtime;
+using Spellkit.Codegen;
 using Spellkit.Runtime.Types;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 
-namespace Spellkit.Library.Json;
+namespace Spellkit.Runtime;
 
-internal static class SpellkitJson
+[SpellkitType]
+public sealed partial class SpellkitJsonTypeInfo : SpellkitForeignTypeInfo
+{
+    public override string ReflectedTypeName => "Json";
+
+    [SpellkitStaticMethod]
+    internal static SpellkitObject Parse(ExecutionContext ctx, string value) =>
+        SpellkitJson.Parse(ctx, value);
+
+    [SpellkitStaticMethod]
+    internal static SpellkitObject Stringify(
+        ExecutionContext ctx,
+        SpellkitObject value,
+        bool indented = false) =>
+        SpellkitJson.Stringify(ctx, value, indented) is { } result
+            ? SpellkitString.Get(result)
+            : Nil;
+}
+
+public static class SpellkitJson
 {
     private const int MaxDepth = 64;
 
-    internal static SpellkitObject Parse(ExecutionContext ctx, string value) =>
+    public static SpellkitObject Parse(ExecutionContext ctx, string value) =>
         Parse(ctx, Encoding.UTF8.GetBytes(value));
 
-    internal static SpellkitObject Parse(ExecutionContext ctx, ReadOnlyMemory<byte> value)
+    public static SpellkitObject Parse(ExecutionContext ctx, ReadOnlyMemory<byte> value)
     {
         try
         {
@@ -25,7 +47,7 @@ internal static class SpellkitJson
         }
     }
 
-    internal static string? Stringify(ExecutionContext ctx, SpellkitObject value, bool indented = false)
+    public static string? Stringify(ExecutionContext ctx, SpellkitObject value, bool indented = false)
     {
         try
         {
@@ -130,17 +152,9 @@ internal static class SpellkitJson
         }
     }
 
-    private static bool WriteDictionary(
-        ExecutionContext ctx,
-        Utf8JsonWriter writer,
-        SpellkitDictionary dictionary,
-        HashSet<SpellkitObject> active)
+    private static bool WriteDictionary(ExecutionContext ctx, Utf8JsonWriter writer, SpellkitDictionary dictionary, HashSet<SpellkitObject> active)
     {
-        if (!Enter(ctx, dictionary, active))
-        {
-            return false;
-        }
-
+        if (!Enter(ctx, dictionary, active)) return false;
         writer.WriteStartObject();
         foreach (var item in dictionary)
         {
@@ -161,17 +175,9 @@ internal static class SpellkitJson
         return true;
     }
 
-    private static bool WriteTuple(
-        ExecutionContext ctx,
-        Utf8JsonWriter writer,
-        SpellkitTuple tuple,
-        HashSet<SpellkitObject> active)
+    private static bool WriteTuple(ExecutionContext ctx, Utf8JsonWriter writer, SpellkitTuple tuple, HashSet<SpellkitObject> active)
     {
-        if (!Enter(ctx, tuple, active))
-        {
-            return false;
-        }
-
+        if (!Enter(ctx, tuple, active)) return false;
         var objectShape = tuple.Count > 0 && Enumerable.Range(0, tuple.Count).All(index => tuple.GetKey(index) is not null);
         if (objectShape)
         {
@@ -204,17 +210,9 @@ internal static class SpellkitJson
         return true;
     }
 
-    private static bool WriteArray(
-        ExecutionContext ctx,
-        Utf8JsonWriter writer,
-        SpellkitArray array,
-        HashSet<SpellkitObject> active)
+    private static bool WriteArray(ExecutionContext ctx, Utf8JsonWriter writer, SpellkitArray array, HashSet<SpellkitObject> active)
     {
-        if (!Enter(ctx, array, active))
-        {
-            return false;
-        }
-
+        if (!Enter(ctx, array, active)) return false;
         writer.WriteStartArray();
         foreach (var item in array)
         {
@@ -229,15 +227,9 @@ internal static class SpellkitJson
         return true;
     }
 
-    private static bool Enter(
-        ExecutionContext ctx,
-        SpellkitObject value,
-        HashSet<SpellkitObject> active)
+    private static bool Enter(ExecutionContext ctx, SpellkitObject value, HashSet<SpellkitObject> active)
     {
-        if (active.Add(value))
-        {
-            return true;
-        }
+        if (active.Add(value)) return true;
         ctx.InvalidValue("Cyclic JSON value");
         return false;
     }

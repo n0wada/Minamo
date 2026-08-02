@@ -1,0 +1,5 @@
+{
+  "extensions": [
+    "Spellkit.Extra.Http.dll"
+  ]
+}

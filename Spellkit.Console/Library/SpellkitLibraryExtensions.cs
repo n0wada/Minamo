@@ -1,10 +1,7 @@
 using Spellkit.Hosting;
-using Spellkit.Library.Binary;
 using Spellkit.Library.Collections;
-using Spellkit.Library.ConsoleLibrary;
-using Spellkit.Library.Http;
+using Spellkit.Library.ReadLineLibrary;
 using Spellkit.Library.IO;
-using Spellkit.Library.Json;
 using Spellkit.Library.Mathematics;
 using Spellkit.Library.Random;
 using Spellkit.Library.Text;
@@ -19,36 +16,13 @@ internal static class SpellkitLibraryExtensions
     {
         ArgumentNullException.ThrowIfNull(host);
         return host
-            .AddBinaryModule()
             .AddCollectionsModule()
-            .AddJsonModule()
+            .AddReadLineModule()
+            .AddIoModule()
             .AddMathModule()
             .AddRandomModule()
             .AddTextModule()
             .AddTimeModule()
             .AddUuidModule();
-    }
-
-    internal static SpellkitHost AddHostLibrary(this SpellkitHost host)
-    {
-        ArgumentNullException.ThrowIfNull(host);
-        return host
-            .AddConsoleModule()
-            .AddIoModule();
-    }
-
-    internal static SpellkitHost AddExtendedLibrary(this SpellkitHost host)
-    {
-        ArgumentNullException.ThrowIfNull(host);
-        return host.AddHttpModule();
-    }
-
-    internal static SpellkitHost AddBundledLibraries(this SpellkitHost host)
-    {
-        ArgumentNullException.ThrowIfNull(host);
-        return host
-            .AddStandardLibrary()
-            .AddHostLibrary()
-            .AddExtendedLibrary();
     }
 }

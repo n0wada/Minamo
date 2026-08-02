@@ -65,7 +65,8 @@ internal sealed class ReplSession : IDisposable
         {
             BuilderOptions = buildOptions
         })
-            .AddBundledLibraries();
+            .AddStandardLibrary()
+            .AddConfiguredExtensionLibraries();
 
         host.ConfigureModules(buildOptions);
         return host;

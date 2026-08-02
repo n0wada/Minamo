@@ -120,7 +120,7 @@ Within a hosted script, local names, imports, and built-ins are resolved before 
 the host environment. This allows one compiled program to run with different host-provided views.
 
 Hosts can also hide the global `host` object and expose only explicitly selected names. See the
-[Hosting API guide](../Hosting/Guide.md) for capabilities, resource lifetimes, execution limits,
+[Hosting API guide](../Developers/HostingGuide.md) for capabilities, resource lifetimes, execution limits,
 and the host boundary.
 
 ## Exceptions and cleanup
@@ -143,5 +143,5 @@ try {
 
 - [Program structure](ProgramStructure.md)
 - [Syntax](Syntax.md)
-- [Hosting API guide](../Hosting/Guide.md)
+- [Hosting API guide](../Developers/HostingGuide.md)
 - [Grammar reference](../Reference/Grammar.md)

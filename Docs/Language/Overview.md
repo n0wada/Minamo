@@ -421,7 +421,7 @@ host.State["selected"] = "player"
 host.Signals.On("player.hit", damage => print(damage))
 ```
 
-See the [Hosting API guide](../Hosting/Guide.md) for capabilities, execution limits, resource lifetime,
+See the [Hosting API guide](../Developers/HostingGuide.md) for capabilities, execution limits, resource lifetime,
 telemetry, and C# integration.
 
 ## Next steps
@@ -429,7 +429,7 @@ telemetry, and C# integration.
 - [Detailed grammar reference](../Reference/Grammar.md)
 - [Language recipes](Recipes.md)
 - [Interactive selects](../Developers/InteractiveSelect.md)
-- [Hosting API](../Hosting/Guide.md)
+- [Hosting API](../Developers/HostingGuide.md)
 - [Compatibility](../Operations/Compatibility.md)
 - [Runnable Station Console example](../../Examples/StationConsole/README.md)
 - [Interactive Quest Console example](../../Examples/QuestConsole/README.md)

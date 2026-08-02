@@ -1,6 +1,5 @@
 using Spellkit.Compiler;
 using Spellkit.Hosting;
-using Spellkit.Library.Binary;
 using Spellkit.Library.IO;
 using Spellkit.Library.Text;
 using Spellkit.Library.Time;

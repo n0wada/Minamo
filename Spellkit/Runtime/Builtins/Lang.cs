@@ -29,6 +29,8 @@ internal sealed partial class Lang : ForeignUnit
     {
         AddType<SpellkitOptionTypeInfo>();
         AddType<SpellkitResultTypeInfo>();
+        AddType<SpellkitByteArrayTypeInfo>();
+        AddType<SpellkitJsonTypeInfo>();
         hostRootType = AddType<SpellkitHostRootTypeInfo>();
     }
 

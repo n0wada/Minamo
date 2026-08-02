@@ -1,11 +1,12 @@
 using Spellkit.Hosting;
+using Spellkit.Library.ConsoleLibrary;
 using Spellkit.Runtime;
 
-namespace Spellkit.Library.ConsoleLibrary;
+namespace Spellkit.Library.ReadLineLibrary;
 
-[SpellkitModule("console")]
+[SpellkitModule("readline")]
 [SpellkitForeignType(typeof(SpellkitConsoleTypeInfo))]
-public static class ConsoleModule
+public static class ReadLineModule
 {
     [SpellkitCommand("readLine")]
     internal static string ReadLine(SpellkitCommandContext host)
