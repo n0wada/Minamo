@@ -122,6 +122,21 @@ internal sealed partial class HandwrittenParser
                 continue;
             }
 
+            if (IsContextualKeyword("view"))
+            {
+                Consume();
+                var view = ParseSelectViewBody();
+                if (view is not null)
+                {
+                    state.View = view;
+                }
+                else
+                {
+                    SynchronizeStatement();
+                }
+                continue;
+            }
+
             if (IsContextualKeyword("otherwise"))
             {
                 Consume();
@@ -143,6 +158,20 @@ internal sealed partial class HandwrittenParser
                 if (choice is not null)
                 {
                     state.Choices.Add(choice);
+                }
+                else
+                {
+                    SynchronizeStatement();
+                }
+                continue;
+            }
+
+            if (Check(TokenKind.For))
+            {
+                var dynamicChoices = ParseSelectDynamicChoices();
+                if (dynamicChoices is not null)
+                {
+                    state.DynamicChoices.Add(dynamicChoices);
                 }
                 else
                 {
@@ -225,6 +254,19 @@ internal sealed partial class HandwrittenParser
                 continue;
             }
 
+            if (IsContextualKeyword("view"))
+            {
+                Consume();
+                var view = ParseSelectViewBody();
+                if (view is null)
+                {
+                    return null;
+                }
+
+                choice.View = view;
+                continue;
+            }
+
             break;
         }
 
@@ -236,6 +278,137 @@ internal sealed partial class HandwrittenParser
 
         choice.Body = body;
         return choice;
+    }
+
+    private SelectDynamicChoiceGroupSyntax? ParseSelectDynamicChoices()
+    {
+        var keyword = Consume();
+        if (!Check(TokenKind.LowerIdentifier))
+        {
+            ReportExpected(TokenKind.LowerIdentifier);
+            return null;
+        }
+
+        var item = Consume();
+        if (!Expect(TokenKind.In))
+        {
+            return null;
+        }
+
+        var source = ParseExpression();
+        if (source is null || !Expect(TokenKind.LeftBrace))
+        {
+            return null;
+        }
+
+        var group = new SelectDynamicChoiceGroupSyntax(keyword.Location)
+        {
+            ItemName = item.Text,
+            Source = source
+        };
+        while (!Check(TokenKind.RightBrace) && !IsAtEnd)
+        {
+            if (IsContextualKeyword("choose"))
+            {
+                var choice = ParseSelectDynamicChoice();
+                if (choice is not null)
+                {
+                    group.Choices.Add(choice);
+                }
+                else
+                {
+                    SynchronizeStatement();
+                }
+                continue;
+            }
+
+            Report(ParserError.InvalidStatement, Current);
+            Consume();
+            SynchronizeStatement();
+        }
+
+        Expect(TokenKind.RightBrace);
+        if (group.Choices.Count == 0)
+        {
+            Report(ParserError.InvalidStatement, keyword);
+            return null;
+        }
+        return group;
+    }
+
+    private SelectDynamicChoiceSyntax? ParseSelectDynamicChoice()
+    {
+        var keyword = Consume();
+        var id = ParseGuardExpression();
+        if (id is null || !ExpectSeparator())
+        {
+            return null;
+        }
+
+        var choice = new SelectDynamicChoiceSyntax(keyword.Location) { Id = id };
+        while (!Check(TokenKind.Arrow) && !Check(TokenKind.RightBrace) && !IsAtEnd)
+        {
+            if (IsContextualKeyword("label"))
+            {
+                Consume();
+                choice.Label = ParseSelectDynamicChoiceExpression();
+                if (choice.Label is null)
+                {
+                    return null;
+                }
+                continue;
+            }
+
+            if (IsContextualKeyword("description"))
+            {
+                Consume();
+                choice.Description = ParseSelectDynamicChoiceExpression();
+                if (choice.Description is null)
+                {
+                    return null;
+                }
+                continue;
+            }
+
+            if (Match(TokenKind.When))
+            {
+                choice.Guard = ParseSelectDynamicChoiceExpression();
+                if (choice.Guard is null)
+                {
+                    return null;
+                }
+                continue;
+            }
+
+            if (IsContextualKeyword("view"))
+            {
+                Consume();
+                choice.View = ParseSelectViewBody();
+                if (choice.View is null)
+                {
+                    return null;
+                }
+                continue;
+            }
+
+            Report(ParserError.InvalidStatement, Current);
+            return null;
+        }
+
+        var body = ParseSelectActionBody();
+        if (body is null)
+        {
+            return null;
+        }
+
+        choice.Body = body;
+        return choice;
+    }
+
+    private SyntaxNode? ParseSelectDynamicChoiceExpression()
+    {
+        var expression = ParseGuardExpression();
+        return expression is not null && ExpectSeparator() ? expression : null;
     }
 
     private SelectEventSyntax? ParseSelectEvent()
@@ -274,6 +447,23 @@ internal sealed partial class HandwrittenParser
         }
 
         return ParseBlock();
+    }
+
+    private SyntaxNode? ParseSelectViewBody()
+    {
+        if (!Expect(TokenKind.Arrow))
+        {
+            return null;
+        }
+
+        var view = ParseExpression();
+        if (view is null)
+        {
+            return null;
+        }
+
+        ExpectSeparator();
+        return view;
     }
 
     private void ParseSelectParameters(List<ParameterSyntax> parameters)

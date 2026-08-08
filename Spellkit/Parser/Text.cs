@@ -39,15 +39,12 @@ public abstract class SourceBuffer
 
 internal sealed class StringBuffer : SourceBuffer
 {
-    private readonly char[] buffer;
+    private readonly string buffer;
     private readonly int bufferLen;
     private int bufferPosition;
 
-    public StringBuffer(string value)
-    {
-        buffer = value.ToCharArray();
-        bufferLen = buffer.Length;
-    }
+    public StringBuffer(string value) =>
+        (buffer, bufferLen) = (value, value.Length);
 
     public StringBuffer(string value, string fileName) : this(value) =>
         FileName = fileName.Replace('\\', '/');

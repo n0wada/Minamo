@@ -237,6 +237,290 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
+    public void SelectSnapshotsExposeRevisionsAndViews()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = instance.Execute("""
+            select flow {
+                initial state start {
+                    view => ["title": "Start", "step": 1]
+                    choose "next"
+                        view => ["style": "primary"]
+                        => goto finish("Done")
+                }
+
+                state finish(title: String) {
+                    view => ["title": title, "step": 2]
+                    choose "exit"
+                        view => ["style": "danger"]
+                        => exit title
+                }
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        using var session = instance.OpenSelect("flow");
+        var initial = session.Snapshot;
+        var initialStateView = initial.State.View?
+            .GetValue<Dictionary<string, object?>>()
+            ?? throw new InvalidOperationException("The initial state view is unavailable.");
+        var initialChoiceView = Assert.Single(initial.Choices).View?
+            .GetValue<Dictionary<string, object?>>()
+            ?? throw new InvalidOperationException("The initial choice view is unavailable.");
+
+        Assert.Equal("flow", initial.Name);
+        Assert.Equal(0L, initial.Revision);
+        Assert.Equal("start", initial.State.Id);
+        Assert.Equal("Start", initialStateView["title"]);
+        Assert.Equal(1, initialStateView["step"]);
+        Assert.Equal("primary", initialChoiceView["style"]);
+
+        var next = session.SelectAtRevision("next", initial.Revision);
+        var nextStateView = next.Snapshot.State.View?
+            .GetValue<Dictionary<string, object?>>()
+            ?? throw new InvalidOperationException("The next state view is unavailable.");
+        var nextChoiceView = Assert.Single(next.Snapshot.Choices).View?
+            .GetValue<Dictionary<string, object?>>()
+            ?? throw new InvalidOperationException("The next choice view is unavailable.");
+
+        Assert.Equal(initial.Revision + 1, next.Snapshot.Revision);
+        Assert.Equal("finish", next.Snapshot.State.Id);
+        Assert.Equal("Done", nextStateView["title"]);
+        Assert.Equal("danger", nextChoiceView["style"]);
+        Assert.Equal(next.Snapshot.Revision, session.Revision);
+        Assert.Equal(next.Snapshot.Revision, session.Snapshot.Revision);
+
+        var mismatch = Assert.Throws<SpellkitSelectRevisionMismatchException>(
+            () => session.SelectAtRevision("exit", initial.Revision));
+        Assert.Equal(initial.Revision, mismatch.ExpectedRevision);
+        Assert.Equal(next.Snapshot.Revision, mismatch.Snapshot.Revision);
+        Assert.Equal("finish", mismatch.Snapshot.State.Id);
+
+        var completed = session.SelectAtRevision("exit", next.Snapshot.Revision);
+
+        Assert.True(completed.IsCompleted);
+        Assert.Equal(next.Snapshot.Revision + 1, completed.Snapshot.Revision);
+        Assert.Equal("finish", completed.Snapshot.State.Id);
+        Assert.Equal("Done", completed.GetValue<string>());
+    }
+
+    [Fact]
+    public void RefreshReevaluatesTheSnapshotAndInvalidateRejectsStaleChoices()
+    {
+        var available = true;
+        using var instance = new SpellkitHost()
+            .Module("inventory", module => module.Command("IsAvailable", _ => available))
+            .CreateInstance();
+        var initialized = instance.Execute("""
+            import inventory
+
+            select flow {
+                initial state waiting {
+                    choose "finish"
+                        when inventory.IsAvailable()
+                        => exit "done"
+                }
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        using var session = instance.OpenSelect("flow");
+        var initial = session.Snapshot;
+        available = false;
+        var refreshed = session.Refresh();
+
+        Assert.Equal(initial.Revision, refreshed.Revision);
+        Assert.Empty(refreshed.Choices);
+
+        var invalidated = session.Invalidate();
+
+        Assert.Equal(initial.Revision + 1, invalidated.Revision);
+        Assert.Empty(invalidated.Choices);
+        Assert.Equal(invalidated.Revision, session.Revision);
+        available = true;
+        var availableAgain = session.Refresh();
+        Assert.Equal(invalidated.Revision, availableAgain.Revision);
+        Assert.Single(availableAgain.Choices);
+        var stale = Assert.Throws<SpellkitSelectRevisionMismatchException>(
+            () => session.SelectAtRevision("finish", initial.Revision));
+        Assert.Equal(invalidated.Revision, stale.Snapshot.Revision);
+
+        var completed = session.SelectAtRevision("finish", availableAgain.Revision);
+
+        Assert.True(completed.IsCompleted);
+        Assert.Equal("done", completed.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task RefreshAndInvalidateAsyncFollowTheSameRevisionRules()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = await instance.ExecuteAsync("""
+            select flow {
+                initial state waiting {
+                    choose "finish" => exit
+                }
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        using var session = await instance.OpenSelectAsync("flow");
+        var initial = await session.RefreshAsync();
+        var invalidated = await session.InvalidateAsync();
+
+        Assert.Equal(initial.Revision + 1, invalidated.Revision);
+        await Assert.ThrowsAsync<SpellkitSelectRevisionMismatchException>(
+            () => session.SelectAtRevisionAsync("finish", initial.Revision));
+
+        var completed = await session.SelectAtRevisionAsync("finish", invalidated.Revision);
+        Assert.True(completed.IsCompleted);
+    }
+
+    [Fact]
+    public async Task AsyncRevisionBoundEventsRejectStaleSnapshots()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = await instance.ExecuteAsync("""
+            select flow {
+                initial state waiting {
+                    on "advance" => goto ready
+                }
+
+                state ready {
+                    on "finish" (value) => exit value
+                }
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        using var session = await instance.OpenSelectAsync("flow");
+        var waiting = session.Snapshot;
+        var ready = await session.SendAtRevisionAsync("advance", waiting.Revision);
+
+        var mismatch = await Assert.ThrowsAsync<SpellkitSelectRevisionMismatchException>(
+            () => session.SendAtRevisionAsync("finish", 42, waiting.Revision));
+        Assert.Equal(waiting.Revision, mismatch.ExpectedRevision);
+        Assert.Equal(ready.Snapshot.Revision, mismatch.Snapshot.Revision);
+        Assert.Equal("ready", mismatch.Snapshot.State.Id);
+
+        var completed = await session.SendAtRevisionAsync(
+            "finish",
+            42,
+            ready.Snapshot.Revision);
+
+        Assert.True(completed.IsCompleted);
+        Assert.Equal(42L, completed.GetValue<long>());
+    }
+
+    [Fact]
+    public void DynamicChoicesExposeViewsAndBindTheirItems()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = instance.Execute("""
+            select shop {
+                initial state browse {
+                    choose "leave" => exit "left"
+
+                    for item in [
+                        (id: "apple", name: "Apple", enabled: true, price: 3),
+                        (id: "pear", name: "Pear", enabled: false, price: 5)
+                    ] {
+                        choose item.id
+                            label item.name
+                            description "Fresh fruit"
+                            when item.enabled
+                            view => ["price": item.price]
+                            => exit item.price
+                    }
+                }
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        using var session = instance.OpenSelect("shop");
+        var snapshot = session.Snapshot;
+
+        Assert.Equal(new[] { "leave", "apple" }, snapshot.Choices.Select(choice => choice.Id));
+        var apple = snapshot.Choices.Single(choice => choice.Id == "apple");
+        Assert.Equal("Apple", apple.Label);
+        Assert.Equal("Fresh fruit", apple.Description);
+        var appleView = apple.View?.GetValue<Dictionary<string, object?>>()
+            ?? throw new InvalidOperationException("The dynamic choice view is unavailable.");
+        Assert.Equal(3, appleView["price"]);
+        Assert.Throws<ArgumentException>(() => session.Select("apple", 1));
+
+        var completed = session.SelectAtRevision("apple", snapshot.Revision);
+
+        Assert.True(completed.IsCompleted);
+        Assert.Equal(3L, completed.GetValue<long>());
+    }
+
+    [Fact]
+    public void EmptyDynamicChoiceSourceKeepsTheStateActive()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = instance.Execute("""
+            select flow {
+                initial state waiting {
+                    for item in [] {
+                        choose item
+                            => exit item
+                    }
+                }
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        using var session = instance.OpenSelect("flow");
+
+        Assert.False(session.IsCompleted);
+        Assert.Empty(session.Snapshot.Choices);
+    }
+
+    [Fact]
+    public void DynamicChoiceIdsMustBeUnique()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = instance.Execute("""
+            select flow {
+                initial state waiting {
+                    for item in ["same", "same"] {
+                        choose item
+                            => exit
+                    }
+                }
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        var error = Assert.Throws<InvalidOperationException>(() => instance.OpenSelect("flow"));
+        Assert.Contains("duplicate choice ID 'same'", error.Message);
+    }
+
+    [Fact]
+    public void OtherwiseRunsWhenDynamicChoicesAreEmpty()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            let flow = select {
+                initial state waiting {
+                    for item in [] {
+                        choose item
+                            => exit item
+                    }
+
+                    otherwise => exit "empty"
+                }
+            }
+
+            do flow
+            """);
+
+        Assert.True(run.IsCompleted, run.Failure?.ToString());
+        Assert.Equal("empty", run.GetValue<string>());
+    }
+
+    [Fact]
     public void ScriptDoRunsTheSelectAndThenContinuesExecution()
     {
         var output = new StringBuilder();

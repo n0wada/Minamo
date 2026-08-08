@@ -132,8 +132,10 @@ internal sealed record LoweredSelectState(
     IReadOnlyList<LoweredParameter> Parameters,
     LoweredNode? Enter,
     LoweredNode? Leave,
+    LoweredNode? View,
     LoweredNode? Otherwise,
     IReadOnlyList<LoweredSelectChoice> Choices,
+    IReadOnlyList<LoweredSelectDynamicChoiceGroup> DynamicChoices,
     IReadOnlyList<LoweredSelectEvent> Events);
 
 internal sealed record LoweredSelectChoice(
@@ -143,6 +145,22 @@ internal sealed record LoweredSelectChoice(
     string Label,
     string? Description,
     LoweredNode? Guard,
+    LoweredNode? View,
+    LoweredNode Body);
+
+internal sealed record LoweredSelectDynamicChoiceGroup(
+    Location Location,
+    LoweredParameter Item,
+    LoweredNode Source,
+    IReadOnlyList<LoweredSelectDynamicChoice> Choices);
+
+internal sealed record LoweredSelectDynamicChoice(
+    Location Location,
+    LoweredNode Id,
+    LoweredNode? Label,
+    LoweredNode? Description,
+    LoweredNode? Guard,
+    LoweredNode? View,
     LoweredNode Body);
 
 internal sealed record LoweredSelectEvent(

@@ -5,9 +5,8 @@ shops, quests, and similar flows: Script defines states and available actions, w
 the UI, input events, and game data.
 
 The feature supports named and anonymous factories, select-local declarations, VM suspension at
-`do`, nested selects, guards, visible choices, hidden host events, fallback actions, state
-parameters, and state lifecycle hooks. Dynamic choices and persistence of suspended executions
-remain deferred.
+`do`, nested selects, guards, visible and dynamic choices, hidden host events, fallback actions,
+state parameters, and state lifecycle hooks. Persistence of suspended executions remains deferred.
 
 ## Mental model
 
@@ -102,10 +101,13 @@ select-expression
 
 state-declaration
     ::= [ "initial" ] "state" identifier parameters?
-        "{" { state-hook | otherwise-declaration | choice-declaration | event-declaration } "}"
+        "{" { state-hook | state-view | otherwise-declaration | choice-declaration | dynamic-choice-group | event-declaration } "}"
 
 state-hook
     ::= ( "enter" | "leave" ) "=>" block
+
+state-view
+    ::= "view" "=>" expression
 
 otherwise-declaration
     ::= "otherwise" "=>" choice-body
@@ -115,6 +117,18 @@ choice-declaration
         [ "label" string ]
         [ "description" string ]
         [ "when" expression ]
+        [ "view" "=>" expression ]
+        "=>" choice-body
+
+dynamic-choice-group
+    ::= "for" identifier "in" expression "{" dynamic-choice+ "}"
+
+dynamic-choice
+    ::= "choose" expression newline
+        { "label" expression newline
+        | "description" expression newline
+        | "when" expression newline
+        | "view" "=>" expression newline }
         "=>" choice-body
 
 event-declaration
@@ -154,6 +168,14 @@ again.
 `enter` runs after a session is created for the initial state and after a `goto` enters a state.
 `leave` runs before a `goto` or `exit` leaves the current state. Both hooks must be blocks and are
 side-effect hooks: they cannot `goto`, `exit`, or suspend on another select.
+
+`view` supplies host-facing display data. A state can declare one state view, and a choice can
+declare one choice view. A view is an expression terminated by a newline or semicolon; it is
+therefore written before the choice action's `=>`. State views and choice views receive the current
+state parameters and captured select-local values. Choice views deliberately do not receive the
+host-supplied choice arguments, because the host needs them before a choice is selected. Views are
+evaluated each time a snapshot is read, so they should be free of side effects and cannot start a
+nested select.
 
 State parameters carry the data for a particular state entry. A `goto` supplies the target state's
 values, and those values are available as ordinary variables in the target state's `enter`, `leave`,
@@ -217,6 +239,128 @@ choose "set-volume" (trackId, value) => { }
 With zero parameters, no payload is accepted. With one parameter, the payload is that value. With
 two or more parameters, the payload must be one tuple whose elements bind to the parameters.
 
+## Dynamic choices
+
+Use a state-local `for` group to generate choices from a collection. The loop variable is available
+to the generated choice ID, presentation fields, guard, view, and action body.
+
+```kit
+initial state browse {
+    choose "leave" => exit
+
+    for item in shop.Stock {
+        choose item.id
+            label item.name
+            description item.description
+            when item.available
+            view => ["price": item.price, "rarity": item.rarity]
+            => {
+                cart.Add(item)
+                goto browse
+            }
+    }
+}
+```
+
+The source must evaluate to a Spellkit collection, such as an array, tuple, dictionary, set, or
+string. It is evaluated whenever the host reads the current snapshot and again when a choice is
+selected. Generated IDs must be nonempty strings and must be unique across the state's static and
+dynamic choices. A missing, hidden, or changed generated choice is rejected on selection just like
+a static choice whose `when` guard became false.
+
+Dynamic choices do not currently declare host-supplied parameters: their loop item is the action's
+input. Their `SpellkitChoice.Parameters` collection is therefore empty. An empty dynamic source
+keeps the state active, allowing its source to become available later; `otherwise` still runs when
+that source produces no visible choices and the state has no host events.
+
+## Views and snapshots
+
+Use `view` to keep rendering data beside the state or choice it describes. A dictionary literal is
+convenient for structured UI data:
+
+```kit
+select courierQuest {
+    initial state offer {
+        view => ["template": "quest.offer", "title": "Courier needed"]
+
+        choose "accept"
+            label "Accept"
+            view => ["style": "primary", "icon": "check"]
+            => goto active("courier")
+    }
+
+    state active(questId: String) {
+        view => ["template": "quest.active", "questId": questId]
+
+        choose "leave"
+            view => ["style": "secondary"]
+            => exit
+    }
+}
+```
+
+`SpellkitSelectSession.Snapshot` returns an immutable `SpellkitSelectSnapshot` containing the
+currently interactive select's name, state, visible choices, completion flag, and revision. This
+also follows an active nested select, so a UI always renders the interaction that can currently
+receive input. The revision starts at zero and increases after each successful select action,
+cancellation, or host invalidation; use it to avoid rerendering an unchanged snapshot or to track
+which UI render produced an input event.
+
+Send the revision that produced a UI action to reject stale input atomically. A mismatch leaves
+the session unchanged and throws `SpellkitSelectRevisionMismatchException`; its `Snapshot` is the
+current UI state to render instead.
+
+```csharp
+try
+{
+    var result = town.SelectAtRevision("accept", snapshot.Revision);
+    ui.Render(result.Snapshot);
+}
+catch (SpellkitSelectRevisionMismatchException stale)
+{
+    ui.Render(stale.Snapshot);
+}
+```
+
+When host-owned data changes outside a select action, call `Invalidate` after updating that data.
+It advances the revision and returns a newly evaluated snapshot, so actions from the previous UI
+render are rejected. `Refresh` also evaluates and returns a snapshot, but deliberately preserves
+the current revision; use it for an ordinary UI resync that does not make an existing render stale.
+
+```csharp
+inventory.Changed += (_, _) =>
+{
+    var snapshot = town.Invalidate();
+    ui.Render(snapshot);
+};
+```
+
+`InvalidateAsync` and `RefreshAsync` serialize with asynchronous select actions without blocking
+the caller. Host-owned data must still be updated and invalidated under the host's own dispatcher
+or synchronization mechanism. Do not synchronously invalidate the same session from a callback
+executing one of its select actions; enqueue that notification after the action instead.
+
+Use the three-argument overload when a choice or event has a payload. `SelectAtRevisionAsync` and
+`SendAtRevisionAsync` provide the same check for asynchronous hosts.
+
+```csharp
+var snapshot = town.Snapshot;
+var stateData = snapshot.State.View?
+    .GetValue<Dictionary<string, object?>>();
+
+ui.Render(snapshot.State.Id, stateData, snapshot.Choices);
+
+foreach (var choice in snapshot.Choices)
+{
+    var choiceData = choice.View?.GetValue<Dictionary<string, object?>>();
+    ui.AddChoice(choice.Id, choice.Label, choiceData);
+}
+```
+
+The generic `GetValue<T>()` and `TryGetValue<T>()` methods use the standard host conversion rules.
+For example, dictionary literals convert to `Dictionary<string, object?>`; scalar views can be
+read directly as `string`, `long`, and similar host types.
+
 ## Host events
 
 `on` declares a host event that is not included in `Choices`. Its parameters use the same payload
@@ -257,24 +401,41 @@ The session API is:
 public sealed class SpellkitSelectSession : IDisposable
 {
     public string Name { get; }
+    public long Revision { get; }
+    public SpellkitSelectSnapshot Snapshot { get; }
+    public SpellkitSelectSnapshot Refresh();
+    public Task<SpellkitSelectSnapshot> RefreshAsync();
+    public SpellkitSelectSnapshot Invalidate();
+    public Task<SpellkitSelectSnapshot> InvalidateAsync();
     public string State { get; }
     public IReadOnlyList<SpellkitChoice> Choices { get; }
     public bool IsCompleted { get; }
 
     public SpellkitSelectResult Select(string choiceId);
     public SpellkitSelectResult Select(string choiceId, object? argument);
+    public SpellkitSelectResult SelectAtRevision(string choiceId, long expectedRevision);
+    public SpellkitSelectResult SelectAtRevision(
+        string choiceId, object? argument, long expectedRevision);
     public SpellkitSelectResult Send(string eventId);
     public SpellkitSelectResult Send(string eventId, object? argument);
+    public SpellkitSelectResult SendAtRevision(string eventId, long expectedRevision);
+    public SpellkitSelectResult SendAtRevision(
+        string eventId, object? argument, long expectedRevision);
     public void Cancel();
 }
 ```
 
-`State` is the current state name. `SpellkitChoice` exposes `Id`, `Label`, `Description`,
-`ParameterCount`, and `Parameters`. Each `SpellkitChoiceParameter` exposes the source parameter
-`Name` and its optional `TypeName`. `Select` and `Send` return the next available choices or an
-`IsCompleted` result.
-They report an error for unavailable IDs, invalid argument shapes, or a completed session. Calls on
-one session are serialized; do not issue concurrent action calls.
+`State` is the current state name. `SpellkitChoice` exposes `Id`, `Label`, `Description`, `View`,
+`ParameterCount`, and `Parameters`. `SpellkitSelectSnapshot` exposes `Name`, `Revision`, `State`,
+`Choices`, and `IsCompleted`; its state is a `SpellkitSelectState` with `Id` and `View`. Each
+`SpellkitChoiceParameter` exposes the source parameter `Name` and its optional `TypeName`.
+`Select` and `Send` return the next snapshot through `SpellkitSelectResult.Snapshot`, while the
+existing `Choices` and `IsCompleted` result properties remain available for compatibility.
+They report an error for unavailable IDs, invalid argument shapes, or a completed session.
+`SelectAtRevision` and `SendAtRevision` additionally reject stale UI actions with
+`SpellkitSelectRevisionMismatchException`. `Refresh` and `Invalidate` participate in the same
+serialization as actions. Calls on one session are serialized; do not issue concurrent action
+calls.
 
 ## Script-initiated selects and VM continuations
 
@@ -402,7 +563,6 @@ must be dotted Spellkit names and duplicates are rejected.
 
 The current implementation deliberately excludes:
 
-- dynamic choice generation;
 - public `yield` / generic `resume` syntax;
 - serializing suspended VM continuations or select instances;
 - concurrent action calls and multiple suspended runs in one host instance.

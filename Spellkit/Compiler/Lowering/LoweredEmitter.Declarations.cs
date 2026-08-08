@@ -623,6 +623,12 @@ internal sealed partial class LoweredEmitter
                 initialCount++;
             }
 
+            var stateViewSlot = EmitSelectHook(
+                state.View,
+                $"$select-view:{node.Name ?? "anonymous"}:{i}",
+                state.Parameters,
+                selectContext,
+                ref closureCount);
             var enterSlot = EmitSelectHook(
                 state.Enter,
                 $"$select-enter:{node.Name ?? "anonymous"}:{i}",
@@ -679,6 +685,13 @@ internal sealed partial class LoweredEmitter
                     guardSlot = closureCount++;
                 }
 
+                var viewSlot = EmitSelectHook(
+                    choice.View,
+                    $"$select-choice-view:{node.Name ?? "anonymous"}:{i}:{j}",
+                    state.Parameters,
+                    selectContext,
+                    ref closureCount);
+
                 var function = new LoweredFunctionDeclaration(
                     choice.Location,
                     TypeName: null,
@@ -705,10 +718,89 @@ internal sealed partial class LoweredEmitter
                     choice.Description,
                     functionSlot,
                     guardSlot,
+                    viewSlot,
                     SelectParameters(choice.Parameters)));
             }
 
             var eventNames = new HashSet<string>(StringComparer.Ordinal);
+            var dynamicChoices = new List<SelectDynamicChoiceGroupDefinition>(state.DynamicChoices.Count);
+            for (var j = 0; j < state.DynamicChoices.Count; j++)
+            {
+                var group = state.DynamicChoices[j];
+                var sourceSlot = EmitSelectHook(
+                    group.Source,
+                    $"$select-dynamic-source:{node.Name ?? "anonymous"}:{i}:{j}",
+                    state.Parameters,
+                    selectContext,
+                    ref closureCount)
+                    ?? throw new InvalidOperationException("A dynamic select choice source is unavailable.");
+                var parameters = CombineParameters(state.Parameters, [group.Item]);
+                var templates = new List<SelectDynamicChoiceDefinition>(group.Choices.Count);
+                for (var k = 0; k < group.Choices.Count; k++)
+                {
+                    var choice = group.Choices[k];
+                    var idSlot = EmitSelectHook(
+                        choice.Id,
+                        $"$select-dynamic-id:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
+                        parameters,
+                        selectContext,
+                        ref closureCount)
+                        ?? throw new InvalidOperationException("A dynamic select choice ID is unavailable.");
+                    var labelSlot = EmitSelectHook(
+                        choice.Label,
+                        $"$select-dynamic-label:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
+                        parameters,
+                        selectContext,
+                        ref closureCount);
+                    var descriptionSlot = EmitSelectHook(
+                        choice.Description,
+                        $"$select-dynamic-description:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
+                        parameters,
+                        selectContext,
+                        ref closureCount);
+                    var guardSlot = EmitSelectHook(
+                        choice.Guard,
+                        $"$select-dynamic-guard:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
+                        parameters,
+                        selectContext,
+                        ref closureCount);
+                    var viewSlot = EmitSelectHook(
+                        choice.View,
+                        $"$select-dynamic-view:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
+                        parameters,
+                        selectContext,
+                        ref closureCount);
+                    var action = new LoweredFunctionDeclaration(
+                        choice.Location,
+                        TypeName: null,
+                        TargetTypeName: null,
+                        Name: $"$select-dynamic:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
+                        IsStatic: false,
+                        IsIndexer: false,
+                        IsConstructor: false,
+                        Getter: false,
+                        Setter: false,
+                        IsIterator: false,
+                        IsImplInitializer: false,
+                        IsPrivate: true,
+                        Parameters: parameters,
+                        Body: choice.Body,
+                        NeedsValue: false,
+                        IteratorBody: false,
+                        IsStdCall: !target.NoOptimizations);
+                    EmitFunctionBody(-1, action, selectContext, iteratorBody: false);
+                    templates.Add(new(
+                        idSlot,
+                        labelSlot,
+                        descriptionSlot,
+                        guardSlot,
+                        viewSlot,
+                        closureCount++));
+                }
+
+                dynamicChoices.Add(new(sourceSlot, templates));
+            }
+
             var events = new List<SelectEventDefinition>(state.Events.Count);
             for (var j = 0; j < state.Events.Count; j++)
             {
@@ -748,10 +840,12 @@ internal sealed partial class LoweredEmitter
                 state.Name,
                 state.IsInitial,
                 SelectParameters(state.Parameters),
+                stateViewSlot,
                 enterSlot,
                 leaveSlot,
                 otherwiseSlot,
                 choices,
+                dynamicChoices,
                 events));
         }
 

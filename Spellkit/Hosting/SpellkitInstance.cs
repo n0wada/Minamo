@@ -881,16 +881,20 @@ public sealed class SpellkitInstance : IDisposable
         return matches[0];
     }
 
-    internal SpellkitSelectSession CreateSelectSession(SelectInstance select)
+    internal SpellkitSelectSession CreateSelectSession(
+        SelectInstance select,
+        SpellkitSelectRevision? revision = null)
     {
-        var session = new SpellkitSelectSession(this, select);
+        var session = new SpellkitSelectSession(this, select, revision);
         session.Initialize();
         return session;
     }
 
-    internal async Task<SpellkitSelectSession> CreateSelectSessionAsync(SelectInstance select)
+    internal async Task<SpellkitSelectSession> CreateSelectSessionAsync(
+        SelectInstance select,
+        SpellkitSelectRevision? revision = null)
     {
-        var session = new SpellkitSelectSession(this, select);
+        var session = new SpellkitSelectSession(this, select, revision);
         await session.InitializeAsync().ConfigureAwait(false);
         return session;
     }
@@ -964,13 +968,10 @@ public sealed class SpellkitInstance : IDisposable
                     if (run.IsCompleted)
                     {
                         suspendedRun = null;
-                        return new SpellkitSelectResult(
-                            Array.Empty<SpellkitChoice>(),
-                            isCompleted: true,
-                            actionResult.Value);
+                        return new SpellkitSelectResult(actionResult.Snapshot, actionResult.Value);
                     }
 
-                    return new SpellkitSelectResult(run.Choices, isCompleted: false);
+                    return new SpellkitSelectResult(run.GetSelect().Snapshot);
                 }
                 catch (Exception ex)
                 {
@@ -1022,13 +1023,10 @@ public sealed class SpellkitInstance : IDisposable
                 if (run.IsCompleted)
                 {
                     suspendedRun = null;
-                    return new SpellkitSelectResult(
-                        Array.Empty<SpellkitChoice>(),
-                        isCompleted: true,
-                        actionResult.Value);
+                    return new SpellkitSelectResult(actionResult.Snapshot, actionResult.Value);
                 }
 
-                return new SpellkitSelectResult(run.Choices, isCompleted: false);
+                return new SpellkitSelectResult(run.GetSelect().Snapshot);
             }
             catch (Exception ex)
             {
@@ -1348,7 +1346,23 @@ public sealed class SpellkitInstance : IDisposable
 
     internal bool EvaluateSelectGuard(
         SpellkitFunction guard,
-        SpellkitObject[] arguments)
+        SpellkitObject[] arguments) =>
+        EvaluateSelectValue(guard, arguments, "guard").IsTrue();
+
+    internal SpellkitObject EvaluateSelectView(
+        SpellkitFunction view,
+        SpellkitObject[] arguments) =>
+        EvaluateSelectValue(view, arguments, "view");
+
+    internal SpellkitObject EvaluateSelectDynamicChoice(
+        SpellkitFunction function,
+        SpellkitObject[] arguments) =>
+        EvaluateSelectValue(function, arguments, "dynamic choice");
+
+    private SpellkitObject EvaluateSelectValue(
+        SpellkitFunction function,
+        SpellkitObject[] arguments,
+        string kind)
     {
         var ownsGate = !operationScope.Value;
         if (ownsGate)
@@ -1379,24 +1393,24 @@ public sealed class SpellkitInstance : IDisposable
                 {
                     var context = CreateExecutionContext(runtimeContext!, control: null);
                     SpellkitObject value;
-                    if (guard is SpellkitNativeFunction function)
+                    if (function is SpellkitNativeFunction nativeFunction)
                     {
-                        var execution = SpellkitMachine.ExecuteWithArguments(function, arguments, context);
+                        var execution = SpellkitMachine.ExecuteWithArguments(nativeFunction, arguments, context);
                         execution = CompleteAwaitablesAsync(
                             execution,
                             runAsynchronously: false).GetAwaiter().GetResult();
                         if (execution.Reason is TerminationReason.Suspended)
                         {
-                            throw new InvalidOperationException("A select guard cannot start a select.");
+                            throw new InvalidOperationException($"A select {kind} cannot start a select.");
                         }
                         value = execution.Value ?? SpellkitNil.Instance;
                     }
                     else
                     {
-                        value = guard.Call(context, arguments);
+                        value = function.Call(context, arguments);
                     }
                     context.ThrowIf();
-                    return value.IsTrue();
+                    return value;
                 }
                 finally
                 {

@@ -10,18 +10,67 @@ namespace Spellkit.Hosting;
 
 public sealed record SpellkitChoiceParameter(string Name, string? TypeName);
 
+/// <summary>Display data evaluated by a select state or choice.</summary>
+public sealed class SpellkitSelectView
+{
+    private readonly SpellkitObject value;
+
+    internal SpellkitSelectView(SpellkitObject value) => this.value = value;
+
+    /// <summary>Converts the display data to a host type.</summary>
+    public T? GetValue<T>() => SpellkitHostValueConverter.Convert<T>(value, "Select view");
+
+    /// <summary>Attempts to convert the display data to a host type.</summary>
+    public bool TryGetValue<T>(out T? result) =>
+        SpellkitHostValueConverter.TryConvert(value, out result);
+}
+
+/// <summary>The currently active state and its display data.</summary>
+public sealed record SpellkitSelectState(string Id, SpellkitSelectView? View);
+
+/// <summary>An immutable UI-facing view of a select session.</summary>
+public sealed class SpellkitSelectSnapshot
+{
+    internal SpellkitSelectSnapshot(
+        string name,
+        long revision,
+        SpellkitSelectState state,
+        IReadOnlyList<SpellkitChoice> choices,
+        bool isCompleted)
+    {
+        Name = name;
+        Revision = revision;
+        State = state;
+        Choices = choices;
+        IsCompleted = isCompleted;
+    }
+
+    public string Name { get; }
+
+    /// <summary>Monotonically increases after a successful select action, cancellation, or invalidation.</summary>
+    public long Revision { get; }
+
+    public SpellkitSelectState State { get; }
+
+    public IReadOnlyList<SpellkitChoice> Choices { get; }
+
+    public bool IsCompleted { get; }
+}
+
 public sealed record SpellkitChoice
 {
     public SpellkitChoice(
         string id,
         int parameterCount,
         string? label = null,
-        string? description = null)
+        string? description = null,
+        SpellkitSelectView? view = null)
     {
         Id = id;
         ParameterCount = parameterCount;
         Label = label ?? id;
         Description = description;
+        View = view;
         Parameters = Array.Empty<SpellkitChoiceParameter>();
     }
 
@@ -29,13 +78,15 @@ public sealed record SpellkitChoice
         string id,
         IReadOnlyList<SpellkitChoiceParameter> parameters,
         string? label = null,
-        string? description = null)
+        string? description = null,
+        SpellkitSelectView? view = null)
     {
         Id = id;
         Parameters = parameters.ToArray();
         ParameterCount = Parameters.Count;
         Label = label ?? id;
         Description = description;
+        View = view;
     }
 
     public string Id { get; }
@@ -43,6 +94,8 @@ public sealed record SpellkitChoice
     public string Label { get; }
 
     public string? Description { get; }
+
+    public SpellkitSelectView? View { get; }
 
     public int ParameterCount { get; }
 
@@ -54,18 +107,18 @@ public sealed class SpellkitSelectResult
     private readonly SpellkitObject? value;
 
     internal SpellkitSelectResult(
-        IReadOnlyList<SpellkitChoice> choices,
-        bool isCompleted,
+        SpellkitSelectSnapshot snapshot,
         SpellkitObject? value = null)
     {
-        Choices = choices;
-        IsCompleted = isCompleted;
+        Snapshot = snapshot;
         this.value = value;
     }
 
-    public IReadOnlyList<SpellkitChoice> Choices { get; }
+    public SpellkitSelectSnapshot Snapshot { get; }
 
-    public bool IsCompleted { get; }
+    public IReadOnlyList<SpellkitChoice> Choices => Snapshot.Choices;
+
+    public bool IsCompleted => Snapshot.IsCompleted;
 
     internal SpellkitObject Value => value ?? SpellkitNil.Instance;
 
@@ -75,21 +128,67 @@ public sealed class SpellkitSelectResult
         SpellkitHostValueConverter.TryConvert(value, out result);
 }
 
+internal sealed class SpellkitSelectRevision
+{
+    private long value;
+
+    internal long Current => System.Threading.Interlocked.Read(ref value);
+
+    internal void Advance() => System.Threading.Interlocked.Increment(ref value);
+}
+
+/// <summary>Thrown when an action was rendered from an older select snapshot.</summary>
+public sealed class SpellkitSelectRevisionMismatchException : InvalidOperationException
+{
+    internal SpellkitSelectRevisionMismatchException(
+        long expectedRevision,
+        SpellkitSelectSnapshot snapshot)
+        : base(
+            $"Select revision {expectedRevision} does not match current revision {snapshot.Revision}.")
+    {
+        ExpectedRevision = expectedRevision;
+        Snapshot = snapshot;
+    }
+
+    public long ExpectedRevision { get; }
+
+    /// <summary>Gets the current snapshot that supersedes the rejected action.</summary>
+    public SpellkitSelectSnapshot Snapshot { get; }
+}
+
 public sealed class SpellkitSelectSession : IDisposable
 {
+    private sealed record ResolvedSelectChoice(
+        string Id,
+        string Label,
+        string? Description,
+        IReadOnlyList<SpellkitChoiceParameter> Parameters,
+        SpellkitFunction Action,
+        SpellkitFunction? Guard,
+        SpellkitFunction? View,
+        SpellkitObject[] BoundArguments)
+    {
+        internal int ParameterCount => Parameters.Count;
+    }
+
     private readonly object syncRoot = new();
     private readonly System.Threading.SemaphoreSlim actionGate = new(1, 1);
     private readonly SpellkitInstance instance;
     private readonly SelectInstance selectInstance;
+    private readonly SpellkitSelectRevision revision;
     private SpellkitSelectSession? nested;
     private SpellkitMachine.VmContinuation? actionContinuation;
     private bool otherwiseRunning;
     private bool disposed;
 
-    internal SpellkitSelectSession(SpellkitInstance instance, SelectInstance selectInstance)
+    internal SpellkitSelectSession(
+        SpellkitInstance instance,
+        SelectInstance selectInstance,
+        SpellkitSelectRevision? revision = null)
     {
         this.instance = instance;
         this.selectInstance = selectInstance;
+        this.revision = revision ?? new SpellkitSelectRevision();
     }
 
     internal void Initialize()
@@ -132,6 +231,21 @@ public sealed class SpellkitSelectSession : IDisposable
 
     public string Name => selectInstance.Name;
 
+    public long Revision => revision.Current;
+
+    /// <summary>Gets the current UI-facing state of this select.</summary>
+    public SpellkitSelectSnapshot Snapshot
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                ThrowIfDisposed();
+                return GetSnapshot();
+            }
+        }
+    }
+
     /// <summary>Gets the name of the current state.</summary>
     public string State
     {
@@ -149,11 +263,67 @@ public sealed class SpellkitSelectSession : IDisposable
     {
         get
         {
-            lock (syncRoot)
-            {
-                ThrowIfDisposed();
-                return nested?.Choices ?? GetChoices();
-            }
+            return Snapshot.Choices;
+        }
+    }
+
+    /// <summary>Re-evaluates and returns the current UI-facing state without changing its revision.</summary>
+    public SpellkitSelectSnapshot Refresh()
+    {
+        actionGate.Wait();
+        try
+        {
+            return RefreshCore(invalidate: false);
+        }
+        finally
+        {
+            actionGate.Release();
+        }
+    }
+
+    /// <summary>Asynchronously re-evaluates and returns the current UI-facing state without changing its revision.</summary>
+    public async Task<SpellkitSelectSnapshot> RefreshAsync()
+    {
+        await actionGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            return RefreshCore(invalidate: false);
+        }
+        finally
+        {
+            actionGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Invalidates UI operations rendered from the current revision, then returns a refreshed snapshot.
+    /// </summary>
+    public SpellkitSelectSnapshot Invalidate()
+    {
+        actionGate.Wait();
+        try
+        {
+            return RefreshCore(invalidate: true);
+        }
+        finally
+        {
+            actionGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously invalidates UI operations rendered from the current revision, then returns a refreshed snapshot.
+    /// </summary>
+    public async Task<SpellkitSelectSnapshot> InvalidateAsync()
+    {
+        await actionGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            return RefreshCore(invalidate: true);
+        }
+        finally
+        {
+            actionGate.Release();
         }
     }
 
@@ -170,25 +340,65 @@ public sealed class SpellkitSelectSession : IDisposable
 
     internal SpellkitObject CompletionValue => selectInstance.Value;
 
-    public SpellkitSelectResult Select(string choiceId) => SelectCore(choiceId, null, hasArgument: false);
+    public SpellkitSelectResult Select(string choiceId) =>
+        SelectCore(choiceId, null, hasArgument: false, expectedRevision: null);
 
-    public SpellkitSelectResult Select(string choiceId, object? argument) => SelectCore(choiceId, argument, hasArgument: true);
+    public SpellkitSelectResult Select(string choiceId, object? argument) =>
+        SelectCore(choiceId, argument, hasArgument: true, expectedRevision: null);
 
-    public SpellkitSelectResult Send(string eventId) => SendCore(eventId, null, hasArgument: false);
+    public SpellkitSelectResult SelectAtRevision(string choiceId, long expectedRevision) =>
+        SelectCore(choiceId, null, hasArgument: false, expectedRevision);
 
-    public SpellkitSelectResult Send(string eventId, object? argument) => SendCore(eventId, argument, hasArgument: true);
+    public SpellkitSelectResult SelectAtRevision(
+        string choiceId,
+        object? argument,
+        long expectedRevision) =>
+        SelectCore(choiceId, argument, hasArgument: true, expectedRevision);
+
+    public SpellkitSelectResult Send(string eventId) =>
+        SendCore(eventId, null, hasArgument: false, expectedRevision: null);
+
+    public SpellkitSelectResult Send(string eventId, object? argument) =>
+        SendCore(eventId, argument, hasArgument: true, expectedRevision: null);
+
+    public SpellkitSelectResult SendAtRevision(string eventId, long expectedRevision) =>
+        SendCore(eventId, null, hasArgument: false, expectedRevision);
+
+    public SpellkitSelectResult SendAtRevision(
+        string eventId,
+        object? argument,
+        long expectedRevision) =>
+        SendCore(eventId, argument, hasArgument: true, expectedRevision);
 
     public Task<SpellkitSelectResult> SelectAsync(string choiceId) =>
-        SelectCoreAsync(choiceId, null, hasArgument: false);
+        SelectCoreAsync(choiceId, null, hasArgument: false, expectedRevision: null);
 
     public Task<SpellkitSelectResult> SelectAsync(string choiceId, object? argument) =>
-        SelectCoreAsync(choiceId, argument, hasArgument: true);
+        SelectCoreAsync(choiceId, argument, hasArgument: true, expectedRevision: null);
+
+    public Task<SpellkitSelectResult> SelectAtRevisionAsync(string choiceId, long expectedRevision) =>
+        SelectCoreAsync(choiceId, null, hasArgument: false, expectedRevision);
+
+    public Task<SpellkitSelectResult> SelectAtRevisionAsync(
+        string choiceId,
+        object? argument,
+        long expectedRevision) =>
+        SelectCoreAsync(choiceId, argument, hasArgument: true, expectedRevision);
 
     public Task<SpellkitSelectResult> SendAsync(string eventId) =>
-        SendCoreAsync(eventId, null, hasArgument: false);
+        SendCoreAsync(eventId, null, hasArgument: false, expectedRevision: null);
 
     public Task<SpellkitSelectResult> SendAsync(string eventId, object? argument) =>
-        SendCoreAsync(eventId, argument, hasArgument: true);
+        SendCoreAsync(eventId, argument, hasArgument: true, expectedRevision: null);
+
+    public Task<SpellkitSelectResult> SendAtRevisionAsync(string eventId, long expectedRevision) =>
+        SendCoreAsync(eventId, null, hasArgument: false, expectedRevision);
+
+    public Task<SpellkitSelectResult> SendAtRevisionAsync(
+        string eventId,
+        object? argument,
+        long expectedRevision) =>
+        SendCoreAsync(eventId, argument, hasArgument: true, expectedRevision);
 
     public void Cancel()
     {
@@ -200,6 +410,7 @@ public sealed class SpellkitSelectSession : IDisposable
                 ThrowIfDisposed();
                 nested?.Cancel();
                 selectInstance.Cancel();
+                revision.Advance();
             }
         }
         finally
@@ -233,7 +444,11 @@ public sealed class SpellkitSelectSession : IDisposable
         }
     }
 
-    private SpellkitSelectResult SelectCore(string choiceId, object? argument, bool hasArgument)
+    private SpellkitSelectResult SelectCore(
+        string choiceId,
+        object? argument,
+        bool hasArgument,
+        long? expectedRevision)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(choiceId);
         actionGate.Wait();
@@ -242,6 +457,7 @@ public sealed class SpellkitSelectSession : IDisposable
             lock (syncRoot)
             {
                 ThrowIfDisposed();
+                EnsureExpectedRevision(expectedRevision);
                 if (selectInstance.IsCompleted)
                 {
                     throw new InvalidOperationException($"Select session '{Name}' has already completed.");
@@ -252,8 +468,8 @@ public sealed class SpellkitSelectSession : IDisposable
                     return ResumeNested(choiceId, argument, hasArgument);
                 }
 
-                var choice = selectInstance.State.Choices.SingleOrDefault(candidate =>
-                    string.Equals(candidate.Name, choiceId, StringComparison.Ordinal));
+                var choice = GetAvailableChoices().SingleOrDefault(candidate =>
+                    string.Equals(candidate.Id, choiceId, StringComparison.Ordinal));
                 if (choice is null)
                 {
                     throw new ArgumentException(
@@ -261,16 +477,10 @@ public sealed class SpellkitSelectSession : IDisposable
                         nameof(choiceId));
                 }
 
-                if (!IsAvailable(choice))
-                {
-                    throw new ArgumentException(
-                        $"Choice '{choiceId}' is not currently available in select state '{selectInstance.State.Name}'.",
-                        nameof(choiceId));
-                }
-
-                var arguments = selectInstance.AddStateArguments(
+                var arguments = AddArguments(
+                    choice.BoundArguments,
                     ConvertArguments(choice, argument, hasArgument));
-                var result = instance.InvokeSelectAction(selectInstance.Choice(choice), arguments);
+                var result = instance.InvokeSelectAction(choice.Action, arguments);
                 return ApplyActionExecution(result);
             }
         }
@@ -280,7 +490,11 @@ public sealed class SpellkitSelectSession : IDisposable
         }
     }
 
-    private SpellkitSelectResult SendCore(string eventId, object? argument, bool hasArgument)
+    private SpellkitSelectResult SendCore(
+        string eventId,
+        object? argument,
+        bool hasArgument,
+        long? expectedRevision)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
         actionGate.Wait();
@@ -289,6 +503,7 @@ public sealed class SpellkitSelectSession : IDisposable
             lock (syncRoot)
             {
                 ThrowIfDisposed();
+                EnsureExpectedRevision(expectedRevision);
                 if (selectInstance.IsCompleted)
                 {
                     throw new InvalidOperationException($"Select session '{Name}' has already completed.");
@@ -328,13 +543,15 @@ public sealed class SpellkitSelectSession : IDisposable
     private async Task<SpellkitSelectResult> SelectCoreAsync(
         string choiceId,
         object? argument,
-        bool hasArgument)
+        bool hasArgument,
+        long? expectedRevision)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(choiceId);
         await actionGate.WaitAsync().ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
+            EnsureExpectedRevision(expectedRevision);
             if (selectInstance.IsCompleted)
             {
                 throw new InvalidOperationException($"Select session '{Name}' has already completed.");
@@ -350,19 +567,20 @@ public sealed class SpellkitSelectSession : IDisposable
                     : nestedResult;
             }
 
-            var choice = selectInstance.State.Choices.SingleOrDefault(candidate =>
-                string.Equals(candidate.Name, choiceId, StringComparison.Ordinal));
-            if (choice is null || !IsAvailable(choice))
+            var choice = GetAvailableChoices().SingleOrDefault(candidate =>
+                string.Equals(candidate.Id, choiceId, StringComparison.Ordinal));
+            if (choice is null)
             {
                 throw new ArgumentException(
                     $"Choice '{choiceId}' is not currently available in select state '{selectInstance.State.Name}'.",
                     nameof(choiceId));
             }
 
-            var arguments = selectInstance.AddStateArguments(
+            var arguments = AddArguments(
+                choice.BoundArguments,
                 ConvertArguments(choice, argument, hasArgument));
             var result = await instance.InvokeSelectActionAsync(
-                selectInstance.Choice(choice),
+                choice.Action,
                 arguments).ConfigureAwait(false);
             return await ApplyActionExecutionAsync(result).ConfigureAwait(false);
         }
@@ -375,13 +593,15 @@ public sealed class SpellkitSelectSession : IDisposable
     private async Task<SpellkitSelectResult> SendCoreAsync(
         string eventId,
         object? argument,
-        bool hasArgument)
+        bool hasArgument,
+        long? expectedRevision)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
         await actionGate.WaitAsync().ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
+            EnsureExpectedRevision(expectedRevision);
             if (selectInstance.IsCompleted)
             {
                 throw new InvalidOperationException($"Select session '{Name}' has already completed.");
@@ -493,7 +713,8 @@ public sealed class SpellkitSelectSession : IDisposable
                 }
 
                 actionContinuation = result.Continuation;
-                nested = instance.CreateSelectSession(suspension.Select);
+                nested = instance.CreateSelectSession(suspension.Select, revision);
+                revision.Advance();
                 if (!nested.IsCompleted)
                 {
                     return WaitingResult();
@@ -515,6 +736,7 @@ public sealed class SpellkitSelectSession : IDisposable
             var outcome = selectInstance.Apply(result.Value ?? SpellkitNil.Instance);
             ApplyLifecycleHooks(outcome);
             selectInstance.CompleteIfIdle();
+            revision.Advance();
             if (outcome.IsCompleted)
             {
                 return CompletedResult(outcome.Value);
@@ -539,7 +761,10 @@ public sealed class SpellkitSelectSession : IDisposable
                 }
 
                 actionContinuation = result.Continuation;
-                nested = await instance.CreateSelectSessionAsync(suspension.Select).ConfigureAwait(false);
+                nested = await instance.CreateSelectSessionAsync(
+                    suspension.Select,
+                    revision).ConfigureAwait(false);
+                revision.Advance();
                 if (!nested.IsCompleted)
                 {
                     return WaitingResult();
@@ -563,6 +788,7 @@ public sealed class SpellkitSelectSession : IDisposable
             var outcome = selectInstance.Apply(result.Value ?? SpellkitNil.Instance);
             await ApplyLifecycleHooksAsync(outcome).ConfigureAwait(false);
             selectInstance.CompleteIfIdle();
+            revision.Advance();
             if (outcome.IsCompleted)
             {
                 return CompletedResult(outcome.Value);
@@ -647,14 +873,63 @@ public sealed class SpellkitSelectSession : IDisposable
 
     private SpellkitSelectResult WaitingResult()
     {
-        var choices = nested?.Choices ?? GetChoices();
         return selectInstance.IsCompleted
             ? CompletedResult(selectInstance.Value)
-            : new(choices, isCompleted: false);
+            : new(GetSnapshot());
     }
 
-    private static SpellkitSelectResult CompletedResult(SpellkitObject value) =>
-        new(Array.Empty<SpellkitChoice>(), isCompleted: true, value);
+    private SpellkitSelectResult CompletedResult(SpellkitObject value) =>
+        new(GetSnapshot(), value);
+
+    private SpellkitSelectSnapshot GetSnapshot()
+    {
+        if (nested is not null)
+        {
+            return nested.Snapshot;
+        }
+
+        if (selectInstance.IsCompleted)
+        {
+            return CreateSnapshot(Array.Empty<SpellkitChoice>());
+        }
+
+        var choices = GetChoices();
+        if (nested is not null)
+        {
+            return nested.Snapshot;
+        }
+
+        return CreateSnapshot(
+            selectInstance.IsCompleted ? Array.Empty<SpellkitChoice>() : choices);
+    }
+
+    private SpellkitSelectSnapshot RefreshCore(bool invalidate)
+    {
+        lock (syncRoot)
+        {
+            ThrowIfDisposed();
+            if (invalidate)
+            {
+                revision.Advance();
+            }
+
+            return GetSnapshot();
+        }
+    }
+
+    private SpellkitSelectSnapshot CreateSnapshot(IReadOnlyList<SpellkitChoice> choices)
+    {
+        var state = selectInstance.State;
+        var stateView = selectInstance.IsCompleted
+            ? null
+            : CreateView(selectInstance.View(state));
+        return new(
+            selectInstance.Name,
+            revision.Current,
+            new SpellkitSelectState(state.Name, stateView),
+            choices,
+            selectInstance.IsCompleted);
+    }
 
     private IReadOnlyList<SpellkitChoice> GetChoices()
     {
@@ -689,28 +964,148 @@ public sealed class SpellkitSelectSession : IDisposable
     }
 
     private IReadOnlyList<SpellkitChoice> GetVisibleChoices() =>
-        selectInstance.State.Choices
-            .Where(IsAvailable)
+        GetAvailableChoices()
             .Select(choice => new SpellkitChoice(
+                choice.Id,
+                choice.Parameters,
+                choice.Label,
+                choice.Description,
+                CreateView(choice.View, choice.BoundArguments)))
+            .ToArray();
+
+    private IReadOnlyList<ResolvedSelectChoice> GetAvailableChoices()
+    {
+        var candidates = new List<ResolvedSelectChoice>();
+        foreach (var choice in selectInstance.State.Choices)
+        {
+            candidates.Add(new(
                 choice.Name,
+                choice.Label,
+                choice.Description,
                 choice.Parameters
                     .Select(parameter => new SpellkitChoiceParameter(
                         parameter.Name,
                         parameter.TypeName))
                     .ToArray(),
-                choice.Label,
-                choice.Description))
-            .ToArray();
+                selectInstance.Choice(choice),
+                selectInstance.Guard(choice),
+                selectInstance.View(choice),
+                selectInstance.StateArguments));
+        }
 
-    private bool IsAvailable(SelectChoiceDefinition choice) =>
-        selectInstance.Guard(choice) is not { } guard
-        || instance.EvaluateSelectGuard(guard, selectInstance.StateArguments);
+        foreach (var group in selectInstance.State.DynamicChoices)
+        {
+            var source = instance.EvaluateSelectDynamicChoice(
+                selectInstance.DynamicChoiceSource(group),
+                selectInstance.StateArguments);
+            if (source is not IEnumerable<SpellkitObject> items)
+            {
+                throw new InvalidOperationException(
+                    $"The dynamic choices in select state '{selectInstance.State.Name}' must be a collection.");
+            }
+
+            foreach (var item in items)
+            {
+                var arguments = selectInstance.AddStateArguments([item]);
+                foreach (var template in group.Choices)
+                {
+                    var id = RequireDynamicChoiceText(
+                        selectInstance.DynamicChoiceId(template),
+                        arguments,
+                        "ID");
+                    var label = selectInstance.DynamicChoiceLabel(template) is { } labelFunction
+                        ? EvaluateDynamicChoiceText(labelFunction, arguments, "label") ?? id
+                        : id;
+                    var description = selectInstance.DynamicChoiceDescription(template) is { } descriptionFunction
+                        ? EvaluateDynamicChoiceText(descriptionFunction, arguments, "description")
+                        : null;
+                    candidates.Add(new(
+                        id,
+                        label,
+                        description,
+                        Array.Empty<SpellkitChoiceParameter>(),
+                        selectInstance.DynamicChoiceAction(template),
+                        selectInstance.DynamicChoiceGuard(template),
+                        selectInstance.DynamicChoiceView(template),
+                        arguments));
+                }
+            }
+        }
+
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var candidate in candidates)
+        {
+            if (!ids.Add(candidate.Id))
+            {
+                throw new InvalidOperationException(
+                    $"The select state '{selectInstance.State.Name}' generated duplicate choice ID '{candidate.Id}'.");
+            }
+        }
+
+        return candidates.Where(IsAvailable).ToArray();
+    }
+
+    private string RequireDynamicChoiceText(
+        SpellkitFunction function,
+        SpellkitObject[] arguments,
+        string part)
+    {
+        var value = EvaluateDynamicChoiceText(function, arguments, part);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException(
+                $"A dynamic select choice {part} in state '{selectInstance.State.Name}' cannot be empty.");
+        }
+
+        return value;
+    }
+
+    private string? EvaluateDynamicChoiceText(
+        SpellkitFunction function,
+        SpellkitObject[] arguments,
+        string part) =>
+        SpellkitHostValueConverter.Convert<string>(
+            instance.EvaluateSelectDynamicChoice(function, arguments),
+            $"Dynamic select choice {part}");
+
+    private SpellkitSelectView? CreateView(SpellkitFunction? view) =>
+        CreateView(view, selectInstance.StateArguments);
+
+    private SpellkitSelectView? CreateView(
+        SpellkitFunction? view,
+        SpellkitObject[] arguments) =>
+        view is null
+            ? null
+            : new SpellkitSelectView(
+                instance.EvaluateSelectView(view, arguments));
+
+    private bool IsAvailable(ResolvedSelectChoice choice) =>
+        choice.Guard is null
+        || instance.EvaluateSelectGuard(choice.Guard, choice.BoundArguments);
 
     private static SpellkitObject[] ConvertArguments(
-        SelectChoiceDefinition choice,
+        ResolvedSelectChoice choice,
         object? argument,
         bool hasArgument) =>
-        ConvertArguments(choice.Name, choice.ParameterCount, "Choice", argument, hasArgument);
+        ConvertArguments(choice.Id, choice.ParameterCount, "Choice", argument, hasArgument);
+
+    private static SpellkitObject[] AddArguments(
+        IReadOnlyList<SpellkitObject> boundArguments,
+        IReadOnlyList<SpellkitObject> arguments)
+    {
+        var result = new SpellkitObject[boundArguments.Count + arguments.Count];
+        for (var i = 0; i < boundArguments.Count; i++)
+        {
+            result[i] = boundArguments[i];
+        }
+
+        for (var i = 0; i < arguments.Count; i++)
+        {
+            result[boundArguments.Count + i] = arguments[i];
+        }
+
+        return result;
+    }
 
     private static SpellkitObject[] ConvertArguments(
         string name,
@@ -752,6 +1147,18 @@ public sealed class SpellkitSelectSession : IDisposable
             values[i] = TypeConverter.ConvertFrom(tuple[i]);
         }
         return values;
+    }
+
+    private void EnsureExpectedRevision(long? expectedRevision)
+    {
+        if (expectedRevision is null || expectedRevision == revision.Current)
+        {
+            return;
+        }
+
+        throw new SpellkitSelectRevisionMismatchException(
+            expectedRevision.Value,
+            GetSnapshot());
     }
 
     private void ThrowIfDisposed()

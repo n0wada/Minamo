@@ -114,6 +114,7 @@ internal sealed class LoweringPass
                     choice.Label ?? choice.Name,
                     choice.Description,
                     choice.Guard is null ? null : LowerNode(choice.Guard, new CompilerContext()),
+                    choice.View is null ? null : LowerNode(choice.View, new CompilerContext()),
                     LowerNode(choice.Body, new CompilerContext()));
             }
 
@@ -128,6 +129,39 @@ internal sealed class LoweringPass
                     LowerNode(handler.Body, new CompilerContext()));
             }
 
+            var dynamicChoices = new LoweredSelectDynamicChoiceGroup[state.DynamicChoices.Count];
+            for (var j = 0; j < state.DynamicChoices.Count; j++)
+            {
+                var group = state.DynamicChoices[j];
+                var templates = new LoweredSelectDynamicChoice[group.Choices.Count];
+                for (var k = 0; k < group.Choices.Count; k++)
+                {
+                    var choice = group.Choices[k];
+                    templates[k] = new(
+                        choice.Location,
+                        LowerNode(choice.Id, new CompilerContext()),
+                        choice.Label is null ? null : LowerNode(choice.Label, new CompilerContext()),
+                        choice.Description is null ? null : LowerNode(choice.Description, new CompilerContext()),
+                        choice.Guard is null ? null : LowerNode(choice.Guard, new CompilerContext()),
+                        choice.View is null ? null : LowerNode(choice.View, new CompilerContext()),
+                        LowerNode(choice.Body, new CompilerContext()));
+                }
+
+                dynamicChoices[j] = new(
+                    group.Location,
+                    new(
+                        group.Location,
+                        group.ItemName,
+                        DefaultValue: null,
+                        HasDefaultValue: false,
+                        DefaultValueLocation: group.Location,
+                        TypeAnnotation: null,
+                        IsVarArgs: false,
+                        Mutable: false),
+                    LowerNode(group.Source, new CompilerContext()),
+                    templates);
+            }
+
             states[i] = new(
                 state.Location,
                 state.Name,
@@ -135,8 +169,10 @@ internal sealed class LoweringPass
                 LowerParameters(state.Parameters),
                 state.Enter is null ? null : LowerNode(state.Enter, new CompilerContext()),
                 state.Leave is null ? null : LowerNode(state.Leave, new CompilerContext()),
+                state.View is null ? null : LowerNode(state.View, new CompilerContext()),
                 state.Otherwise is null ? null : LowerNode(state.Otherwise, new CompilerContext()),
                 choices,
+                dynamicChoices,
                 events);
         }
 

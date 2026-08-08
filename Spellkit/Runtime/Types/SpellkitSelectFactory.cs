@@ -73,10 +73,37 @@ internal sealed class SpellkitSelectFactory : SpellkitObject
     internal SpellkitFunction? Guard(SelectChoiceDefinition choice) =>
         choice.GuardFunctionSlot is int slot ? closures![slot] : null;
 
+    internal SpellkitFunction? View(SelectChoiceDefinition choice) =>
+        choice.ViewFunctionSlot is int slot ? closures![slot] : null;
+
+    internal SpellkitFunction DynamicChoiceSource(SelectDynamicChoiceGroupDefinition group) =>
+        closures![group.SourceFunctionSlot];
+
+    internal SpellkitFunction DynamicChoiceId(SelectDynamicChoiceDefinition choice) =>
+        closures![choice.IdFunctionSlot];
+
+    internal SpellkitFunction? DynamicChoiceLabel(SelectDynamicChoiceDefinition choice) =>
+        choice.LabelFunctionSlot is int slot ? closures![slot] : null;
+
+    internal SpellkitFunction? DynamicChoiceDescription(SelectDynamicChoiceDefinition choice) =>
+        choice.DescriptionFunctionSlot is int slot ? closures![slot] : null;
+
+    internal SpellkitFunction? DynamicChoiceGuard(SelectDynamicChoiceDefinition choice) =>
+        choice.GuardFunctionSlot is int slot ? closures![slot] : null;
+
+    internal SpellkitFunction? DynamicChoiceView(SelectDynamicChoiceDefinition choice) =>
+        choice.ViewFunctionSlot is int slot ? closures![slot] : null;
+
+    internal SpellkitFunction DynamicChoiceAction(SelectDynamicChoiceDefinition choice) =>
+        closures![choice.FunctionSlot];
+
     internal SpellkitFunction Event(SelectEventDefinition handler) => closures![handler.FunctionSlot];
 
     internal SpellkitFunction? Enter(SelectStateDefinition state) =>
         state.EnterFunctionSlot is int slot ? closures![slot] : null;
+
+    internal SpellkitFunction? View(SelectStateDefinition state) =>
+        state.ViewFunctionSlot is int slot ? closures![slot] : null;
 
     internal SpellkitFunction? Leave(SelectStateDefinition state) =>
         state.LeaveFunctionSlot is int slot ? closures![slot] : null;
@@ -133,9 +160,34 @@ internal sealed class SelectInstance
 
     internal SpellkitFunction? Guard(SelectChoiceDefinition choice) => factory.Guard(choice);
 
+    internal SpellkitFunction? View(SelectChoiceDefinition choice) => factory.View(choice);
+
+    internal SpellkitFunction DynamicChoiceSource(SelectDynamicChoiceGroupDefinition group) =>
+        factory.DynamicChoiceSource(group);
+
+    internal SpellkitFunction DynamicChoiceId(SelectDynamicChoiceDefinition choice) =>
+        factory.DynamicChoiceId(choice);
+
+    internal SpellkitFunction? DynamicChoiceLabel(SelectDynamicChoiceDefinition choice) =>
+        factory.DynamicChoiceLabel(choice);
+
+    internal SpellkitFunction? DynamicChoiceDescription(SelectDynamicChoiceDefinition choice) =>
+        factory.DynamicChoiceDescription(choice);
+
+    internal SpellkitFunction? DynamicChoiceGuard(SelectDynamicChoiceDefinition choice) =>
+        factory.DynamicChoiceGuard(choice);
+
+    internal SpellkitFunction? DynamicChoiceView(SelectDynamicChoiceDefinition choice) =>
+        factory.DynamicChoiceView(choice);
+
+    internal SpellkitFunction DynamicChoiceAction(SelectDynamicChoiceDefinition choice) =>
+        factory.DynamicChoiceAction(choice);
+
     internal SpellkitFunction Event(SelectEventDefinition handler) => factory.Event(handler);
 
     internal SpellkitFunction? Enter(SelectStateDefinition target) => factory.Enter(target);
+
+    internal SpellkitFunction? View(SelectStateDefinition target) => factory.View(target);
 
     internal SpellkitFunction? Leave(SelectStateDefinition target) => factory.Leave(target);
 
@@ -158,6 +210,7 @@ internal sealed class SelectInstance
     internal void CompleteIfIdle()
     {
         if (state.Choices.Count == 0
+            && state.DynamicChoices.Count == 0
             && state.Events.Count == 0
             && state.OtherwiseFunctionSlot is null)
         {

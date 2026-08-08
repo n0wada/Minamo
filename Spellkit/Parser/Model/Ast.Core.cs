@@ -102,6 +102,8 @@ public enum NodeType
     ,Exit
     ,SelectInvocation
     ,SelectEvent
+    ,SelectDynamicChoices
+    ,SelectDynamicChoice
 }
 
 public interface INamedNode

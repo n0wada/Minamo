@@ -14,10 +14,12 @@ internal sealed record SelectStateDefinition(
     string Name,
     bool IsInitial,
     IReadOnlyList<SelectParameterDefinition> Parameters,
+    int? ViewFunctionSlot,
     int? EnterFunctionSlot,
     int? LeaveFunctionSlot,
     int? OtherwiseFunctionSlot,
     IReadOnlyList<SelectChoiceDefinition> Choices,
+    IReadOnlyList<SelectDynamicChoiceGroupDefinition> DynamicChoices,
     IReadOnlyList<SelectEventDefinition> Events);
 
 internal sealed record SelectParameterDefinition(string Name, string? TypeName);
@@ -28,10 +30,23 @@ internal sealed record SelectChoiceDefinition(
     string? Description,
     int FunctionSlot,
     int? GuardFunctionSlot,
+    int? ViewFunctionSlot,
     IReadOnlyList<SelectParameterDefinition> Parameters)
 {
     internal int ParameterCount => Parameters.Count;
 }
+
+internal sealed record SelectDynamicChoiceGroupDefinition(
+    int SourceFunctionSlot,
+    IReadOnlyList<SelectDynamicChoiceDefinition> Choices);
+
+internal sealed record SelectDynamicChoiceDefinition(
+    int IdFunctionSlot,
+    int? LabelFunctionSlot,
+    int? DescriptionFunctionSlot,
+    int? GuardFunctionSlot,
+    int? ViewFunctionSlot,
+    int FunctionSlot);
 
 internal sealed record SelectEventDefinition(
     string Name,
