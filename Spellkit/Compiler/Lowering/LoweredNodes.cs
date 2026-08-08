@@ -129,6 +129,10 @@ internal sealed record LoweredSelectState(
     Location Location,
     string Name,
     bool IsInitial,
+    IReadOnlyList<LoweredParameter> Parameters,
+    LoweredNode? Enter,
+    LoweredNode? Leave,
+    LoweredNode? Otherwise,
     IReadOnlyList<LoweredSelectChoice> Choices,
     IReadOnlyList<LoweredSelectEvent> Events);
 
@@ -272,7 +276,8 @@ internal sealed record LoweredControlTransfer(
     Location Location,
     LoweredNode? Expression,
     LoweredControlTransferKind Kind,
-    string? SelectState = null) : LoweredNode(Location);
+    string? SelectState = null,
+    IReadOnlyList<LoweredNode>? Arguments = null) : LoweredNode(Location);
 
 internal enum LoweredControlTransferKind
 {

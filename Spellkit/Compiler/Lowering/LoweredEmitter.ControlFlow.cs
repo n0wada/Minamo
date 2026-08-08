@@ -123,6 +123,22 @@ internal sealed partial class LoweredEmitter
                 ctx.SelectName ?? string.Empty);
         }
 
+        if (node.SelectState is not null
+            && ctx.SelectStateParameterCounts is { } parameterCounts
+            && parameterCounts.TryGetValue(node.SelectState, out var expected))
+        {
+            var actual = node.Arguments?.Count ?? 0;
+            if (actual != expected)
+            {
+                target.AddError(
+                    CompilerError.SelectStateParameterCount,
+                    node.Location,
+                    node.SelectState,
+                    expected,
+                    actual);
+            }
+        }
+
         EmitReturn(node, ctx);
     }
 

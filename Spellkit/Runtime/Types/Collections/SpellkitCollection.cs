@@ -37,8 +37,6 @@ public abstract class SpellkitCollection : SpellkitEnumerable
 
     public abstract SpellkitObject[] ToArray();
 
-    internal protected abstract SpellkitObject[] UnsafeAccess();
-
     internal static SpellkitObject[] ConcatValues(ExecutionContext ctx, params SpellkitObject[] values)
     {
         if (values is null)
@@ -167,7 +165,12 @@ internal abstract partial class SpellkitCollTypeInfo : SpellkitTypeInfo
     [SpellkitMethod(BuiltinMethodNames.Slice)]
     internal static IEnumerable<SpellkitObject> Slice(SpellkitCollection self, int index, [Default]int? size)
     {
-        var arr = self.UnsafeAccess();
+        var arr = self switch
+        {
+            SpellkitArray array => array.UnsafeAccess(),
+            SpellkitTuple tuple => tuple.UnsafeAccess(),
+            _ => self.ToArray()
+        };
 
         if (size is null)
         {
@@ -184,7 +187,7 @@ internal abstract partial class SpellkitCollTypeInfo : SpellkitTypeInfo
             index = self.Count + index;
         }
 
-        if (index >= self.Count)
+        if (index < 0 || index >= self.Count)
         {
             throw new SpellkitCodeException(SpellkitError.IndexOutOfRange);
         }

@@ -83,6 +83,7 @@ internal sealed partial class HandwrittenParser
             Name = name.Text,
             IsInitial = initial
         };
+        ParseSelectParameters(state.Parameters);
 
         if (!Expect(TokenKind.LeftBrace))
         {
@@ -91,6 +92,51 @@ internal sealed partial class HandwrittenParser
 
         while (!Check(TokenKind.RightBrace) && !IsAtEnd)
         {
+            if (IsContextualKeyword("enter"))
+            {
+                Consume();
+                var enter = ParseSelectStateHookBody();
+                if (enter is not null)
+                {
+                    state.Enter = enter;
+                }
+                else
+                {
+                    SynchronizeStatement();
+                }
+                continue;
+            }
+
+            if (IsContextualKeyword("leave"))
+            {
+                Consume();
+                var leave = ParseSelectStateHookBody();
+                if (leave is not null)
+                {
+                    state.Leave = leave;
+                }
+                else
+                {
+                    SynchronizeStatement();
+                }
+                continue;
+            }
+
+            if (IsContextualKeyword("otherwise"))
+            {
+                Consume();
+                var otherwise = ParseSelectActionBody();
+                if (otherwise is not null)
+                {
+                    state.Otherwise = otherwise;
+                }
+                else
+                {
+                    SynchronizeStatement();
+                }
+                continue;
+            }
+
             if (IsContextualKeyword("choose"))
             {
                 var choice = ParseSelectChoice();
@@ -214,6 +260,22 @@ internal sealed partial class HandwrittenParser
         return handler;
     }
 
+    private SyntaxNode? ParseSelectStateHookBody()
+    {
+        if (!Expect(TokenKind.Arrow))
+        {
+            return null;
+        }
+
+        if (!Check(TokenKind.LeftBrace))
+        {
+            ReportExpected(TokenKind.LeftBrace);
+            return null;
+        }
+
+        return ParseBlock();
+    }
+
     private void ParseSelectParameters(List<ParameterSyntax> parameters)
     {
         if (!Match(TokenKind.LeftParen))
@@ -278,7 +340,14 @@ internal sealed partial class HandwrittenParser
         }
 
         var state = Consume();
-        return new GotoSyntax(token.Location) { State = state.Text };
+        var node = new GotoSyntax(token.Location) { State = state.Text };
+        if (Match(TokenKind.LeftParen))
+        {
+            ParseExpressionList(node.Arguments, TokenKind.RightParen);
+            Expect(TokenKind.RightParen);
+        }
+
+        return node;
     }
 
     private ParameterSyntax? ParseSelectParameter()
@@ -290,7 +359,13 @@ internal sealed partial class HandwrittenParser
         }
 
         var name = Consume();
-        return new ParameterSyntax(name.Location) { Name = name.Text };
+        var parameter = new ParameterSyntax(name.Location) { Name = name.Text };
+        if (Match(TokenKind.Colon))
+        {
+            parameter.TypeAnnotation = ParseTypeAnnotation();
+        }
+
+        return parameter;
     }
 
     private SyntaxNode ParseExit()

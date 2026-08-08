@@ -814,7 +814,9 @@ public sealed class SpellkitInstance : IDisposable
     {
         var factory = ResolveSelectFactory(name)
             ?? throw new ArgumentException($"No select named '{name}' is available.", nameof(name));
-        return new SpellkitSelectSession(this, CreateSelectInstance(factory));
+        var session = new SpellkitSelectSession(this, CreateSelectInstance(factory));
+        session.Initialize();
+        return session;
     }
 
     private SelectInstance CreateSelectInstance(SpellkitSelectFactory factory)
@@ -879,10 +881,19 @@ public sealed class SpellkitInstance : IDisposable
         return matches[0];
     }
 
-    internal SpellkitSelectSession CreateSelectSession(SelectInstance select) => new(this, select);
+    internal SpellkitSelectSession CreateSelectSession(SelectInstance select)
+    {
+        var session = new SpellkitSelectSession(this, select);
+        session.Initialize();
+        return session;
+    }
 
-    internal Task<SpellkitSelectSession> CreateSelectSessionAsync(SelectInstance select) =>
-        Task.FromResult(new SpellkitSelectSession(this, select));
+    internal async Task<SpellkitSelectSession> CreateSelectSessionAsync(SelectInstance select)
+    {
+        var session = new SpellkitSelectSession(this, select);
+        await session.InitializeAsync().ConfigureAwait(false);
+        return session;
+    }
 
     internal SpellkitSelectResult Select(
         SpellkitRunSession run,
@@ -1335,7 +1346,9 @@ public sealed class SpellkitInstance : IDisposable
             runAsynchronously: true).ConfigureAwait(false);
     }
 
-    internal bool EvaluateSelectGuard(SpellkitFunction guard)
+    internal bool EvaluateSelectGuard(
+        SpellkitFunction guard,
+        SpellkitObject[] arguments)
     {
         var ownsGate = !operationScope.Value;
         if (ownsGate)
@@ -1368,7 +1381,7 @@ public sealed class SpellkitInstance : IDisposable
                     SpellkitObject value;
                     if (guard is SpellkitNativeFunction function)
                     {
-                        var execution = SpellkitMachine.ExecuteWithArguments(function, [], context);
+                        var execution = SpellkitMachine.ExecuteWithArguments(function, arguments, context);
                         execution = CompleteAwaitablesAsync(
                             execution,
                             runAsynchronously: false).GetAwaiter().GetResult();
@@ -1380,7 +1393,7 @@ public sealed class SpellkitInstance : IDisposable
                     }
                     else
                     {
-                        value = guard.Call(context);
+                        value = guard.Call(context, arguments);
                     }
                     context.ThrowIf();
                     return value.IsTrue();

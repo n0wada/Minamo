@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 
 namespace Spellkit.Hosting;
 
+public sealed record SpellkitChoiceParameter(string Name, string? TypeName);
+
 public sealed record SpellkitChoice
 {
     public SpellkitChoice(
@@ -20,6 +22,20 @@ public sealed record SpellkitChoice
         ParameterCount = parameterCount;
         Label = label ?? id;
         Description = description;
+        Parameters = Array.Empty<SpellkitChoiceParameter>();
+    }
+
+    internal SpellkitChoice(
+        string id,
+        IReadOnlyList<SpellkitChoiceParameter> parameters,
+        string? label = null,
+        string? description = null)
+    {
+        Id = id;
+        Parameters = parameters.ToArray();
+        ParameterCount = Parameters.Count;
+        Label = label ?? id;
+        Description = description;
     }
 
     public string Id { get; }
@@ -29,6 +45,8 @@ public sealed record SpellkitChoice
     public string? Description { get; }
 
     public int ParameterCount { get; }
+
+    public IReadOnlyList<SpellkitChoiceParameter> Parameters { get; }
 }
 
 public sealed class SpellkitSelectResult
@@ -65,12 +83,51 @@ public sealed class SpellkitSelectSession : IDisposable
     private readonly SelectInstance selectInstance;
     private SpellkitSelectSession? nested;
     private SpellkitMachine.VmContinuation? actionContinuation;
+    private bool otherwiseRunning;
     private bool disposed;
 
     internal SpellkitSelectSession(SpellkitInstance instance, SelectInstance selectInstance)
     {
         this.instance = instance;
         this.selectInstance = selectInstance;
+    }
+
+    internal void Initialize()
+    {
+        if (selectInstance.IsCompleted)
+        {
+            return;
+        }
+
+        if (selectInstance.Enter(selectInstance.State) is { } enter)
+        {
+            RunLifecycleHook(enter, selectInstance.StateArguments);
+        }
+
+        selectInstance.CompleteIfIdle();
+        if (!selectInstance.IsCompleted)
+        {
+            _ = GetChoices();
+        }
+    }
+
+    internal async Task InitializeAsync()
+    {
+        if (selectInstance.IsCompleted)
+        {
+            return;
+        }
+
+        if (selectInstance.Enter(selectInstance.State) is { } enter)
+        {
+            await RunLifecycleHookAsync(enter, selectInstance.StateArguments).ConfigureAwait(false);
+        }
+
+        selectInstance.CompleteIfIdle();
+        if (!selectInstance.IsCompleted)
+        {
+            _ = GetChoices();
+        }
     }
 
     public string Name => selectInstance.Name;
@@ -211,7 +268,8 @@ public sealed class SpellkitSelectSession : IDisposable
                         nameof(choiceId));
                 }
 
-                var arguments = ConvertArguments(choice, argument, hasArgument);
+                var arguments = selectInstance.AddStateArguments(
+                    ConvertArguments(choice, argument, hasArgument));
                 var result = instance.InvokeSelectAction(selectInstance.Choice(choice), arguments);
                 return ApplyActionExecution(result);
             }
@@ -250,12 +308,13 @@ public sealed class SpellkitSelectSession : IDisposable
                         nameof(eventId));
                 }
 
-                var arguments = ConvertArguments(
-                    handler.Name,
-                    handler.ParameterCount,
-                    "Event",
-                    argument,
-                    hasArgument);
+                var arguments = selectInstance.AddStateArguments(
+                    ConvertArguments(
+                        handler.Name,
+                        handler.ParameterCount,
+                        "Event",
+                        argument,
+                        hasArgument));
                 var result = instance.InvokeSelectAction(selectInstance.Event(handler), arguments);
                 return ApplyActionExecution(result);
             }
@@ -300,7 +359,8 @@ public sealed class SpellkitSelectSession : IDisposable
                     nameof(choiceId));
             }
 
-            var arguments = ConvertArguments(choice, argument, hasArgument);
+            var arguments = selectInstance.AddStateArguments(
+                ConvertArguments(choice, argument, hasArgument));
             var result = await instance.InvokeSelectActionAsync(
                 selectInstance.Choice(choice),
                 arguments).ConfigureAwait(false);
@@ -346,12 +406,13 @@ public sealed class SpellkitSelectSession : IDisposable
                     nameof(eventId));
             }
 
-            var arguments = ConvertArguments(
-                handler.Name,
-                handler.ParameterCount,
-                "Event",
-                argument,
-                hasArgument);
+            var arguments = selectInstance.AddStateArguments(
+                ConvertArguments(
+                    handler.Name,
+                    handler.ParameterCount,
+                    "Event",
+                    argument,
+                    hasArgument));
             var result = await instance.InvokeSelectActionAsync(
                 selectInstance.Event(handler),
                 arguments).ConfigureAwait(false);
@@ -452,12 +513,16 @@ public sealed class SpellkitSelectSession : IDisposable
             }
 
             var outcome = selectInstance.Apply(result.Value ?? SpellkitNil.Instance);
+            ApplyLifecycleHooks(outcome);
+            selectInstance.CompleteIfIdle();
             if (outcome.IsCompleted)
             {
                 return CompletedResult(outcome.Value);
             }
 
-            return WaitingResult();
+            return selectInstance.IsCompleted
+                ? CompletedResult(selectInstance.Value)
+                : WaitingResult();
         }
     }
 
@@ -496,34 +561,150 @@ public sealed class SpellkitSelectSession : IDisposable
             }
 
             var outcome = selectInstance.Apply(result.Value ?? SpellkitNil.Instance);
+            await ApplyLifecycleHooksAsync(outcome).ConfigureAwait(false);
+            selectInstance.CompleteIfIdle();
             if (outcome.IsCompleted)
             {
                 return CompletedResult(outcome.Value);
             }
 
-            return WaitingResult();
+            return selectInstance.IsCompleted
+                ? CompletedResult(selectInstance.Value)
+                : WaitingResult();
         }
     }
 
-    private SpellkitSelectResult WaitingResult() =>
-        new(nested?.Choices ?? GetChoices(), isCompleted: false);
+    private void ApplyLifecycleHooks(SelectActionOutcome outcome)
+    {
+        if (outcome.LeavingState is { } leaving
+            && selectInstance.Leave(leaving) is { } leave)
+        {
+            RunLifecycleHook(
+                leave,
+                outcome.LeavingStateArguments ?? Array.Empty<SpellkitObject>());
+        }
+
+        if (outcome.EnteringState is { } entering
+            && !selectInstance.IsCompleted
+            && selectInstance.Enter(entering) is { } enter)
+        {
+            RunLifecycleHook(enter, selectInstance.StateArguments);
+        }
+    }
+
+    private async Task ApplyLifecycleHooksAsync(SelectActionOutcome outcome)
+    {
+        if (outcome.LeavingState is { } leaving
+            && selectInstance.Leave(leaving) is { } leave)
+        {
+            await RunLifecycleHookAsync(
+                leave,
+                outcome.LeavingStateArguments ?? Array.Empty<SpellkitObject>()).ConfigureAwait(false);
+        }
+
+        if (outcome.EnteringState is { } entering
+            && !selectInstance.IsCompleted
+            && selectInstance.Enter(entering) is { } enter)
+        {
+            await RunLifecycleHookAsync(enter, selectInstance.StateArguments).ConfigureAwait(false);
+        }
+    }
+
+    private void RunLifecycleHook(
+        SpellkitFunction hook,
+        SpellkitObject[] arguments)
+    {
+        EnsureLifecycleHookResult(instance.InvokeSelectAction(hook, arguments));
+    }
+
+    private async Task RunLifecycleHookAsync(
+        SpellkitFunction hook,
+        SpellkitObject[] arguments)
+    {
+        EnsureLifecycleHookResult(
+            await instance.InvokeSelectActionAsync(
+                hook,
+                arguments).ConfigureAwait(false));
+    }
+
+    private static void EnsureLifecycleHookResult(ExecutionResult result)
+    {
+        if (result.Reason is not TerminationReason.Complete)
+        {
+            throw new InvalidOperationException(
+                "A select state lifecycle hook cannot suspend or fail.");
+        }
+
+        if (result.Value is SpellkitTuple { Count: 2 or 3 } tuple
+            && tuple[0] is SpellkitString marker
+            && (marker.Value == SelectControlSignal.Goto
+                || marker.Value == SelectControlSignal.Exit))
+        {
+            throw new InvalidOperationException(
+                "A select state lifecycle hook cannot change select state or exit the select.");
+        }
+    }
+
+    private SpellkitSelectResult WaitingResult()
+    {
+        var choices = nested?.Choices ?? GetChoices();
+        return selectInstance.IsCompleted
+            ? CompletedResult(selectInstance.Value)
+            : new(choices, isCompleted: false);
+    }
 
     private static SpellkitSelectResult CompletedResult(SpellkitObject value) =>
         new(Array.Empty<SpellkitChoice>(), isCompleted: true, value);
 
-    private IReadOnlyList<SpellkitChoice> GetChoices() => selectInstance.IsCompleted
-        ? Array.Empty<SpellkitChoice>()
-        : selectInstance.State.Choices
+    private IReadOnlyList<SpellkitChoice> GetChoices()
+    {
+        if (selectInstance.IsCompleted)
+        {
+            return Array.Empty<SpellkitChoice>();
+        }
+
+        var choices = GetVisibleChoices();
+        if (choices.Count == 0
+            && selectInstance.ShouldRunOtherwise
+            && !otherwiseRunning)
+        {
+            selectInstance.MarkOtherwiseTriggered();
+            otherwiseRunning = true;
+            try
+            {
+                var otherwise = selectInstance.Otherwise()
+                    ?? throw new InvalidOperationException("The select otherwise handler is unavailable.");
+                var result = instance.InvokeSelectAction(
+                    otherwise,
+                    selectInstance.AddStateArguments(Array.Empty<SpellkitObject>()));
+                return ApplyActionExecution(result).Choices;
+            }
+            finally
+            {
+                otherwiseRunning = false;
+            }
+        }
+
+        return choices;
+    }
+
+    private IReadOnlyList<SpellkitChoice> GetVisibleChoices() =>
+        selectInstance.State.Choices
             .Where(IsAvailable)
             .Select(choice => new SpellkitChoice(
                 choice.Name,
-                choice.ParameterCount,
+                choice.Parameters
+                    .Select(parameter => new SpellkitChoiceParameter(
+                        parameter.Name,
+                        parameter.TypeName))
+                    .ToArray(),
                 choice.Label,
                 choice.Description))
             .ToArray();
 
     private bool IsAvailable(SelectChoiceDefinition choice) =>
-        selectInstance.Guard(choice) is not { } guard || instance.EvaluateSelectGuard(guard);
+        selectInstance.Guard(choice) is not { } guard
+        || instance.EvaluateSelectGuard(guard, selectInstance.StateArguments);
 
     private static SpellkitObject[] ConvertArguments(
         SelectChoiceDefinition choice,

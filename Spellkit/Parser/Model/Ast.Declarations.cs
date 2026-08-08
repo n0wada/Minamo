@@ -198,6 +198,14 @@ public sealed class SelectStateSyntax : SyntaxNode
 
     public bool IsInitial { get; set; }
 
+    public List<ParameterSyntax> Parameters { get; } = new();
+
+    public SyntaxNode? Enter { get; set; }
+
+    public SyntaxNode? Leave { get; set; }
+
+    public SyntaxNode? Otherwise { get; set; }
+
     public List<SelectChoiceSyntax> Choices { get; } = new();
 
     public List<SelectEventSyntax> Events { get; } = new();
@@ -211,7 +219,28 @@ public sealed class SelectStateSyntax : SyntaxNode
 
         sb.Append("state ");
         sb.Append(Name);
+        if (Parameters.Count > 0)
+        {
+            sb.Append('(');
+            Parameters.ToString(sb);
+            sb.Append(')');
+        }
         sb.Append(" {");
+        if (Enter is not null)
+        {
+            sb.Append(" enter => ");
+            Enter.ToString(sb);
+        }
+        if (Leave is not null)
+        {
+            sb.Append(" leave => ");
+            Leave.ToString(sb);
+        }
+        if (Otherwise is not null)
+        {
+            sb.Append(" otherwise => ");
+            Otherwise.ToString(sb);
+        }
         foreach (var choice in Choices)
         {
             choice.ToString(sb);

@@ -65,7 +65,6 @@ public sealed class SpellkitString : SpellkitCollection
 
     public static explicit operator string(SpellkitString str) => str.Value;
 
-    protected internal override SpellkitObject[] UnsafeAccess() => throw new NotImplementedException();
 }
 
 [SpellkitType]
@@ -204,7 +203,7 @@ internal sealed partial class SpellkitStringTypeInfo : SpellkitCollTypeInfo
             return self;
         }
 
-        if (index >= self.Count)
+        if (index < 0 || index >= self.Count)
         {
             throw new SpellkitCodeException(SpellkitError.IndexOutOfRange, index);
         }

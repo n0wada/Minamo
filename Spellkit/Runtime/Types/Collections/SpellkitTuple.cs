@@ -364,7 +364,7 @@ public class SpellkitTuple : SpellkitCollection
 
     internal bool HasItem(string name) => GetOrdinal(name) is not -1;
 
-    internal protected override SpellkitObject[] UnsafeAccess() => values;
+    internal SpellkitObject[] UnsafeAccess() => values;
 
     private static SpellkitObject Compare(bool gt, SpellkitTuple xs, SpellkitTuple ys, ExecutionContext ctx)
     {

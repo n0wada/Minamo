@@ -715,6 +715,19 @@ import math as math
     assert(2, Foo.Bar())
 #endregion
 
+#region "Delete member"
+    struct TemporaryMember { }
+    func TemporaryMember.InstanceValue() => 1
+    static func TemporaryMember.StaticValue() => 2
+    let value = TemporaryMember()
+    assert(true, TemporaryMember.Has("StaticValue"))
+    assert(true, value.Has("InstanceValue"))
+    TemporaryMember.DeleteMember("StaticValue")
+    TemporaryMember.DeleteMember("InstanceValue")
+    assert(false, TemporaryMember.Has("StaticValue"))
+    assert(false, value.Has("InstanceValue"))
+#endregion
+
 #region "Lower-case methods and properties"
     struct Counter { value }
     impl Counter {

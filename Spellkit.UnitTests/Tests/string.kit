@@ -39,6 +39,16 @@
     assert(13, res)
 #endregion
 
+#region "Methods: Slice"
+    let invalidIndex = try {
+        "abc".Slice(-4)
+        false
+    } catch e {
+        constructorName(e) == "IndexOutOfRange"
+    }
+    assert(true, invalidIndex)
+#endregion
+
 #region "Methods: EnumerateRunes, RuneCount"
     let text = "A😀B"
     assert(4, text.Length())

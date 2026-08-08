@@ -186,7 +186,7 @@ public class SpellkitArray : SpellkitCollection, IEnumerable<SpellkitObject>
         return arr;
     }
 
-    internal protected override SpellkitObject[] UnsafeAccess() => values;
+    internal SpellkitObject[] UnsafeAccess() => values;
 }
 
 [SpellkitType]

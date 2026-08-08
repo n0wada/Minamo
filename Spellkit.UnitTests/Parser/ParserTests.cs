@@ -48,6 +48,24 @@ public sealed class ParserTests
     }
 
     [Fact]
+    public void AllowsManyAsAnIdentifierWhileTypeRemainsReserved()
+    {
+        var many = SpellkitParser.Parse("let many = 1\nmany");
+        var type = SpellkitParser.Parse("let type = 1");
+
+        Assert.True(many.Success);
+        Assert.False(type.Success);
+    }
+
+    [Fact]
+    public void KeepsBackslashEscapesInQuotedLiterals()
+    {
+        var result = SpellkitParser.Parse("let slash = '\\\\'");
+
+        Assert.True(result.Success);
+    }
+
+    [Fact]
     public void ParsesFileAndPreservesPath()
     {
         var directory = Path.Combine(

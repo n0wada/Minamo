@@ -75,6 +75,15 @@ internal sealed class SpellkitSelectFactory : SpellkitObject
 
     internal SpellkitFunction Event(SelectEventDefinition handler) => closures![handler.FunctionSlot];
 
+    internal SpellkitFunction? Enter(SelectStateDefinition state) =>
+        state.EnterFunctionSlot is int slot ? closures![slot] : null;
+
+    internal SpellkitFunction? Leave(SelectStateDefinition state) =>
+        state.LeaveFunctionSlot is int slot ? closures![slot] : null;
+
+    internal SpellkitFunction? Otherwise(SelectStateDefinition state) =>
+        state.OtherwiseFunctionSlot is int slot ? closures![slot] : null;
+
     public override string TypeName => "SelectFactory";
 
     public override object ToObject() => this;
@@ -88,13 +97,15 @@ internal sealed class SelectInstance
 {
     private readonly SpellkitSelectFactory factory;
     private SelectStateDefinition state;
+    private SpellkitObject[] stateArguments;
     private bool completed;
+    private bool otherwiseTriggered;
 
     internal SelectInstance(SpellkitSelectFactory factory)
     {
         this.factory = factory;
         state = factory.InitialState;
-        CompleteIfIdle();
+        stateArguments = CreateInitialStateArguments(state);
     }
 
     internal SelectStateDefinition State => state;
@@ -102,6 +113,13 @@ internal sealed class SelectInstance
     internal string Name => factory.Name;
 
     internal bool IsCompleted => completed;
+
+    internal SpellkitObject[] StateArguments => stateArguments;
+
+    internal bool ShouldRunOtherwise =>
+        !otherwiseTriggered
+        && state.OtherwiseFunctionSlot is not null
+        && state.Events.Count == 0;
 
     internal SpellkitObject Value { get; private set; } = SpellkitNil.Instance;
 
@@ -117,42 +135,120 @@ internal sealed class SelectInstance
 
     internal SpellkitFunction Event(SelectEventDefinition handler) => factory.Event(handler);
 
+    internal SpellkitFunction? Enter(SelectStateDefinition target) => factory.Enter(target);
+
+    internal SpellkitFunction? Leave(SelectStateDefinition target) => factory.Leave(target);
+
+    internal SpellkitFunction? Otherwise() => factory.Otherwise(state);
+
+    internal SpellkitObject[] AddStateArguments(IReadOnlyList<SpellkitObject> arguments)
+    {
+        var result = new SpellkitObject[stateArguments.Length + arguments.Count];
+        stateArguments.CopyTo(result, 0);
+        for (var i = 0; i < arguments.Count; i++)
+        {
+            result[stateArguments.Length + i] = arguments[i];
+        }
+
+        return result;
+    }
+
+    internal void MarkOtherwiseTriggered() => otherwiseTriggered = true;
+
+    internal void CompleteIfIdle()
+    {
+        if (state.Choices.Count == 0
+            && state.Events.Count == 0
+            && state.OtherwiseFunctionSlot is null)
+        {
+            completed = true;
+            Value = SpellkitNil.Instance;
+        }
+    }
+
     internal SelectActionOutcome Apply(SpellkitObject result)
     {
-        if (result is SpellkitTuple { Count: 2 } tuple && tuple[0] is SpellkitString marker)
+        if (result is SpellkitTuple tuple
+            && tuple.Count is 2 or 3
+            && tuple[0] is SpellkitString marker)
         {
-            if (marker.Value == SelectControlSignal.Exit)
+            if (marker.Value == SelectControlSignal.Exit && tuple.Count == 2)
             {
+                var leavingState = state;
+                var leavingArguments = stateArguments;
                 completed = true;
                 Value = tuple[1];
-                return new(IsCompleted: true, Value);
+                return new(
+                    IsCompleted: true,
+                    Value: Value,
+                    LeavingState: leavingState,
+                    EnteringState: null,
+                    LeavingStateArguments: leavingArguments);
             }
 
             if (marker.Value == SelectControlSignal.Goto && tuple[1] is SpellkitString target)
             {
-                state = factory.Definition!.States.SingleOrDefault(candidate => candidate.Name == target.Value)
+                var leavingState = state;
+                var leavingArguments = stateArguments;
+                var enteringState = factory.Definition!.States.SingleOrDefault(candidate => candidate.Name == target.Value)
                     ?? throw new InvalidOperationException($"The select has no state named '{target.Value}'.");
-                CompleteIfIdle();
-                return new(IsCompleted, Value);
+                var enteringArguments = ReadTransitionArguments(tuple, enteringState);
+                state = enteringState;
+                stateArguments = enteringArguments;
+                otherwiseTriggered = false;
+                return new(
+                    IsCompleted: false,
+                    Value: Value,
+                    LeavingState: leavingState,
+                    EnteringState: enteringState,
+                    LeavingStateArguments: leavingArguments);
             }
         }
 
         return new(IsCompleted: false, SpellkitNil.Instance);
     }
 
-    private bool CompleteIfIdle()
+    private static SpellkitObject[] CreateInitialStateArguments(SelectStateDefinition state)
     {
-        if (state.Choices.Count == 0
-            && state.Events.Count == 0)
+        var arguments = new SpellkitObject[state.Parameters.Count];
+        Array.Fill(arguments, SpellkitNil.Instance);
+        return arguments;
+    }
+
+    private static SpellkitObject[] ReadTransitionArguments(
+        SpellkitTuple transition,
+        SelectStateDefinition target)
+    {
+        var arguments = transition.Count == 2
+            ? Array.Empty<SpellkitObject>()
+            : transition[2] is SpellkitTuple values
+                ? ToArray(values)
+                : throw new InvalidOperationException("A select state transition payload must be a tuple.");
+        if (arguments.Length != target.Parameters.Count)
         {
-            completed = true;
-            Value = SpellkitNil.Instance;
+            throw new InvalidOperationException(
+                $"The select state '{target.Name}' expects {target.Parameters.Count} transition argument(s), but {arguments.Length} were provided.");
         }
 
-        return completed;
+        return arguments;
     }
+
+    private static SpellkitObject[] ToArray(SpellkitTuple values)
+    {
+        var result = new SpellkitObject[values.Count];
+        for (var i = 0; i < values.Count; i++)
+        {
+            result[i] = values[i];
+        }
+
+        return result;
+    }
+
 }
 
 internal readonly record struct SelectActionOutcome(
     bool IsCompleted,
-    SpellkitObject Value);
+    SpellkitObject Value,
+    SelectStateDefinition? LeavingState = null,
+    SelectStateDefinition? EnteringState = null,
+    SpellkitObject[]? LeavingStateArguments = null);

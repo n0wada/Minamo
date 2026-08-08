@@ -111,9 +111,9 @@ public abstract partial class SpellkitTypeInfo : SpellkitObject
                 (context, _, strObj) =>
                 {
                     var nm = strObj.ToString();
-                    SetBuiltin(ctx, nm, null);
-                    Members.Remove(name);
-                    StaticMembers.Remove(name);
+                    SetBuiltin(context, nm, null);
+                    Members.Remove(nm);
+                    StaticMembers.Remove(nm);
                     return Nil;
                 }, "name"),
             _ => InitializeStaticMember(name, ctx)
@@ -219,10 +219,8 @@ public abstract partial class SpellkitTypeInfo : SpellkitObject
                 return;
             }
 
-            Members.Remove(name);
         }
 
-        Members.Remove(name);
         Members[name] = func;
     }
 

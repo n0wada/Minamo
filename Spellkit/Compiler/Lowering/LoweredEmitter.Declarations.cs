@@ -598,15 +598,21 @@ internal sealed partial class LoweredEmitter
         var states = new List<SelectStateDefinition>(node.States.Count);
         var initialCount = 0;
         var stateNames = new HashSet<string>(StringComparer.Ordinal);
+        var stateParameterCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var state in node.States)
         {
             if (!stateNames.Add(state.Name))
             {
                 target.AddError(CompilerError.SelectDuplicateState, node.Location, state.Name);
             }
+
+            stateParameterCounts[state.Name] = state.Parameters.Count;
         }
 
-        var selectContext = ctx.WithSelectStates(node.Name ?? "<anonymous>", stateNames);
+        var selectContext = ctx.WithSelectStates(
+            node.Name ?? "<anonymous>",
+            stateNames,
+            stateParameterCounts);
         var closureCount = 0;
 
         for (var i = 0; i < node.States.Count; i++)
@@ -616,6 +622,25 @@ internal sealed partial class LoweredEmitter
             {
                 initialCount++;
             }
+
+            var enterSlot = EmitSelectHook(
+                state.Enter,
+                $"$select-enter:{node.Name ?? "anonymous"}:{i}",
+                state.Parameters,
+                selectContext,
+                ref closureCount);
+            var leaveSlot = EmitSelectHook(
+                state.Leave,
+                $"$select-leave:{node.Name ?? "anonymous"}:{i}",
+                state.Parameters,
+                selectContext,
+                ref closureCount);
+            var otherwiseSlot = EmitSelectHook(
+                state.Otherwise,
+                $"$select-otherwise:{node.Name ?? "anonymous"}:{i}",
+                state.Parameters,
+                selectContext,
+                ref closureCount);
 
             var names = new HashSet<string>(StringComparer.Ordinal);
             var choices = new List<SelectChoiceDefinition>(state.Choices.Count);
@@ -645,7 +670,7 @@ internal sealed partial class LoweredEmitter
                         IsIterator: false,
                         IsImplInitializer: false,
                         IsPrivate: true,
-                        Parameters: [],
+                        Parameters: state.Parameters,
                         Body: choice.Guard,
                         NeedsValue: false,
                         IteratorBody: false,
@@ -667,7 +692,7 @@ internal sealed partial class LoweredEmitter
                     IsIterator: false,
                     IsImplInitializer: false,
                     IsPrivate: true,
-                    Parameters: choice.Parameters,
+                    Parameters: CombineParameters(state.Parameters, choice.Parameters),
                     Body: choice.Body,
                     NeedsValue: false,
                     IteratorBody: false,
@@ -680,7 +705,7 @@ internal sealed partial class LoweredEmitter
                     choice.Description,
                     functionSlot,
                     guardSlot,
-                    choice.Parameters.Count));
+                    SelectParameters(choice.Parameters)));
             }
 
             var eventNames = new HashSet<string>(StringComparer.Ordinal);
@@ -710,16 +735,24 @@ internal sealed partial class LoweredEmitter
                     IsIterator: false,
                     IsImplInitializer: false,
                     IsPrivate: true,
-                    Parameters: handler.Parameters,
+                    Parameters: CombineParameters(state.Parameters, handler.Parameters),
                     Body: handler.Body,
                     NeedsValue: false,
                     IteratorBody: false,
                     IsStdCall: !target.NoOptimizations);
                 EmitFunctionBody(-1, function, selectContext, iteratorBody: false);
-                events.Add(new(handler.Name, closureCount++, handler.Parameters.Count));
+                events.Add(new(handler.Name, closureCount++, SelectParameters(handler.Parameters)));
             }
 
-            states.Add(new(state.Name, state.IsInitial, choices, events));
+            states.Add(new(
+                state.Name,
+                state.IsInitial,
+                SelectParameters(state.Parameters),
+                enterSlot,
+                leaveSlot,
+                otherwiseSlot,
+                choices,
+                events));
         }
 
         if (node.States.Count == 0)
@@ -745,6 +778,71 @@ internal sealed partial class LoweredEmitter
         {
             cw.Drop();
         }
+    }
+
+    private int? EmitSelectHook(
+        LoweredNode? body,
+        string name,
+        IReadOnlyList<LoweredParameter> stateParameters,
+        CompilerContext selectContext,
+        ref int closureCount)
+    {
+        if (body is null)
+        {
+            return null;
+        }
+
+        var function = new LoweredFunctionDeclaration(
+            body.Location,
+            TypeName: null,
+            TargetTypeName: null,
+            Name: name,
+            IsStatic: false,
+            IsIndexer: false,
+            IsConstructor: false,
+            Getter: false,
+            Setter: false,
+            IsIterator: false,
+            IsImplInitializer: false,
+            IsPrivate: true,
+            Parameters: stateParameters,
+            Body: body,
+            NeedsValue: false,
+            IteratorBody: false,
+            IsStdCall: !target.NoOptimizations);
+        EmitFunctionBody(-1, function, selectContext, iteratorBody: false);
+        return closureCount++;
+    }
+
+    private static IReadOnlyList<LoweredParameter> CombineParameters(
+        IReadOnlyList<LoweredParameter> stateParameters,
+        IReadOnlyList<LoweredParameter> actionParameters)
+    {
+        var result = new LoweredParameter[stateParameters.Count + actionParameters.Count];
+        for (var i = 0; i < stateParameters.Count; i++)
+        {
+            result[i] = stateParameters[i];
+        }
+
+        for (var i = 0; i < actionParameters.Count; i++)
+        {
+            result[stateParameters.Count + i] = actionParameters[i];
+        }
+
+        return result;
+    }
+
+    private static IReadOnlyList<SelectParameterDefinition> SelectParameters(
+        IReadOnlyList<LoweredParameter> parameters)
+    {
+        var result = new SelectParameterDefinition[parameters.Count];
+        for (var i = 0; i < parameters.Count; i++)
+        {
+            var parameter = parameters[i];
+            result[i] = new(parameter.Name, parameter.TypeAnnotation?.ToString());
+        }
+
+        return result;
     }
 
     private void EmitSelectFactoryTemplate(LoweredSelectDeclaration node, bool keepResult, CompilerContext ctx)

@@ -159,8 +159,6 @@ internal sealed class Lexer
                 return ScanOperator(TokenKind.LeftBracket, 1, out kind);
             case ']':
                 return ScanOperator(TokenKind.RightBracket, 1, out kind);
-            case '\\':
-                return ScanOperator(TokenKind.Backslash, 1, out kind);
         }
 
         kind = TokenKind.Unknown;
@@ -437,7 +435,6 @@ internal sealed class Lexer
         "not" => TokenKind.Not,
         "nil" => TokenKind.Nil,
         "else" => TokenKind.Else,
-        "many" => TokenKind.Many,
         "throw" => TokenKind.Throw,
         "try" => TokenKind.Try,
         "catch" => TokenKind.Catch,

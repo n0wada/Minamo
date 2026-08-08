@@ -169,8 +169,10 @@ let shop = select {
     }
 
     state browsing {
+        enter => { print("You enter the browsing state.") }
         choose "back" => goto open
         choose "leave" => exit "closed"
+        otherwise => exit "nothing to browse"
     }
 }
 
@@ -181,7 +183,10 @@ print("The shop is ", result, ".")
 `do shop` suspends the script while the host presents choices and evaluates to the value supplied
 by `exit`. Selecting `"browse"` runs its choice body and moves the same interaction instance to
 `browsing`; selecting `"leave"` exits and resumes execution after `do`. Hidden host events may be
-declared with `on` and delivered from C# with `Send`. Named selects can also be opened from C#.
+declared with `on` and delivered from C# with `Send`. `enter` and `leave` blocks run on state
+transitions, while `otherwise` handles a state with no available choices and no host events. State
+parameters receive values from `goto` and are available to the entered state's actions and hooks.
+Named selects can also be opened from C#.
 
 See [Interactive selects](../Developers/InteractiveSelect.md) for factory lifetime, guards,
 nesting, aliases, and the C# session API.

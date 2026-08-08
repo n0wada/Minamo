@@ -132,6 +132,10 @@ internal sealed class LoweringPass
                 state.Location,
                 state.Name,
                 state.IsInitial,
+                LowerParameters(state.Parameters),
+                state.Enter is null ? null : LowerNode(state.Enter, new CompilerContext()),
+                state.Leave is null ? null : LowerNode(state.Leave, new CompilerContext()),
+                state.Otherwise is null ? null : LowerNode(state.Otherwise, new CompilerContext()),
                 choices,
                 events);
         }
@@ -142,17 +146,35 @@ internal sealed class LoweringPass
     public LoweredSelectInvocation Lower(SelectInvocationSyntax node, CompilerContext ctx) =>
         new(node.Location, LowerNode(node.Target, ctx));
 
-    public LoweredControlTransfer Lower(GotoSyntax node) =>
-        new(
+    public LoweredControlTransfer Lower(GotoSyntax node, CompilerContext ctx)
+    {
+        var arguments = new LoweredNode[node.Arguments.Count];
+        for (var i = 0; i < node.Arguments.Count; i++)
+        {
+            arguments[i] = LowerNode(node.Arguments[i], ctx);
+        }
+
+        var controlValues = new LoweredNode[arguments.Length > 0 ? 3 : 2];
+        controlValues[0] = new LoweredLiteral(
             node.Location,
-            new LoweredTuple(
-                node.Location,
-                [
-                    new LoweredLiteral(node.Location, SelectControlSignal.Goto, LoweredLiteralKind.String),
-                    new LoweredLiteral(node.Location, node.State, LoweredLiteralKind.String)
-                ]),
+            SelectControlSignal.Goto,
+            LoweredLiteralKind.String);
+        controlValues[1] = new LoweredLiteral(
+            node.Location,
+            node.State,
+            LoweredLiteralKind.String);
+        if (arguments.Length > 0)
+        {
+            controlValues[2] = new LoweredTuple(node.Location, arguments);
+        }
+
+        return new(
+            node.Location,
+            new LoweredTuple(node.Location, controlValues),
             LoweredControlTransferKind.Goto,
-            node.State);
+            node.State,
+            arguments);
+    }
 
     public LoweredControlTransfer Lower(ExitSyntax node, CompilerContext ctx) =>
         new(
@@ -506,7 +528,7 @@ internal sealed class LoweringPass
             NodeType.Range => Lower((RangeSyntax)node, ctx),
             NodeType.Rebinding => Lower((RebindingSyntax)node, ctx),
             NodeType.Return => Lower((ReturnSyntax)node, ctx),
-            NodeType.Goto => Lower((GotoSyntax)node),
+            NodeType.Goto => Lower((GotoSyntax)node, ctx),
             NodeType.Exit => Lower((ExitSyntax)node, ctx),
             NodeType.String => Lower((StringLiteralSyntax)node),
             NodeType.Throw => Lower((ThrowSyntax)node, ctx),

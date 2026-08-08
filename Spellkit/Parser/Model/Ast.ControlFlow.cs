@@ -173,7 +173,18 @@ public sealed class GotoSyntax : SyntaxNode
 
     public string State { get; set; } = null!;
 
-    internal override void ToString(StringBuilder sb) => sb.Append("goto ").Append(State);
+    public List<SyntaxNode> Arguments { get; } = new();
+
+    internal override void ToString(StringBuilder sb)
+    {
+        sb.Append("goto ").Append(State);
+        if (Arguments.Count > 0)
+        {
+            sb.Append('(');
+            Arguments.ToString(sb);
+            sb.Append(')');
+        }
+    }
 }
 
 public sealed class ExitSyntax : SyntaxNode

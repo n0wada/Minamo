@@ -46,12 +46,13 @@ Reserved words include:
 
 ```text
 as break catch continue do else false for from func get if import in is
-let many match mut nil not or private return set static throw true try type
+let match mut nil not or private return set static throw true try type
 use when while with yield
 ```
 
 `const`, `struct`, `enum`, `trait`, `impl`, `guard`, `finally`, `select`, `initial`, `state`,
-`choose`, `on`, `goto`, `exit`, `label`, and `description` are contextual keywords.
+`choose`, `on`, `goto`, `exit`, `label`, `description`, `enter`, `leave`, and `otherwise` are
+contextual keywords.
 
 ## Numeric literals
 
@@ -194,25 +195,40 @@ select-local
     ::= ( "let" | "mut" ) pattern "=" expression
 
 state-declaration
-    ::= [ "initial" ] "state" identifier
-        "{" { choice-declaration | event-declaration } "}"
+    ::= [ "initial" ] "state" identifier [ parameters ]
+        "{" { state-hook | otherwise-declaration | choice-declaration | event-declaration } "}"
+
+state-hook
+    ::= ( "enter" | "leave" ) "=>" block
+
+otherwise-declaration
+    ::= "otherwise" "=>" choice-body
 
 choice-declaration
-    ::= "choose" string [ "(" identifier { "," identifier } ")" ]
+    ::= "choose" string [ parameters ]
         [ "label" string ]
         [ "description" string ]
         [ "when" expression ]
         "=>" choice-body
 
 event-declaration
-    ::= "on" string [ "(" identifier { "," identifier } ")" ]
+    ::= "on" string [ parameters ]
         "=>" choice-body
 
+parameters
+    ::= "(" parameter { "," parameter } ")"
+
+parameter
+    ::= identifier [ ":" type-annotation ]
+
 choice-body
-    ::= block | "goto" identifier | "exit" [ expression ]
+    ::= block | goto-statement | exit-statement
 
 goto-statement
-    ::= "goto" identifier
+    ::= "goto" identifier [ transition-arguments ]
+
+transition-arguments
+    ::= "(" [ expression { "," expression } ] ")"
 
 exit-statement
     ::= "exit" [ expression ]
@@ -227,13 +243,21 @@ select-invocation
 Named select declarations are permitted only at global (module) scope. Exactly one state is marked
 `initial`. Select locals are created for each select instance and must appear before the state
 declarations. Without `goto`, an action remains in its current state. `goto` exposes the target
-state directly, and a state without choices or events completes immediately. `exit` completes the
-session. Choice and event names are unique within their respective channels in one state. Both receive either no
-argument, one value, or a tuple whose elements bind to their parameters. `choose` declarations are
-visible through `Choices`; `on` declarations are hidden and delivered through the host's `Send`
-API. `label` and `description` provide host-facing display text; `when` controls whether a choice
-is currently available. `goto` targets must name a state declared by the same select.
-`do expression` invokes a factory and evaluates to its exit value.
+state directly, and a state without choices, events, or an `otherwise` handler completes
+immediately. `exit` completes the session. Choice and event names are unique within their
+respective channels in one state. Both receive either no argument, one value, or a tuple whose
+elements bind to their parameters. `choose` declarations are visible through `Choices`; `on`
+declarations are hidden and delivered through the host's `Send` API. `label` and `description`
+provide host-facing display text; `when` controls whether a choice is currently available.
+`otherwise` runs at most once after entering a state when no choice is available and the state has
+no host events; its body may `goto` or `exit`. `enter` runs when a state is entered, including the
+initial state, and `leave` runs before a `goto` or `exit` leaves it. Lifecycle hooks are blocks and
+cannot themselves change state, exit, or suspend. `goto` targets must name a state declared by the
+same select. State parameters receive the expressions supplied by `goto`; they are available as
+ordinary variables in that state's `enter`, `leave`, `otherwise`, `choose`, and `on` bodies and
+guards. State parameters precede choice or event parameters at runtime, and a `goto` must supply
+exactly as many expressions as the target state declares. The initial state starts without
+transition arguments. `do expression` invokes a factory and evaluates to its exit value.
 
 ```swift
 select player {

@@ -5,8 +5,9 @@ shops, quests, and similar flows: Script defines states and available actions, w
 the UI, input events, and game data.
 
 The feature supports named and anonymous factories, select-local declarations, VM suspension at
-`do`, nested selects, guards, visible choices, and hidden host events. Dynamic
-choices, state exit hooks, and persistence of suspended executions remain deferred.
+`do`, nested selects, guards, visible choices, hidden host events, fallback actions, state
+parameters, and state lifecycle hooks. Dynamic choices and persistence of suspended executions
+remain deferred.
 
 ## Mental model
 
@@ -100,8 +101,14 @@ select-expression
     ::= "select" [ identifier ] "{" state-declaration+ "}"
 
 state-declaration
-    ::= [ "initial" ] "state" identifier
-        "{" { choice-declaration | event-declaration } "}"
+    ::= [ "initial" ] "state" identifier parameters?
+        "{" { state-hook | otherwise-declaration | choice-declaration | event-declaration } "}"
+
+state-hook
+    ::= ( "enter" | "leave" ) "=>" block
+
+otherwise-declaration
+    ::= "otherwise" "=>" choice-body
 
 choice-declaration
     ::= "choose" string parameters?
@@ -114,10 +121,19 @@ event-declaration
     ::= "on" string parameters? "=>" choice-body
 
 parameters
-    ::= "(" identifier { "," identifier } ")"
+    ::= "(" parameter { "," parameter } ")"
+
+parameter
+    ::= identifier [ ":" type-annotation ]
 
 choice-body
-    ::= block | "goto" identifier | "exit" [ expression ]
+    ::= block | goto-statement | exit-statement
+
+goto-statement
+    ::= "goto" identifier transition-arguments?
+
+transition-arguments
+    ::= "(" [ expression { "," expression } ] ")"
 
 select-invocation
     ::= "do" expression
@@ -129,8 +145,36 @@ state in the same select.
 
 `goto name` changes the next waiting state. If an action does not execute `goto`, the instance
 remains in its current state. `exit` completes the instance and optionally supplies its result. A
-state with no choices or events completes immediately; an event-only state remains active with an
-empty `Choices` collection.
+state with no choices, events, or `otherwise` handler completes immediately; an event-only state
+remains active with an empty `Choices` collection. `otherwise` runs at most once per state entry
+when all choices are unavailable and no host event is declared. It can `goto` or `exit`; if it
+does neither, the state remains active and the fallback is not repeated until the state is entered
+again.
+
+`enter` runs after a session is created for the initial state and after a `goto` enters a state.
+`leave` runs before a `goto` or `exit` leaves the current state. Both hooks must be blocks and are
+side-effect hooks: they cannot `goto`, `exit`, or suspend on another select.
+
+State parameters carry the data for a particular state entry. A `goto` supplies the target state's
+values, and those values are available as ordinary variables in the target state's `enter`, `leave`,
+`otherwise`, `choose`, and `on` bodies and guards. They are prepended to the internal action
+arguments, so host-supplied choice and event arguments keep their existing shape. State values are
+script-side context; they are not included in `SpellkitChoice.Parameters` or exposed by the
+session's `State` property. The number of expressions in a transition must match the target
+state's parameter count.
+
+```kit
+select counter {
+    initial state start {
+        choose "begin" => goto count(0)
+    }
+
+    state count(total: Integer) {
+        choose "add" (amount: Integer) => goto count(total + amount)
+        choose "finish" => exit total
+    }
+}
+```
 
 ```kit
 choose "guard" label "Talk to the guard" => goto guard
@@ -225,8 +269,10 @@ public sealed class SpellkitSelectSession : IDisposable
 }
 ```
 
-`State` is the current state name. `SpellkitChoice` exposes `Id`, `Label`, `Description`, and
-`ParameterCount`. `Select` and `Send` return the next available choices or an `IsCompleted` result.
+`State` is the current state name. `SpellkitChoice` exposes `Id`, `Label`, `Description`,
+`ParameterCount`, and `Parameters`. Each `SpellkitChoiceParameter` exposes the source parameter
+`Name` and its optional `TypeName`. `Select` and `Send` return the next available choices or an
+`IsCompleted` result.
 They report an error for unavailable IDs, invalid argument shapes, or a completed session. Calls on
 one session are serialized; do not issue concurrent action calls.
 
@@ -358,7 +404,6 @@ The current implementation deliberately excludes:
 
 - dynamic choice generation;
 - public `yield` / generic `resume` syntax;
-- state exit hooks;
 - serializing suspended VM continuations or select instances;
 - concurrent action calls and multiple suspended runs in one host instance.
 
