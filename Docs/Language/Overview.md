@@ -188,7 +188,8 @@ transitions, while `otherwise` handles a state with no available choices and no 
 parameters receive values from `goto` and are available to the entered state's actions and hooks.
 Named selects can also be opened from C#.
 
-See [Interactive selects](../Developers/InteractiveSelect.md) for factory lifetime, guards,
+See [Interactive selects](../Developers/InteractiveSelect.md) for basic host integration and
+[Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md) for factory lifetime,
 nesting, aliases, and the C# session API.
 
 ## Collections
@@ -434,6 +435,7 @@ telemetry, and C# integration.
 - [Detailed grammar reference](../Reference/Grammar.md)
 - [Language recipes](Recipes.md)
 - [Interactive selects](../Developers/InteractiveSelect.md)
+- [Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md)
 - [Hosting API](../Developers/HostingGuide.md)
 - [Compatibility](../Operations/Compatibility.md)
 - [Runnable Station Console example](../../Examples/StationConsole/README.md)

@@ -211,7 +211,7 @@ Compatibility documents current target frameworks and the repository validation 
 ### For developers
 
 - [Public API layers](Docs/Developers/PublicApiLayers.md)
-- [Interactive select design](Docs/Developers/InteractiveSelect.md)
+- [Advanced interactive select design](Docs/Developers/InteractiveSelectAdvanced.md)
 
 These guides distinguish the application-facing Hosting API from tooling and runtime extension
 surfaces, and record planned language and host integration designs.

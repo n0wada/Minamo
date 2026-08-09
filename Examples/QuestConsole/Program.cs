@@ -35,7 +35,7 @@ internal static class Program
         return 0;
     }
 
-    private static void RunSelect(SpellkitSelectSession select)
+    private static void RunSelect(SpellkitSelect select)
     {
         while (!select.IsCompleted)
         {

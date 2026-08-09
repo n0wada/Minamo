@@ -272,7 +272,15 @@ public sealed class SpellkitInstance : IDisposable
             SpellkitFailureKind.Input);
     }
 
-    public SpellkitSelectSession OpenSelect(string name)
+    /// <summary>
+    /// Opens a named select through its synchronous, choice-oriented API.
+    /// </summary>
+    public SpellkitSelect OpenSelect(string name) => new(OpenSelectSession(name));
+
+    /// <summary>
+    /// Opens a named select session with snapshot, revision, invalidation, and asynchronous action support.
+    /// </summary>
+    public SpellkitSelectSession OpenSelectSession(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (runtimeContext is null)
@@ -489,7 +497,7 @@ public sealed class SpellkitInstance : IDisposable
         }
     }
 
-    public async Task<SpellkitSelectSession> OpenSelectAsync(string name)
+    public async Task<SpellkitSelectSession> OpenSelectSessionAsync(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (runtimeContext is null)

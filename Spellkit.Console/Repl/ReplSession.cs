@@ -173,7 +173,7 @@ internal sealed class ReplSession : IDisposable
     {
         try
         {
-            using var select = session.OpenSelect(name);
+            using var select = session.OpenSelectSession(name);
             RunSelectSession(select);
             return true;
         }

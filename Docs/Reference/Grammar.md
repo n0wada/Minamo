@@ -183,9 +183,12 @@ The final expression of a block is its value.
 ## Interactive selects
 
 An interactive select defines a host-driven state machine. A host normally opens it through
-`SpellkitInstance.OpenSelect`; Script may also invoke a factory with `do expression`. The host renders
-current choices and sends a selected choice back to the session. See
-[Interactive selects](../Developers/InteractiveSelect.md) for the C# protocol.
+`SpellkitInstance.OpenSelect`, or through `SpellkitInstance.OpenSelectSession` for the advanced
+session API. Script may also invoke a factory with `do expression`. The host renders current choices
+and sends a selected choice back to the session. See
+[Interactive selects](../Developers/InteractiveSelect.md) for the basic C# protocol and
+[Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md) for snapshots,
+asynchronous hosts, and nested interactions.
 
 ```text
 select-declaration

@@ -232,8 +232,9 @@ internal static class HostingScenarios
         AssertHasMethod<SpellkitInstance>("ExecuteAsync", "asynchronous instance execution");
         AssertHasMethod<SpellkitInstance>("ExecuteFile", "explicit script file execution");
         AssertHasMethod<SpellkitInstance>("ExecuteFileAsync", "asynchronous file execution");
-        AssertHasMethod<SpellkitInstance>("OpenSelect", "interactive select creation");
-        AssertHasMethod<SpellkitInstance>("OpenSelectAsync", "asynchronous interactive select creation");
+        AssertHasMethod<SpellkitInstance>("OpenSelect", "basic interactive select creation");
+        AssertHasMethod<SpellkitInstance>("OpenSelectSession", "advanced interactive select creation");
+        AssertHasMethod<SpellkitInstance>("OpenSelectSessionAsync", "asynchronous interactive select creation");
         AssertHasMethod<SpellkitInstance>("StartAsync", "asynchronous suspended run creation");
         AssertHasMethod<SpellkitInstance>("DispatchSignals", "pending signal dispatch");
         AssertHasMethod<SpellkitInstance>("DispatchSignalsAsync", "asynchronous signal dispatch");

@@ -2,7 +2,7 @@
   <PropertyGroup>
     <!-- Product identity lives here so a future rename does not require editing every project. -->
     <SpellkitProductName>Spellkit</SpellkitProductName>
-    <SpellkitVersion>0.9.3</SpellkitVersion>
+    <SpellkitVersion>0.9.4</SpellkitVersion>
     <SpellkitCompany>Spellkit Contributors</SpellkitCompany>
     <SpellkitCopyright>Copyright (c) Spellkit Contributors</SpellkitCopyright>
     <MicrosoftCodeAnalysisVersion>4.1.0</MicrosoftCodeAnalysisVersion>

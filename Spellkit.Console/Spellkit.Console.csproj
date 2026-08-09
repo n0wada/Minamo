@@ -15,14 +15,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Spellkit.Generators\Spellkit.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\Spellkit\Spellkit.csproj" />
-    <ProjectReference Include="..\..\spellkit.extensions\Http\Spellkit.Extra.Http.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="spellkit.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\spellkit.extensions\Http\bin\$(Configuration)\Spellkit.Extra.Http.dll"
-          Link="Spellkit.Extra.Http.dll"
-          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

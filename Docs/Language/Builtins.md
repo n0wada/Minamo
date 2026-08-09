@@ -187,11 +187,41 @@ import * from readline
 print(readLine(), terminator: nil)
 ```
 
+### `collections`
+
+Import `collections` for collection types whose ordering or capacity has a specific meaning. All
+five types are iterable and expose `Length()` and `Count`; operations that have no value to return
+produce `nil`.
+
+| Type | Purpose and selected operations |
+| --- | --- |
+| `PriorityQueue(values?)` | A minimum-priority queue. `Enqueue(value, priority)`, `Peek()`, and `Dequeue()`; the latter two return `(value, priority)`. Equal priorities retain enqueue order. |
+| `Deque(values?)` | A double-ended queue. `PushFront(value)`, `PushBack(value)`, `PopFront()`, `PopBack()`, `First()`, and `Last()`. |
+| `SortedSet(values?)` | A duplicate-free set iterated in ascending value order. `Add(value)`, `Remove(value)`, `Contains(value)`, `First()`, `Last()`, and `Range(...)`. |
+| `MultiMap(pairs?)` | Multiple values per key. `Add(key, value)`, `Get(key)`, `Remove(key, value)`, `RemoveKey(key)`, `ContainsKey(key)`, and `Keys`. Keys and values retain insertion order. |
+| `RingBuffer(capacity, values?)` | A fixed-size, oldest-to-newest buffer. `Add(value)` overwrites the oldest value when full; `First()`, `Last()`, and `Capacity` expose its current boundaries. |
+
+`values` is a sequence. `PriorityQueue` expects `(value, priority)` pairs and `MultiMap` expects
+`(key, value)` pairs. `Get` returns an `Array` snapshot, including an empty array when the key is
+absent. `RingBuffer` requires a positive capacity.
+
+```swift
+import * from collections
+
+let work = PriorityQueue()
+work.Enqueue("write release notes", 2)
+work.Enqueue("ship", 1)
+let next = work.Dequeue()       // (value: "ship", priority: 1)
+
+let recent = RingBuffer(3, [1, 2, 3])
+recent.Add(4)
+print(recent.ToArray())         // [2, 3, 4]
+```
+
 The `readline` and `io` modules can access host resources. An embedding host chooses which
 modules to register and can instead expose narrower host commands and capabilities. The `http`
-module is an external extension of the `spell` distribution; see the
-[Hosting API guide](../Developers/HostingGuide.md#external-extension-libraries) for its loading
-contract.
+module is not part of the default `spell` distribution; add its external extension through
+[`spellkit.json`](../Developers/HostingGuide.md#external-extension-libraries) when it is needed.
 
 Core types provide explicit conversions for common data formats:
 

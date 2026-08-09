@@ -26,5 +26,5 @@ Talk to the guard, ask about the courier, accept the quest, return to the square
 During initialization, `alias(questGame(), "quest.town")` calls `questGame` once and registers its
 factory. Each `instance.OpenSelect("quest.town")` creates fresh cells for the two select-local
 quest flags, then binds the choice and guard closures to those cells. `Program.cs` drives the
-resulting `SpellkitSelectSession` by calling `Select`. This example intentionally shows the
+resulting `SpellkitSelect` by calling `Select`. This example intentionally shows the
 C#-initiated API rather than `do` and a suspended Script continuation.

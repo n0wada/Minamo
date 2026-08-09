@@ -318,7 +318,7 @@ using var run = await instance.StartAsync(source);
 var step = await run.SelectAsync("continue");
 var eventResult = await run.SendAsync("loaded", payload);
 
-using var select = await instance.OpenSelectAsync("dialog");
+using var select = await instance.OpenSelectSessionAsync("dialog");
 await select.SelectAsync("confirm");
 ```
 
@@ -1075,6 +1075,9 @@ be absolute or relative to the directory containing the configuration file:
   ]
 }
 ```
+
+The default `spellkit.json` has an empty `extensions` array. For example, add
+`Spellkit.Extra.Http.dll` only to a `spell` distribution that includes the HTTP extension.
 
 `spell` loads each assembly, creates its `ISpellkitLibrary` implementations, and
 invokes `Register`. An extension should reference `Spellkit.dll`, not
