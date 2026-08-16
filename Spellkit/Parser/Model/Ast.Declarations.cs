@@ -198,8 +198,6 @@ public sealed class SelectStateSyntax : SyntaxNode
 
     public bool IsInitial { get; set; }
 
-    public List<ParameterSyntax> Parameters { get; } = new();
-
     public SyntaxNode? Enter { get; set; }
 
     public SyntaxNode? Leave { get; set; }
@@ -223,12 +221,6 @@ public sealed class SelectStateSyntax : SyntaxNode
 
         sb.Append("state ");
         sb.Append(Name);
-        if (Parameters.Count > 0)
-        {
-            sb.Append('(');
-            Parameters.ToString(sb);
-            sb.Append(')');
-        }
         sb.Append(" {");
         if (Enter is not null)
         {
@@ -299,8 +291,6 @@ public sealed class SelectDynamicChoiceSyntax : SyntaxNode
 
     public SyntaxNode? Label { get; set; }
 
-    public SyntaxNode? Description { get; set; }
-
     public SyntaxNode? Guard { get; set; }
 
     public SyntaxNode? View { get; set; }
@@ -315,11 +305,6 @@ public sealed class SelectDynamicChoiceSyntax : SyntaxNode
         {
             sb.Append(" label ");
             Label.ToString(sb);
-        }
-        if (Description is not null)
-        {
-            sb.Append(" description ");
-            Description.ToString(sb);
         }
         if (Guard is not null)
         {
@@ -346,8 +331,6 @@ public sealed class SelectChoiceSyntax : SyntaxNode
 
     public string? Label { get; set; }
 
-    public string? Description { get; set; }
-
     public SyntaxNode? Guard { get; set; }
 
     public SyntaxNode? View { get; set; }
@@ -370,13 +353,6 @@ public sealed class SelectChoiceSyntax : SyntaxNode
         {
             sb.Append(" label \"");
             sb.Append(Label);
-            sb.Append('"');
-        }
-
-        if (Description is not null)
-        {
-            sb.Append(" description \"");
-            sb.Append(Description);
             sb.Append('"');
         }
 

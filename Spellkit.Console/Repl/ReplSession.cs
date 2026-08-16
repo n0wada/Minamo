@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Spellkit;
 
@@ -30,7 +31,7 @@ internal sealed class ReplSession : IDisposable
         var spellkitEnvironment = new SpellkitEnvironment()
                 .UseInput(_ => Console.ReadLine())
                 .UseOutput(Console.Write)
-                .UseSelect(RunSelectSession);
+                .UseSelectAsync(RunSelectSessionAsync);
         session = host.CreateInstance(spellkitEnvironment, options.UserArguments);
         CompilationLinker = new SpellkitIncrementalLinker(lookup, options.UserArguments);
         commands = new ReplCommands(this);
@@ -129,7 +130,7 @@ internal sealed class ReplSession : IDisposable
 
     public bool Eval(string source)
     {
-        var result = session.Execute(source, "<stdio>");
+        var result = session.ExecuteAsync(source).GetAwaiter().GetResult();
         return PrintResult(result, measureTime: false);
     }
 
@@ -165,7 +166,7 @@ internal sealed class ReplSession : IDisposable
 
     public bool EvalFile(string fileName, bool measureTime)
     {
-        var result = session.ExecuteFile(fileName);
+        var result = session.ExecuteFileAsync(fileName).GetAwaiter().GetResult();
         return PrintResult(result, measureTime);
     }
 
@@ -173,9 +174,7 @@ internal sealed class ReplSession : IDisposable
     {
         try
         {
-            using var select = session.OpenSelectSession(name);
-            RunSelectSession(select);
-            return true;
+            return RunSelectAsync(name).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
@@ -184,7 +183,14 @@ internal sealed class ReplSession : IDisposable
         }
     }
 
-    private void RunSelectSession(SpellkitSelectSession select)
+    private async Task<bool> RunSelectAsync(string name)
+    {
+        using var select = await session.OpenSelectSessionAsync(name).ConfigureAwait(false);
+        await RunSelectSessionAsync(select).ConfigureAwait(false);
+        return true;
+    }
+
+    private async ValueTask RunSelectSessionAsync(SpellkitSelectSession select)
     {
         while (!select.IsCompleted)
         {
@@ -200,10 +206,6 @@ internal sealed class ReplSession : IDisposable
             {
                 var renderedChoice = choices[i];
                 ConsoleOutput.Output($"{i + 1}. {renderedChoice.Label} [{renderedChoice.Id}]");
-                if (!string.IsNullOrEmpty(renderedChoice.Description))
-                {
-                    ConsoleOutput.Output($"   {renderedChoice.Description}");
-                }
             }
 
             ConsoleOutput.Prefix("select> ");
@@ -245,11 +247,11 @@ internal sealed class ReplSession : IDisposable
                         continue;
                     }
 
-                    select.Select(choice.Id);
+                    await select.SelectAsync(choice.Id).ConfigureAwait(false);
                 }
                 else if (choice.ParameterCount == 1 && argument is not null)
                 {
-                    select.Select(choice.Id, argument);
+                    await select.SelectAsync(choice.Id, argument).ConfigureAwait(false);
                 }
                 else
                 {

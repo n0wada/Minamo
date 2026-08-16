@@ -1,14 +1,14 @@
 # Advanced interactive selects
 
 This page covers the parts of `select` intended for richer UI integrations and script composition.
-Start with [Interactive selects](InteractiveSelect.md) for the ordinary `OpenSelect`
+Start with [Interactive selects](InteractiveSelect.md) for the ordinary `OpenSelectAsync`
 loop.
 
 ## Advanced sessions and snapshots
 
-`SpellkitInstance.OpenSelectSession` returns `SpellkitSelectSession`. Use it when the host needs a stable
-UI frame, stale-input rejection, invalidation after host-owned changes, or asynchronous select
-actions. `OpenSelectSessionAsync` creates the same kind of session without blocking the caller.
+`SpellkitInstance.OpenSelectSessionAsync` returns `SpellkitSelectSession`. Use it when the host needs a stable
+UI frame, stale-input rejection, invalidation after host-owned changes, or select actions that
+await host work. Session operations that can run Spellkit code are asynchronous.
 
 `Snapshot` is not required for ordinary local UI loops. It is one coherent description of a render:
 the interactive select name, state and state view, visible choices and choice views, completion
@@ -16,14 +16,14 @@ state, and a Revision number. When a nested select is active, the snapshot follo
 interaction because that is the one that can receive input.
 
 ```csharp
-using var town = instance.OpenSelectSession("game.town");
+using var town = await instance.OpenSelectSessionAsync("game.town");
 
 var snapshot = town.Snapshot;
 ui.Render(snapshot.State.Id, snapshot.Choices);
 
 try
 {
-    var result = town.SelectAtRevision("accept", snapshot.Revision);
+    var result = await town.SelectAtRevisionAsync("accept", snapshot.Revision);
     ui.Render(result.Snapshot.State.Id, result.Snapshot.Choices);
 }
 catch (SpellkitSelectRevisionMismatchException stale)
@@ -39,22 +39,21 @@ leaves the session unchanged and provides a current snapshot in
 
 ### Refreshing host-owned data
 
-`Refresh` reevaluates a snapshot without changing its revision. Use it when a UI needs an ordinary
-resync. `Invalidate` reevaluates the snapshot and advances its revision, making input from older
-renders stale.
+`RefreshAsync` reevaluates a snapshot without changing its revision. Use it when a UI needs an
+ordinary resync. `InvalidateAsync` reevaluates the snapshot and advances its revision, making
+input from older renders stale.
 
 ```csharp
-inventory.Changed += (_, _) =>
+inventory.Changed += async (_, _) =>
 {
-    var snapshot = town.Invalidate();
+    var snapshot = await town.InvalidateAsync();
     ui.Render(snapshot.State.Id, snapshot.Choices);
 };
 ```
 
-`RefreshAsync` and `InvalidateAsync` serialize with asynchronous select actions without blocking
-the caller. Update host-owned data and invalidate it through the host's own dispatcher. Do not
-synchronously invalidate the same session from a callback already executing one of its actions;
-queue that notification instead.
+These operations serialize with select actions without blocking the caller. Update host-owned data
+and invalidate it through the host's own dispatcher. Do not await an invalidation from a callback
+already executing one of the session's actions; queue that notification instead.
 
 ### Display views
 
@@ -63,16 +62,21 @@ snapshot is created and must be side-effect free.
 
 ```kit
 select courierQuest {
+    mut questId = ""
+
     initial state offer {
         view => ["template": "quest.offer", "title": "Courier needed"]
 
         choose "accept"
             label "Accept"
             view => ["style": "primary", "icon": "check"]
-            => goto active("courier")
+            => {
+                questId = "courier"
+                goto active
+            }
     }
 
-    state active(questId: String) {
+    state active {
         view => ["template": "quest.active", "questId": questId]
         choose "leave" => exit
     }
@@ -84,7 +88,7 @@ example, a dictionary view can be read as `Dictionary<string, object?>`.
 
 ## Stateful select declarations
 
-A select expression is a reusable factory. Each `OpenSelect`, `OpenSelectSession`, or `do`
+A select expression is a reusable factory. Each `OpenSelectAsync`, `OpenSelectSessionAsync`, or `do`
 creates a new interaction instance, including its state and select-local values. Captured outer
 variables belong to the factory and are shared by its instances.
 
@@ -105,22 +109,30 @@ func createShop(items) {
 In this example, `visits` belongs to the factory closure while `cartCount` starts again for each
 select instance. Select-local declarations must precede the state declarations.
 
-### State parameters and lifecycle hooks
+### Lifecycle hooks
 
-`goto` can pass values into its target state. The values are ordinary variables in that state's
-choices, events, guards, fallback action, and lifecycle hooks.
+Use select-local values when state actions need to share per-session data. `enter` and `leave`
+run when a state is entered or left.
 
 ```kit
 select counter {
+    mut total = 0
+
     initial state start {
-        choose "begin" => goto count(0)
+        choose "begin" => {
+            total = 0
+            goto count
+        }
     }
 
-    state count(total: Integer) {
+    state count {
         enter => {
             print("Entered count")
         }
-        choose "add" (amount: Integer) => goto count(total + amount)
+        choose "add" (amount: Integer) => {
+            total += amount
+            goto count
+        }
         choose "finish" => exit total
         leave => {
             print("Leaving count")
@@ -129,9 +141,9 @@ select counter {
 }
 ```
 
-The target state must receive exactly the number of values it declares. `enter` runs after the
-initial state is created and after `goto`; `leave` runs before a `goto` or `exit` leaves a state.
-Both are side-effect hooks: they cannot themselves `goto`, `exit`, or start a nested select.
+`enter` runs after the initial state is created and after `goto`; `leave` runs before a `goto` or
+`exit` leaves a state. Both are side-effect hooks: they cannot themselves `goto`, `exit`, or start
+a nested select.
 
 ### Fallback actions
 
@@ -159,13 +171,12 @@ initial state browse {
     for item in shop.Stock {
         choose item.id
             label item.name
-            description item.description
             when item.available
             view => ["price": item.price]
             => {
-                cart.Add(item)
-                goto browse
-            }
+            cart.Add(item)
+            goto browse
+        }
     }
 }
 ```
@@ -202,15 +213,15 @@ Disposing or cancelling an outer session also cancels its active nested select.
 
 ## Asynchronous and event-driven hosts
 
-Use `SelectAsync`, `SendAsync`, `SelectAtRevisionAsync`, and `SendAtRevisionAsync` when script
-actions may await host work. Calls on one session are serialized; do not issue concurrent actions.
+Use `SelectAsync`, `SendAsync`, `SelectAtRevisionAsync`, and `SendAtRevisionAsync` to drive a
+session. Calls on one session are serialized; do not issue concurrent actions.
 
 ```csharp
 using var select = await instance.OpenSelectSessionAsync("dialog");
 var result = await select.SelectAsync("confirm");
 ```
 
-When a script itself executes `do`, start it with `Start` or `StartAsync`. The resulting
+When a script itself executes `do`, start it with `StartAsync`. The resulting
 `SpellkitRunSession` exposes the active choices and resumes the suspended VM as selections arrive.
 
 ```csharp
@@ -222,8 +233,8 @@ while (!run.IsCompleted)
 }
 ```
 
-`SpellkitEnvironment.UseSelect` and `UseSelectAsync` install a host-wide select runner for scripts
-that execute `do` during `Execute` or `ExecuteAsync`. The `spell` console supplies its own runner.
+`SpellkitEnvironment.UseSelectAsync` installs a host-wide select runner for scripts that execute
+`do`. The `spell` console supplies its own runner.
 
 ## Host boundary and limits
 

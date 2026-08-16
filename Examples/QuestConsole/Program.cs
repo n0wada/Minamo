@@ -4,7 +4,7 @@ namespace Spellkit.Examples.QuestConsole;
 
 internal static class Program
 {
-    private static int Main()
+    private static async Task<int> Main()
     {
         var host = new SpellkitHost();
         var environment = new SpellkitEnvironment()
@@ -16,15 +16,15 @@ internal static class Program
         Console.WriteLine("Quest Console");
         Console.WriteLine("A Script-owned quest state driven by a C# interactive-select host.");
 
-        var initialization = instance.ExecuteFile(scriptPath);
+        var initialization = await instance.ExecuteFileAsync(scriptPath);
         if (!initialization.Success)
         {
             Console.Error.WriteLine(initialization.Failure?.Message);
             return 1;
         }
 
-        using var town = instance.OpenSelect("quest.town");
-        RunSelect(town);
+        using var town = await instance.OpenSelectAsync("quest.town");
+        await RunSelect(town);
         if (!town.IsCompleted)
         {
             Console.WriteLine("\nThe town console was cancelled.");
@@ -35,7 +35,7 @@ internal static class Program
         return 0;
     }
 
-    private static void RunSelect(SpellkitSelect select)
+    private static async Task RunSelect(SpellkitSelect select)
     {
         while (!select.IsCompleted)
         {
@@ -46,10 +46,6 @@ internal static class Program
             {
                 var choice = choices[i];
                 Console.WriteLine($"  {i + 1}. {choice.Label}");
-                if (!string.IsNullOrWhiteSpace(choice.Description))
-                {
-                    Console.WriteLine($"     {choice.Description}");
-                }
             }
 
             Console.Write("Select a number or ID (or 'quit'): ");
@@ -70,7 +66,7 @@ internal static class Program
                 continue;
             }
 
-            select.Select(choiceId);
+            await select.SelectAsync(choiceId);
         }
     }
 }

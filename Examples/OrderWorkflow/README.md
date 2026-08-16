@@ -12,7 +12,7 @@ The script entry point imports four modules:
 
 `main.kit` installs handlers for `order.submitted`, `order.payment.confirmed`, and
 `order.shipment.requested`. The payment handler emits the shipment signal. Because signal delivery
-is explicit, the host calls `DispatchSignals()` a second time to deliver that newly queued request.
+is explicit, the host calls `DispatchSignalsAsync()` a second time to deliver that newly queued request.
 
 The sample accepts `ORD-1001`, rejects an invalid `ORD-1002`, then confirms payment for the accepted
 order. The final output shows host ledger entries alongside the Script-owned `submitted`, `paid`, and

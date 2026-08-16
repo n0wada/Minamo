@@ -7,7 +7,7 @@ renders the terminal UI and drives the interaction.
 It demonstrates:
 
 - `select`, `initial state`, `choose`, `goto`, and `exit`;
-- `label` and `description` for host-facing presentation;
+- `label` for host-facing presentation;
 - `when` guards that read Script-owned, per-session quest flags;
 - a `questGame` function that returns a select factory with select-local state;
 - `alias(questGame(), "quest.town")` to expose that factory to the host;
@@ -24,7 +24,7 @@ Talk to the guard, ask about the courier, accept the quest, return to the square
 `accept` choice is hidden until the Script has recorded that the courier quest is known.
 
 During initialization, `alias(questGame(), "quest.town")` calls `questGame` once and registers its
-factory. Each `instance.OpenSelect("quest.town")` creates fresh cells for the two select-local
+factory. Each `await instance.OpenSelectAsync("quest.town")` creates fresh cells for the two select-local
 quest flags, then binds the choice and guard closures to those cells. `Program.cs` drives the
 resulting `SpellkitSelect` by calling `Select`. This example intentionally shows the
 C#-initiated API rather than `do` and a suspended Script continuation.

@@ -112,7 +112,6 @@ internal sealed class LoweringPass
                     choice.Name,
                     LowerParameters(choice.Parameters),
                     choice.Label ?? choice.Name,
-                    choice.Description,
                     choice.Guard is null ? null : LowerNode(choice.Guard, new CompilerContext()),
                     choice.View is null ? null : LowerNode(choice.View, new CompilerContext()),
                     LowerNode(choice.Body, new CompilerContext()));
@@ -141,7 +140,6 @@ internal sealed class LoweringPass
                         choice.Location,
                         LowerNode(choice.Id, new CompilerContext()),
                         choice.Label is null ? null : LowerNode(choice.Label, new CompilerContext()),
-                        choice.Description is null ? null : LowerNode(choice.Description, new CompilerContext()),
                         choice.Guard is null ? null : LowerNode(choice.Guard, new CompilerContext()),
                         choice.View is null ? null : LowerNode(choice.View, new CompilerContext()),
                         LowerNode(choice.Body, new CompilerContext()));
@@ -166,7 +164,6 @@ internal sealed class LoweringPass
                 state.Location,
                 state.Name,
                 state.IsInitial,
-                LowerParameters(state.Parameters),
                 state.Enter is null ? null : LowerNode(state.Enter, new CompilerContext()),
                 state.Leave is null ? null : LowerNode(state.Leave, new CompilerContext()),
                 state.View is null ? null : LowerNode(state.View, new CompilerContext()),
@@ -184,13 +181,7 @@ internal sealed class LoweringPass
 
     public LoweredControlTransfer Lower(GotoSyntax node, CompilerContext ctx)
     {
-        var arguments = new LoweredNode[node.Arguments.Count];
-        for (var i = 0; i < node.Arguments.Count; i++)
-        {
-            arguments[i] = LowerNode(node.Arguments[i], ctx);
-        }
-
-        var controlValues = new LoweredNode[arguments.Length > 0 ? 3 : 2];
+        var controlValues = new LoweredNode[2];
         controlValues[0] = new LoweredLiteral(
             node.Location,
             SelectControlSignal.Goto,
@@ -199,17 +190,11 @@ internal sealed class LoweringPass
             node.Location,
             node.State,
             LoweredLiteralKind.String);
-        if (arguments.Length > 0)
-        {
-            controlValues[2] = new LoweredTuple(node.Location, arguments);
-        }
-
         return new(
             node.Location,
             new LoweredTuple(node.Location, controlValues),
             LoweredControlTransferKind.Goto,
-            node.State,
-            arguments);
+            node.State);
     }
 
     public LoweredControlTransfer Lower(ExitSyntax node, CompilerContext ctx) =>

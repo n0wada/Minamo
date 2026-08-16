@@ -22,5 +22,5 @@ dotnet run --project .\Examples\StationConsole\StationConsole.csproj
 ```
 
 The host first loads `Scripts/emergency.kit`, then simulates an oxygen incident in engineering.
-The signal is delivered explicitly with `DispatchSignals()`. The script locks the engineering
+The signal is delivered explicitly with `DispatchSignalsAsync()`. The script locks the engineering
 door and raises reactor output, while the other CLR members remain unavailable.

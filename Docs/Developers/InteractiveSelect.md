@@ -4,9 +4,9 @@
 script decides which actions are available and where they lead; the C# host displays those actions
 and sends the selected ID back to the script.
 
-This page covers the normal synchronous host integration. It uses `OpenSelect` and its
-small `SpellkitSelect` API. For web or asynchronous UIs, dynamic choices, nested selects, and the
-Snapshot/Revision protocol, see [Advanced interactive selects](InteractiveSelectAdvanced.md).
+This page covers the normal host integration. It uses `OpenSelectAsync` and its small
+`SpellkitSelect` API. For web UIs, dynamic choices, nested selects, and the Snapshot/Revision
+protocol, see [Advanced interactive selects](InteractiveSelectAdvanced.md).
 
 ## Quick start
 
@@ -23,7 +23,7 @@ select town {
 Execute the script, then open a new interaction and drive it with the currently available choices.
 
 ```csharp
-var initialization = instance.Execute("""
+var initialization = await instance.ExecuteAsync("""
     select town {
         initial state square {
             choose "leave" => exit "goodbye"
@@ -33,11 +33,11 @@ var initialization = instance.Execute("""
 if (!initialization.Success)
     throw new InvalidOperationException(initialization.Failure?.Message);
 
-using var town = instance.OpenSelect("town");
+using var town = await instance.OpenSelectAsync("town");
 while (!town.IsCompleted)
 {
     var choice = ui.Pick(town.Choices);
-    var result = town.Select(choice.Id);
+    var result = await town.SelectAsync(choice.Id);
 
     if (result.IsCompleted)
         Console.WriteLine(result.GetValue<string>());
@@ -51,17 +51,17 @@ while (!town.IsCompleted)
 | `State` | Current script state name. |
 | `Choices` | The currently visible choices. |
 | `IsCompleted` | Whether the select has exited or was cancelled. |
-| `Select(id, argument?)` | Runs a visible choice. |
-| `Send(id, argument?)` | Delivers a hidden host event declared with `on`. |
+| `SelectAsync(id, argument?)` | Runs a visible choice. |
+| `SendAsync(id, argument?)` | Delivers a hidden host event declared with `on`. |
 | `Cancel()` / `Dispose()` | Ends the interaction without an exit result. |
 
-Each call to `OpenSelect` creates a new interaction with its own current state and
+Each call to `OpenSelectAsync` creates a new interaction with its own current state and
 select-local values.
 
 ## States and choices
 
 A state contains the choices available at that point. `choose` IDs are the stable values sent by
-the host. `label` and `description` are display text; when omitted, the label defaults to the ID.
+the host. `label` is display text; when omitted, it defaults to the ID.
 `goto` enters another state and `exit` completes the interaction, optionally with a value.
 
 ```kit
@@ -100,9 +100,9 @@ choose "set-volume" (trackId, value) => { }
 ```
 
 ```csharp
-player.Select("play");
-player.Select("select-track", trackId);
-player.Select("set-volume", (trackId, 80));
+await player.SelectAsync("play");
+await player.SelectAsync("select-track", trackId);
+await player.SelectAsync("set-volume", (trackId, 80));
 ```
 
 No parameter means that no payload is accepted. One parameter receives the supplied value. Two or
@@ -139,11 +139,11 @@ select download {
 ```
 
 ```csharp
-var result = download.Send("completed", fileName);
+var result = await download.SendAsync("completed", fileName);
 ```
 
-`Send` uses the same argument rules as `Select`. An event is accepted only in a state that declares
-it.
+`SendAsync` uses the same argument rules as `SelectAsync`. An event is accepted only in a state
+that declares it.
 
 ## When to use the advanced API
 

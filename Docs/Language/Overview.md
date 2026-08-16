@@ -359,7 +359,7 @@ var host = new SpellkitHost();
 host.AddModule(new AppCommands());
 
 using var instance = host.CreateInstance();
-var result = instance.ExecuteFile("hello.kit");
+var result = await instance.ExecuteFileAsync("hello.kit");
 
 if (!result.Success)
     Console.Error.WriteLine(result.Failure?.Message);
@@ -393,8 +393,8 @@ var program = host.Compile(source).GetValueOrThrow();
 using var first = host.CreateInstance(program);
 using var second = host.CreateInstance(program);
 
-first.Execute();
-second.Execute();
+await first.ExecuteAsync();
+await second.ExecuteAsync();
 ```
 
 The `SpellkitProgram` holds the compiled code; each `SpellkitInstance` keeps its own environment

@@ -83,7 +83,6 @@ internal sealed partial class HandwrittenParser
             Name = name.Text,
             IsInitial = initial
         };
-        ParseSelectParameters(state.Parameters);
 
         if (!Expect(TokenKind.LeftBrace))
         {
@@ -231,19 +230,6 @@ internal sealed partial class HandwrittenParser
                 continue;
             }
 
-            if (IsContextualKeyword("description"))
-            {
-                Consume();
-                if (!Check(TokenKind.String))
-                {
-                    ReportExpected(TokenKind.String);
-                    return null;
-                }
-
-                choice.Description = ((StringLiteralSyntax)ParseString()).Value;
-                continue;
-            }
-
             if (Match(TokenKind.When))
             {
                 choice.Guard = ParseGuardExpression();
@@ -353,17 +339,6 @@ internal sealed partial class HandwrittenParser
                 Consume();
                 choice.Label = ParseSelectDynamicChoiceExpression();
                 if (choice.Label is null)
-                {
-                    return null;
-                }
-                continue;
-            }
-
-            if (IsContextualKeyword("description"))
-            {
-                Consume();
-                choice.Description = ParseSelectDynamicChoiceExpression();
-                if (choice.Description is null)
                 {
                     return null;
                 }
@@ -530,14 +505,7 @@ internal sealed partial class HandwrittenParser
         }
 
         var state = Consume();
-        var node = new GotoSyntax(token.Location) { State = state.Text };
-        if (Match(TokenKind.LeftParen))
-        {
-            ParseExpressionList(node.Arguments, TokenKind.RightParen);
-            Expect(TokenKind.RightParen);
-        }
-
-        return node;
+        return new GotoSyntax(token.Location) { State = state.Text };
     }
 
     private ParameterSyntax? ParseSelectParameter()

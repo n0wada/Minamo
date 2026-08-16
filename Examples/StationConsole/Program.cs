@@ -4,7 +4,7 @@ namespace Spellkit.Examples.StationConsole;
 
 internal static class Program
 {
-    private static int Main()
+    private static async Task<int> Main()
     {
         var station = new Station();
         var host = CreateHost(station);
@@ -19,7 +19,7 @@ internal static class Program
         Console.WriteLine();
 
         var scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "emergency.kit");
-        var startup = instance.ExecuteFile(scriptPath);
+        var startup = await instance.ExecuteFileAsync(scriptPath);
         if (!PrintResult("Startup automation", startup))
         {
             return 1;
@@ -29,7 +29,7 @@ internal static class Program
         station.OxygenLevel = 24;
         instance.Environment.Signals.Emit("station.alert", "engineering");
 
-        var dispatch = instance.DispatchSignals();
+        var dispatch = await instance.DispatchSignalsAsync();
         if (!PrintResult("Emergency signal", dispatch))
         {
             return 1;

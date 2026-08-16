@@ -7,10 +7,10 @@ namespace Spellkit.UnitTesting;
 public sealed class SelectSessionTests
 {
     [Fact]
-    public void InteractiveSelectProvidesTheBasicChoiceApi()
+    public async Task InteractiveSelectProvidesTheBasicChoiceApi()
     {
         using var instance = new SpellkitHost().CreateInstance();
-        var initialization = instance.Execute("""
+        var initialization = await instance.ExecuteAsync("""
             select flow {
                 initial state ready {
                     choose "finish" (value) => exit value
@@ -19,12 +19,12 @@ public sealed class SelectSessionTests
             """);
         Assert.True(initialization.Success, initialization.Failure?.Message);
 
-        using var select = instance.OpenSelect("flow");
+        using var select = await instance.OpenSelectAsync("flow");
         Assert.Equal("ready", select.State);
         Assert.False(select.IsCompleted);
         Assert.Equal("finish", Assert.Single(select.Choices).Id);
 
-        var result = select.Select("finish", 42);
+        var result = await select.SelectAsync("finish", 42);
 
         Assert.True(result.IsCompleted);
         Assert.True(select.IsCompleted);
@@ -33,10 +33,10 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void InteractiveSelectSendsHostEvents()
+    public async Task InteractiveSelectSendsHostEvents()
     {
         using var instance = new SpellkitHost().CreateInstance();
-        var initialization = instance.Execute("""
+        var initialization = await instance.ExecuteAsync("""
             select flow {
                 initial state ready {
                     on "complete" (value) => exit value
@@ -45,10 +45,10 @@ public sealed class SelectSessionTests
             """);
         Assert.True(initialization.Success, initialization.Failure?.Message);
 
-        using var select = instance.OpenSelect("flow");
+        using var select = await instance.OpenSelectAsync("flow");
         Assert.Empty(select.Choices);
 
-        var result = select.Send("complete", "done");
+        var result = await select.SendAsync("complete", "done");
 
         Assert.True(result.IsCompleted);
         Assert.Equal("done", result.GetValue<string>());
@@ -190,7 +190,21 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void SelectSessionTransitionsAndAcceptsTupleArguments()
+    public void SelectDoesNotSupportChoiceDescriptions()
+    {
+        var compiled = new SpellkitHost().Compile("""
+            select flow {
+                initial state ready {
+                    choose "finish" description "Legacy display text" => exit
+                }
+            }
+            """);
+
+        Assert.False(compiled.Success);
+    }
+
+    [Fact]
+    public async Task SelectSessionTransitionsAndAcceptsTupleArguments()
     {
         var volume = 0L;
         var position = (0L, 0L);
@@ -227,7 +241,7 @@ public sealed class SelectSessionTests
                         music.Move(x, y)
                     }
 
-                    choose "status" label "Show status" description "Display player status" when true => {
+                    choose "status" label "Show status" when true => {
                     }
 
                     choose "hidden" label "Hidden command" when false => {
@@ -258,46 +272,50 @@ public sealed class SelectSessionTests
             {
                 Assert.Equal("status", choice.Id);
                 Assert.Equal("Show status", choice.Label);
-                Assert.Equal("Display player status", choice.Description);
             });
-        Assert.Throws<ArgumentException>(() => session.Select("hidden"));
+        await Assert.ThrowsAsync<ArgumentException>(() => session.SelectAsync("hidden"));
 
-        var afterVolume = session.Select("set-volume", 80);
+        var afterVolume = await session.SelectAsync("set-volume", 80);
         Assert.False(afterVolume.IsCompleted);
         Assert.Equal(80, volume);
 
-        session.Select("move", (12, 34));
+        await session.SelectAsync("move", (12, 34));
         Assert.Equal((12L, 34L), position);
 
-        var afterPlay = session.Select("play");
+        var afterPlay = await session.SelectAsync("play");
         Assert.Equal("playing", session.State);
         Assert.Single(afterPlay.Choices);
         Assert.Equal("pause", afterPlay.Choices[0].Id);
 
-        var afterPause = session.Select("pause");
+        var afterPause = await session.SelectAsync("pause");
         Assert.Equal("paused", session.State);
         Assert.Single(afterPause.Choices);
         Assert.Equal("exit", afterPause.Choices[0].Id);
 
-        var completed = session.Select("exit");
+        var completed = await session.SelectAsync("exit");
         Assert.True(completed.IsCompleted);
         Assert.Equal("done", completed.GetValue<string>());
     }
 
     [Fact]
-    public void SelectSnapshotsExposeRevisionsAndViews()
+    public async Task SelectSnapshotsExposeRevisionsAndViews()
     {
         using var instance = new SpellkitHost().CreateInstance();
         var initialized = instance.Execute("""
             select flow {
+                mut title = ""
+
                 initial state start {
                     view => ["title": "Start", "step": 1]
                     choose "next"
                         view => ["style": "primary"]
-                        => goto finish("Done")
+                        => {
+                            title = "Done"
+                            goto finish
+                        }
                 }
 
-                state finish(title: String) {
+                state finish {
                     view => ["title": title, "step": 2]
                     choose "exit"
                         view => ["style": "danger"]
@@ -323,7 +341,7 @@ public sealed class SelectSessionTests
         Assert.Equal(1, initialStateView["step"]);
         Assert.Equal("primary", initialChoiceView["style"]);
 
-        var next = session.SelectAtRevision("next", initial.Revision);
+        var next = await session.SelectAtRevisionAsync("next", initial.Revision);
         var nextStateView = next.Snapshot.State.View?
             .GetValue<Dictionary<string, object?>>()
             ?? throw new InvalidOperationException("The next state view is unavailable.");
@@ -338,13 +356,13 @@ public sealed class SelectSessionTests
         Assert.Equal(next.Snapshot.Revision, session.Revision);
         Assert.Equal(next.Snapshot.Revision, session.Snapshot.Revision);
 
-        var mismatch = Assert.Throws<SpellkitSelectRevisionMismatchException>(
-            () => session.SelectAtRevision("exit", initial.Revision));
+        var mismatch = await Assert.ThrowsAsync<SpellkitSelectRevisionMismatchException>(
+            () => session.SelectAtRevisionAsync("exit", initial.Revision));
         Assert.Equal(initial.Revision, mismatch.ExpectedRevision);
         Assert.Equal(next.Snapshot.Revision, mismatch.Snapshot.Revision);
         Assert.Equal("finish", mismatch.Snapshot.State.Id);
 
-        var completed = session.SelectAtRevision("exit", next.Snapshot.Revision);
+        var completed = await session.SelectAtRevisionAsync("exit", next.Snapshot.Revision);
 
         Assert.True(completed.IsCompleted);
         Assert.Equal(next.Snapshot.Revision + 1, completed.Snapshot.Revision);
@@ -353,7 +371,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void RefreshReevaluatesTheSnapshotAndInvalidateRejectsStaleChoices()
+    public async Task RefreshReevaluatesTheSnapshotAndInvalidateRejectsStaleChoices()
     {
         var available = true;
         using var instance = new SpellkitHost()
@@ -375,25 +393,25 @@ public sealed class SelectSessionTests
         using var session = instance.OpenSelectSession("flow");
         var initial = session.Snapshot;
         available = false;
-        var refreshed = session.Refresh();
+        var refreshed = await session.RefreshAsync();
 
         Assert.Equal(initial.Revision, refreshed.Revision);
         Assert.Empty(refreshed.Choices);
 
-        var invalidated = session.Invalidate();
+        var invalidated = await session.InvalidateAsync();
 
         Assert.Equal(initial.Revision + 1, invalidated.Revision);
         Assert.Empty(invalidated.Choices);
         Assert.Equal(invalidated.Revision, session.Revision);
         available = true;
-        var availableAgain = session.Refresh();
+        var availableAgain = await session.RefreshAsync();
         Assert.Equal(invalidated.Revision, availableAgain.Revision);
         Assert.Single(availableAgain.Choices);
-        var stale = Assert.Throws<SpellkitSelectRevisionMismatchException>(
-            () => session.SelectAtRevision("finish", initial.Revision));
+        var stale = await Assert.ThrowsAsync<SpellkitSelectRevisionMismatchException>(
+            () => session.SelectAtRevisionAsync("finish", initial.Revision));
         Assert.Equal(invalidated.Revision, stale.Snapshot.Revision);
 
-        var completed = session.SelectAtRevision("finish", availableAgain.Revision);
+        var completed = await session.SelectAtRevisionAsync("finish", availableAgain.Revision);
 
         Assert.True(completed.IsCompleted);
         Assert.Equal("done", completed.GetValue<string>());
@@ -461,7 +479,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void DynamicChoicesExposeViewsAndBindTheirItems()
+    public async Task DynamicChoicesExposeViewsAndBindTheirItems()
     {
         using var instance = new SpellkitHost().CreateInstance();
         var initialized = instance.Execute("""
@@ -475,7 +493,6 @@ public sealed class SelectSessionTests
                     ] {
                         choose item.id
                             label item.name
-                            description "Fresh fruit"
                             when item.enabled
                             view => ["price": item.price]
                             => exit item.price
@@ -491,13 +508,12 @@ public sealed class SelectSessionTests
         Assert.Equal(new[] { "leave", "apple" }, snapshot.Choices.Select(choice => choice.Id));
         var apple = snapshot.Choices.Single(choice => choice.Id == "apple");
         Assert.Equal("Apple", apple.Label);
-        Assert.Equal("Fresh fruit", apple.Description);
         var appleView = apple.View?.GetValue<Dictionary<string, object?>>()
             ?? throw new InvalidOperationException("The dynamic choice view is unavailable.");
         Assert.Equal(3, appleView["price"]);
-        Assert.Throws<ArgumentException>(() => session.Select("apple", 1));
+        await Assert.ThrowsAsync<ArgumentException>(() => session.SelectAsync("apple", 1));
 
-        var completed = session.SelectAtRevision("apple", snapshot.Revision);
+        var completed = await session.SelectAtRevisionAsync("apple", snapshot.Revision);
 
         Assert.True(completed.IsCompleted);
         Assert.Equal(3L, completed.GetValue<long>());
@@ -569,21 +585,21 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void ScriptDoRunsTheSelectAndThenContinuesExecution()
+    public async Task ScriptDoRunsTheSelectAndThenContinuesExecution()
     {
         var output = new StringBuilder();
         var invoked = 0;
         using var instance = new SpellkitHost().CreateInstance(
             new SpellkitEnvironment()
                 .UseOutput(value => output.Append(value))
-                .UseSelect(select =>
+                .UseSelectAsync(async select =>
                 {
                     invoked++;
                     Assert.Equal("player", select.Name);
-                    select.Select("exit");
+                    await select.SelectAsync("exit");
                 }));
 
-        var result = instance.Execute("""
+        var result = await instance.ExecuteAsync("""
             select player {
                 initial state stopped {
                     choose "exit" => exit "done"
@@ -601,7 +617,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void StartSuspendsAtDoAndResumesAfterExit()
+    public async Task StartSuspendsAtDoAndResumesAfterExit()
     {
         var output = new StringBuilder();
         using var instance = new SpellkitHost().CreateInstance(
@@ -627,7 +643,7 @@ public sealed class SelectSessionTests
         Assert.Single(run.Choices);
         Assert.Equal("exit", run.Choices[0].Id);
 
-        var result = run.Select("exit");
+        var result = await run.SelectAsync("exit");
 
         Assert.True(result.IsCompleted);
         Assert.True(run.IsCompleted);
@@ -635,7 +651,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void NestedDoResumesTheOuterChoiceAfterInnerExit()
+    public async Task NestedDoResumesTheOuterChoiceAfterInnerExit()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -661,13 +677,13 @@ public sealed class SelectSessionTests
 
         Assert.Equal(new[] { "shop", "exit" }, run.Choices.Select(choice => choice.Id));
 
-        var inShop = run.Select("shop");
+        var inShop = await run.SelectAsync("shop");
         Assert.Equal(new[] { "leave" }, inShop.Choices.Select(choice => choice.Id));
 
-        var backInTown = run.Select("leave");
+        var backInTown = await run.SelectAsync("leave");
         Assert.Equal(new[] { "shop", "exit" }, backInTown.Choices.Select(choice => choice.Id));
 
-        Assert.True(run.Select("exit").IsCompleted);
+        Assert.True((await run.SelectAsync("exit")).IsCompleted);
         Assert.True(run.IsCompleted);
     }
 
@@ -711,7 +727,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void AliasCanExposeAFunctionProducedSelectFactory()
+    public async Task AliasCanExposeAFunctionProducedSelectFactory()
     {
         using var instance = new SpellkitHost().CreateInstance();
         var initialized = instance.Execute("""
@@ -735,14 +751,14 @@ public sealed class SelectSessionTests
 
         using var first = instance.OpenSelectSession("quest.town");
         Assert.Equal("learn", Assert.Single(first.Choices).Id);
-        first.Select("learn");
+        await first.SelectAsync("learn");
 
         using var second = instance.OpenSelectSession("quest.town");
         Assert.Equal("continue", Assert.Single(second.Choices).Id);
     }
 
     [Fact]
-    public void NamedSelectFactoryCreatesIndependentSessions()
+    public async Task NamedSelectFactoryCreatesIndependentSessions()
     {
         using var instance = new SpellkitHost().CreateInstance();
         var initialized = instance.Execute("""
@@ -761,14 +777,14 @@ public sealed class SelectSessionTests
         using var first = instance.OpenSelectSession("player");
         using var second = instance.OpenSelectSession("player");
 
-        first.Select("play");
+        await first.SelectAsync("play");
 
         Assert.Equal("exit", first.Choices.Single().Id);
         Assert.Equal("play", second.Choices.Single().Id);
     }
 
     [Fact]
-    public void SelectLocalsAreCreatedForEachSession()
+    public async Task SelectLocalsAreCreatedForEachSession()
     {
         using var instance = new SpellkitHost().CreateInstance();
         var initialized = instance.Execute("""
@@ -788,7 +804,7 @@ public sealed class SelectSessionTests
 
         using var first = instance.OpenSelectSession("player");
         Assert.Equal("ready", Assert.Single(first.Choices).Id);
-        first.Select("ready");
+        await first.SelectAsync("ready");
         Assert.Equal("exit", Assert.Single(first.Choices).Id);
 
         using var second = instance.OpenSelectSession("player");
@@ -796,7 +812,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void DoEvaluatesAnAnonymousSelectFactoryExpression()
+    public async Task DoEvaluatesAnAnonymousSelectFactoryExpression()
     {
         var output = new StringBuilder();
         using var instance = new SpellkitHost().CreateInstance(
@@ -820,7 +836,7 @@ public sealed class SelectSessionTests
         Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
         Assert.Equal("leave", Assert.Single(run.Choices).Id);
 
-        var result = run.Select("leave");
+        var result = await run.SelectAsync("leave");
 
         Assert.True(result.IsCompleted);
         Assert.True(run.IsCompleted);
@@ -828,7 +844,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void DoCanUseAFactoryVariable()
+    public async Task DoCanUseAFactoryVariable()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -842,11 +858,11 @@ public sealed class SelectSessionTests
             """);
 
         Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
-        Assert.True(run.Select("exit").IsCompleted);
+        Assert.True((await run.SelectAsync("exit")).IsCompleted);
     }
 
     [Fact]
-    public void DoCreatesASelectLocalFrame()
+    public async Task DoCreatesASelectLocalFrame()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -866,8 +882,8 @@ public sealed class SelectSessionTests
             """);
 
         Assert.Equal("ready", Assert.Single(run.Choices).Id);
-        Assert.Equal("exit", Assert.Single(run.Select("ready").Choices).Id);
-        Assert.True(run.Select("exit").IsCompleted);
+        Assert.Equal("exit", Assert.Single((await run.SelectAsync("ready")).Choices).Id);
+        Assert.True((await run.SelectAsync("exit")).IsCompleted);
     }
 
     [Fact]
@@ -931,7 +947,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void OtherwiseRunsAfterTheLastChoiceBecomesUnavailable()
+    public async Task OtherwiseRunsAfterTheLastChoiceBecomesUnavailable()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -949,7 +965,7 @@ public sealed class SelectSessionTests
             """);
 
         Assert.Equal(new[] { "disable", "finish" }, run.Choices.Select(choice => choice.Id));
-        var result = run.Select("disable");
+        var result = await run.SelectAsync("disable");
 
         Assert.True(result.IsCompleted);
         Assert.True(run.IsCompleted);
@@ -957,7 +973,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void OtherwiseDoesNotHideHostEvents()
+    public async Task OtherwiseDoesNotHideHostEvents()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -973,11 +989,11 @@ public sealed class SelectSessionTests
 
         Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
         Assert.Empty(run.Choices);
-        Assert.Equal("event", run.Send("completed").GetValue<string>());
+        Assert.Equal("event", (await run.SendAsync("completed")).GetValue<string>());
     }
 
     [Fact]
-    public void GotoAnEmptyStateCompletesImmediately()
+    public async Task GotoAnEmptyStateCompletesImmediately()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -994,26 +1010,34 @@ public sealed class SelectSessionTests
             """);
 
         Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
-        Assert.True(run.Select("finish").IsCompleted);
+        Assert.True((await run.SelectAsync("finish")).IsCompleted);
         Assert.True(run.IsCompleted);
     }
 
     [Fact]
-    public void StateTransitionArgumentsAreAvailableToStateActionsAndHooks()
+    public async Task SelectLocalStateIsAvailableToStateActionsAndHooks()
     {
         var output = new StringBuilder();
         using var instance = new SpellkitHost().CreateInstance(
             new SpellkitEnvironment().UseOutput(value => output.Append(value)));
         using var run = instance.Start("""
             let flow = select {
+                mut value = 0
+
                 initial state start {
-                    choose "begin" => goto counter(10)
+                    choose "begin" => {
+                        value = 10
+                        goto counter
+                    }
                 }
 
-                state counter(value: Integer) {
+                state counter {
                     enter => { print("enter:", value, terminator: ",") }
                     leave => { print("leave:", value, terminator: ",") }
-                    choose "add" (delta: Integer) when value < 20 => goto counter(value + delta)
+                    choose "add" (delta: Integer) when value < 20 => {
+                        value += delta
+                        goto counter
+                    }
                     otherwise => exit value
                 }
             }
@@ -1022,27 +1046,27 @@ public sealed class SelectSessionTests
             """);
 
         Assert.Equal("begin", Assert.Single(run.Choices).Id);
-        run.Select("begin");
+        await run.SelectAsync("begin");
         Assert.Equal("enter:,10,", output.ToString());
         var add = Assert.Single(run.Choices);
         Assert.Equal(1, add.ParameterCount);
         Assert.Equal("delta", Assert.Single(add.Parameters).Name);
 
-        var result = run.Select("add", 10);
+        var result = await run.SelectAsync("add", 10);
 
         Assert.True(result.IsCompleted);
         Assert.True(run.IsCompleted);
         Assert.Equal(20L, run.GetValue<long>());
-        Assert.Equal("enter:,10,leave:,10,enter:,20,leave:,20,", output.ToString());
+        Assert.Equal("enter:,10,leave:,20,enter:,20,leave:,20,", output.ToString());
     }
 
     [Fact]
-    public void StateTransitionArgumentCountIsValidatedAtCompileTime()
+    public void StateParametersAndTransitionArgumentsAreNotSupported()
     {
         var compiled = new SpellkitHost().Compile("""
             select flow {
                 initial state start {
-                    choose "begin" => goto counter
+                    choose "begin" => goto counter(1)
                 }
 
                 state counter(value: Integer) {
@@ -1052,12 +1076,10 @@ public sealed class SelectSessionTests
             """);
 
         Assert.False(compiled.Success);
-        Assert.Contains(compiled.Errors, error =>
-            error.Code == (int)Spellkit.Compiler.CompilerError.SelectStateParameterCount);
     }
 
     [Fact]
-    public void NestedDoCanUseAnAnonymousFactoryVariable()
+    public async Task NestedDoCanUseAnAnonymousFactoryVariable()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -1082,9 +1104,9 @@ public sealed class SelectSessionTests
             """);
 
         Assert.Equal(new[] { "shop", "exit" }, run.Choices.Select(choice => choice.Id));
-        Assert.Equal("leave", Assert.Single(run.Select("shop").Choices).Id);
-        Assert.Equal(new[] { "shop", "exit" }, run.Select("leave").Choices.Select(choice => choice.Id));
-        Assert.True(run.Select("exit").IsCompleted);
+        Assert.Equal("leave", Assert.Single((await run.SelectAsync("shop")).Choices).Id);
+        Assert.Equal(new[] { "shop", "exit" }, (await run.SelectAsync("leave")).Choices.Select(choice => choice.Id));
+        Assert.True((await run.SelectAsync("exit")).IsCompleted);
     }
 
     [Fact]
@@ -1099,7 +1121,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void DoExpressionReturnsTheSelectExitValue()
+    public async Task DoExpressionReturnsTheSelectExitValue()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -1114,13 +1136,13 @@ public sealed class SelectSessionTests
             """);
 
         Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
-        Assert.True(run.Select("finish").IsCompleted);
+        Assert.True((await run.SelectAsync("finish")).IsCompleted);
         Assert.True(run.IsCompleted);
         Assert.Equal(42L, run.GetValue<long>());
     }
 
     [Fact]
-    public void DoTreatsPropertyAccessAsAnOrdinaryFactoryExpression()
+    public async Task DoTreatsPropertyAccessAsAnOrdinaryFactoryExpression()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -1136,7 +1158,7 @@ public sealed class SelectSessionTests
             """);
 
         Assert.Equal("leave", Assert.Single(run.Choices).Id);
-        Assert.True(run.Select("leave").IsCompleted);
+        Assert.True((await run.SelectAsync("leave")).IsCompleted);
         Assert.Equal("closed", run.GetValue<string>());
     }
 
@@ -1172,7 +1194,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void StateHooksRunWhenStatesAreEnteredAndLeft()
+    public async Task StateHooksRunWhenStatesAreEnteredAndLeft()
     {
         var output = new StringBuilder();
         using var instance = new SpellkitHost().CreateInstance(
@@ -1197,10 +1219,10 @@ public sealed class SelectSessionTests
         using var session = instance.OpenSelectSession("flow");
         Assert.Equal("enter-open,", output.ToString());
 
-        session.Select("next");
+        await session.SelectAsync("next");
         Assert.Equal("enter-open,leave-open,enter-closed,", output.ToString());
 
-        Assert.True(session.Select("finish").IsCompleted);
+        Assert.True((await session.SelectAsync("finish")).IsCompleted);
         Assert.Equal("enter-open,leave-open,enter-closed,leave-closed,", output.ToString());
     }
 
@@ -1234,16 +1256,21 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public async Task AsyncSelectSessionsPassStateTransitionArguments()
+    public async Task AsyncSelectSessionsPreserveSelectLocalState()
     {
         using var instance = new SpellkitHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             select flow {
+                mut value = 0
+
                 initial state start {
-                    choose "begin" => goto ready(7)
+                    choose "begin" => {
+                        value = 7
+                        goto ready
+                    }
                 }
 
-                state ready(value: Integer) {
+                state ready {
                     choose "finish" => exit value
                 }
             }
@@ -1260,7 +1287,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void NestedDoReturnsItsExitValueToTheOuterAction()
+    public async Task NestedDoReturnsItsExitValueToTheOuterAction()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -1283,13 +1310,13 @@ public sealed class SelectSessionTests
             """);
 
         Assert.Equal("shop", Assert.Single(run.Choices).Id);
-        Assert.Equal("buy", Assert.Single(run.Select("shop").Choices).Id);
-        Assert.True(run.Select("buy").IsCompleted);
+        Assert.Equal("buy", Assert.Single((await run.SelectAsync("shop")).Choices).Id);
+        Assert.True((await run.SelectAsync("buy")).IsCompleted);
         Assert.Equal(42L, run.GetValue<long>());
     }
 
     [Fact]
-    public void EventsAreHiddenAndCanCarryArguments()
+    public async Task EventsAreHiddenAndCanCarryArguments()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -1305,7 +1332,7 @@ public sealed class SelectSessionTests
         Assert.True(run.IsWaitingForSelect, run.Failure?.ToString());
         Assert.Empty(run.Choices);
 
-        var result = run.Send("completed", 42);
+        var result = await run.SendAsync("completed", 42);
 
         Assert.True(result.IsCompleted);
         Assert.True(run.IsCompleted);
@@ -1313,7 +1340,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void OpenSelectSessionAcceptsHostEvents()
+    public async Task OpenSelectSessionAcceptsHostEvents()
     {
         using var instance = new SpellkitHost().CreateInstance();
         var initialized = instance.Execute("""
@@ -1329,7 +1356,7 @@ public sealed class SelectSessionTests
 
         Assert.Equal("ready", session.State);
         Assert.Empty(session.Choices);
-        var result = session.Send("completed", 42);
+        var result = await session.SendAsync("completed", 42);
         Assert.True(result.IsCompleted);
         Assert.Equal(42L, result.GetValue<long>());
     }

@@ -51,7 +51,7 @@ use when while with yield
 ```
 
 `const`, `struct`, `enum`, `trait`, `impl`, `guard`, `finally`, `select`, `initial`, `state`,
-`choose`, `on`, `goto`, `exit`, `label`, `description`, `enter`, `leave`, and `otherwise` are
+`choose`, `on`, `goto`, `exit`, `label`, `enter`, `leave`, and `otherwise` are
 contextual keywords.
 
 ## Numeric literals
@@ -183,7 +183,7 @@ The final expression of a block is its value.
 ## Interactive selects
 
 An interactive select defines a host-driven state machine. A host normally opens it through
-`SpellkitInstance.OpenSelect`, or through `SpellkitInstance.OpenSelectSession` for the advanced
+`SpellkitInstance.OpenSelectAsync`, or through `SpellkitInstance.OpenSelectSessionAsync` for the advanced
 session API. Script may also invoke a factory with `do expression`. The host renders current choices
 and sends a selected choice back to the session. See
 [Interactive selects](../Developers/InteractiveSelect.md) for the basic C# protocol and
@@ -198,7 +198,7 @@ select-local
     ::= ( "let" | "mut" ) pattern "=" expression
 
 state-declaration
-    ::= [ "initial" ] "state" identifier [ parameters ]
+    ::= [ "initial" ] "state" identifier
         "{" { state-hook | otherwise-declaration | choice-declaration | event-declaration } "}"
 
 state-hook
@@ -210,7 +210,6 @@ otherwise-declaration
 choice-declaration
     ::= "choose" string [ parameters ]
         [ "label" string ]
-        [ "description" string ]
         [ "when" expression ]
         "=>" choice-body
 
@@ -227,11 +226,7 @@ parameter
 choice-body
     ::= block | goto-statement | exit-statement
 
-goto-statement
-    ::= "goto" identifier [ transition-arguments ]
-
-transition-arguments
-    ::= "(" [ expression { "," expression } ] ")"
+goto-statement ::= "goto" identifier
 
 exit-statement
     ::= "exit" [ expression ]
@@ -250,17 +245,14 @@ state directly, and a state without choices, events, or an `otherwise` handler c
 immediately. `exit` completes the session. Choice and event names are unique within their
 respective channels in one state. Both receive either no argument, one value, or a tuple whose
 elements bind to their parameters. `choose` declarations are visible through `Choices`; `on`
-declarations are hidden and delivered through the host's `Send` API. `label` and `description`
-provide host-facing display text; `when` controls whether a choice is currently available.
+declarations are hidden and delivered through the host's `Send` API. `label` provides host-facing
+display text; `when` controls whether a choice is currently available.
 `otherwise` runs at most once after entering a state when no choice is available and the state has
 no host events; its body may `goto` or `exit`. `enter` runs when a state is entered, including the
 initial state, and `leave` runs before a `goto` or `exit` leaves it. Lifecycle hooks are blocks and
 cannot themselves change state, exit, or suspend. `goto` targets must name a state declared by the
-same select. State parameters receive the expressions supplied by `goto`; they are available as
-ordinary variables in that state's `enter`, `leave`, `otherwise`, `choose`, and `on` bodies and
-guards. State parameters precede choice or event parameters at runtime, and a `goto` must supply
-exactly as many expressions as the target state declares. The initial state starts without
-transition arguments. `do expression` invokes a factory and evaluates to its exit value.
+same select. Select-local values are available to all states in an interaction. `do expression`
+invokes a factory and evaluates to its exit value.
 
 ```swift
 select player {

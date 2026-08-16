@@ -158,7 +158,6 @@ internal sealed class CompilerContext
         IsTailPosition = old.IsTailPosition;
         SelectName = old.SelectName;
         SelectStates = old.SelectStates;
-        SelectStateParameterCounts = old.SelectStateParameterCounts;
     }
 
     public Stack<int> Errors { get; }
@@ -186,8 +185,6 @@ internal sealed class CompilerContext
     public string? SelectName { get; set; }
 
     public IReadOnlySet<string>? SelectStates { get; set; }
-
-    public IReadOnlyDictionary<string, int>? SelectStateParameterCounts { get; set; }
 
     public bool HasFunctionExit => !FunctionExit.IsEmpty();
 
@@ -239,14 +236,12 @@ internal sealed class CompilerContext
 
     public CompilerContext WithSelectStates(
         string name,
-        IReadOnlySet<string> states,
-        IReadOnlyDictionary<string, int> stateParameterCounts)
+        IReadOnlySet<string> states)
     {
         var ctx = new CompilerContext(this)
         {
             SelectName = name,
-            SelectStates = states,
-            SelectStateParameterCounts = stateParameterCounts
+            SelectStates = states
         };
         return ctx;
     }

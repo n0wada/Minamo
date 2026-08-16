@@ -18,8 +18,8 @@ The common path is:
 1. Create a `SpellkitHost`.
 2. Configure runtime policy and register modules, resources, signals, and capabilities.
 3. Create a `SpellkitInstance`.
-4. Execute scripts with `Execute(...)`.
-5. Deliver queued signals at safe points with `DispatchSignals(...)`.
+4. Execute scripts with `ExecuteAsync(...)`.
+5. Deliver queued signals at safe points with `DispatchSignalsAsync(...)`.
 6. Dispose the instance when the console or host scope ends.
 
 The later sections follow that order: setup and instances first, then host features, then limits,
@@ -34,7 +34,7 @@ The Hosting API uses a small set of names consistently on the C# side and the Sp
 | Module commands | `host.Module(...)` | `import module` | Named command groups exposed by the host |
 | Resources | `host.AddResourceType<T>()`, `context.Resource(...)` | Returned handles | Instance-scoped opaque CLR objects |
 | State | `Environment.State.Set/SetScript` | `host.State` | Instance memory with host-owned and script-owned keys |
-| Signals | `host.AddSignal(...)`, `Environment.Signals` | `host.Signals` | Queued events delivered by `DispatchSignals()` |
+| Signals | `host.AddSignal(...)`, `Environment.Signals` | `host.Signals` | Queued events delivered by `DispatchSignalsAsync()` |
 | Input and output | `SpellkitEnvironment.UseInput/UseOutput` | `readLine` (`readline` library), `print` | Instance-local text I/O selected by the host |
 | Capabilities | `host.AddCapabilities(...)`, `Environment.Capabilities` | None | Host-owned allow-list for protected features |
 | Logging | `SpellkitHostOptions.Log` | `host.Log` | User-facing structured log events |
@@ -43,7 +43,7 @@ The Hosting API uses a small set of names consistently on the C# side and the Sp
 
 Use module commands for live host operations, resources for objects with identity and lifetime,
 and `State` for instance facts or script working memory.
-`Signals` are queued and explicit: `DispatchSignals()` dispatches the pending
+`Signals` are queued and explicit: `DispatchSignalsAsync()` dispatches the pending
 queue at a host-chosen safe point rather than immediately re-entering a running VM.
 Input and output can be selected per hosted instance. When a delegate is not supplied, the builtins
 retain their normal process Console behavior for compatibility.
@@ -90,7 +90,7 @@ used with different game instances or test doubles.
 
 ```csharp
 var instance = host.CreateInstance(game);
-var result = instance.Execute("import game\ngame.spawn(\"boss\")");
+var result = await instance.ExecuteAsync("import game\ngame.spawn(\"boss\")");
 
 if (!result.Success)
     Console.WriteLine(result.Failure?.Message
@@ -111,7 +111,7 @@ state, script signal subscriptions, incremental compilation state, and non-servi
 
 ## Results and failures
 
-`Execute` and `ExecuteFile` return a `SpellkitExecutionResult` instead of throwing for script
+`ExecuteAsync` and `ExecuteFileAsync` return a `SpellkitExecutionResult` instead of throwing for script
 compilation errors, runtime errors, input failures, cancellation, and execution limits. Inspect
 `Failure.Kind` to distinguish `Compilation`, `Runtime`, `Input`, `Cancelled`, and `Limit`;
 `Failure.Limit` identifies the exceeded limit. `Diagnostics`
@@ -215,8 +215,8 @@ Spellkit can then use `Math.Abs(...)` after `import * from math`.
 later submissions. Failed builds and runtime failures are rolled back.
 
 ```csharp
-instance.Execute("let boss = game.spawn(\"boss\")");
-instance.Execute("game.teleport(boss, 100, 20)");
+await instance.ExecuteAsync("let boss = game.spawn(\"boss\")");
+await instance.ExecuteAsync("game.teleport(boss, 100, 20)");
 ```
 
 Call `Reset()` to discard compiled definitions and runtime state.
@@ -236,13 +236,13 @@ var program = compiled.GetValueOrThrow();
 using var first = host.CreateInstance(program);
 using var second = host.CreateInstance(program);
 
-var firstRun = first.Execute();
-var secondRun = second.Execute();
+var firstRun = await first.ExecuteAsync();
+var secondRun = await second.ExecuteAsync();
 ```
 
 `SpellkitProgram` contains compiled code and diagnostics and can be shared. Each
 `SpellkitInstance` combines a program, a `SpellkitEnvironment`, and mutable execution state such as
-runtime variables, state, signals, and resource handles. Each `Execute` or `DispatchSignals` call
+runtime variables, state, signals, and resource handles. Each `ExecuteAsync` or `DispatchSignalsAsync` call
 creates a `SpellkitExecution` with its own correlation ID and metrics.
 
 A program is bound to the `SpellkitHost` that compiled it because its compiled module references
@@ -281,7 +281,7 @@ var environment = new SpellkitEnvironment(game)
     .UseOutput(text => output.Append(text));
 
 using var instance = host.CreateInstance(environment);
-var result = instance.Execute("print(\"ready\", terminator: nil)");
+var result = await instance.ExecuteAsync("print(\"ready\", terminator: nil)");
 ```
 
 The input delegate receives the current operation's cancellation token. Returning `null` represents
@@ -290,10 +290,10 @@ as `readLine` after `import * from readline`; the output delegate receives the t
 `print` writes: values, separators, and terminators. Without delegates, the `readline` library and
 `print` retain their process Console behavior.
 
-Use `ExecuteFile` when the host has explicitly selected an entry script:
+Use `ExecuteFileAsync` when the host has explicitly selected an entry script:
 
 ```csharp
-var result = instance.ExecuteFile("Scripts/startup.kit");
+var result = await instance.ExecuteFileAsync("Scripts/startup.kit");
 ```
 
 The full file path is preserved in compiler diagnostics. This loads only the selected entry file;
@@ -322,13 +322,11 @@ using var select = await instance.OpenSelectSessionAsync("dialog");
 await select.SelectAsync("confirm");
 ```
 
-`SelectAsync` and `SendAsync` await asynchronous work in `choose` and `on` actions, including work
-performed after a nested `do`. Their synchronous counterparts remain available and wait
-synchronously for the same VM continuations.
+`SelectAsync` and `SendAsync` await work in `choose` and `on` actions, including work performed
+after a nested `do`.
 
-For a script that executes `do` through `ExecuteAsync`, configure an asynchronous select runner
-with `SpellkitEnvironment.UseSelectAsync(...)`. `UseSelect(...)` remains the synchronous adapter;
-the last configured runner replaces the previous one.
+For a script that executes `do`, configure a select runner with
+`SpellkitEnvironment.UseSelectAsync(...)`.
 
 ## Host environment
 
@@ -566,7 +564,7 @@ VM execution:
 
 ```csharp
 instance.Environment.Signals.Emit("player.hit", 10);
-var dispatch = instance.DispatchSignals();
+var dispatch = await instance.DispatchSignalsAsync();
 
 if (!dispatch.Success)
     foreach (var failure in dispatch.Failures)
@@ -614,7 +612,7 @@ if !host.Signals.TryEmit("player.hit", 10) {
 Use `GetPayload<T>()` or `TryGetPayload<T>()` to consume signal payloads without depending on
 runtime object types. The raw `Payload` remains available for advanced integrations.
 
-`DispatchSignals()` processes only signals that were queued when dispatch began. Signals emitted
+`DispatchSignalsAsync()` processes only signals that were queued when dispatch began. Signals emitted
 by a callback remain queued until the next call. `Reset()` removes Spellkit subscriptions and queued
 signals while preserving C# subscriptions. Instance disposal removes all subscriptions.
 
@@ -660,7 +658,7 @@ module.Command("Load", context =>
 });
 ```
 
-Every `Execute` and `DispatchSignals` call receives a new correlation ID. It is available through
+Every `ExecuteAsync` and `DispatchSignalsAsync` call receives a new correlation ID. It is available through
 `SpellkitExecutionResult.ExecutionId`, `SpellkitSignalDispatchResult.ExecutionId`, `SpellkitCommandContext.ExecutionId`,
 and `SpellkitLogEntry.ExecutionId`. Entries produced by a host command also contain its unqualified
 command name in `Command`; script and signal-level entries leave it empty.
@@ -675,7 +673,7 @@ The `Log` delegate in `SpellkitHostOptions` receives an immutable record object:
 | `Level` | `Debug`, `Info`, `Warning`, or `Error` |
 | `Message` | Log message supplied by the script or host command |
 | `Properties` | Case-insensitive, read-only structured property map; empty when omitted |
-| `ExecutionId` | Correlation ID of the current `Execute` or `DispatchSignals` operation |
+| `ExecutionId` | Correlation ID of the current `ExecuteAsync` or `DispatchSignalsAsync` operation |
 | `Command` | Unqualified host-command name while that command is executing; otherwise `null` |
 
 `ExecutionId` can be used to group interleaved diagnostic output by operation. `Command` identifies
@@ -703,8 +701,8 @@ and a failure raised by a Handler inside a host command is reported as a host co
 
 ## Execution limits
 
-Limits are configured once on `SpellkitHost` and applied independently to every `Execute` and
-`DispatchSignals` operation.
+Limits are configured once on `SpellkitHost` and applied independently to every `ExecuteAsync` and
+`DispatchSignalsAsync` operation.
 
 ```csharp
 var host = new SpellkitHost(new()
@@ -732,8 +730,8 @@ to the corresponding counter.
 Cancellation is supplied per operation:
 
 ```csharp
-var result = instance.Execute(source, cancellationToken);
-var dispatch = instance.DispatchSignals(cancellationToken);
+var result = await instance.ExecuteAsync(source, cancellationToken);
+var dispatch = await instance.DispatchSignalsAsync(cancellationToken);
 ```
 
 Host commands receive a combined token through `SpellkitCommandContext.CancellationToken`. It is
@@ -792,7 +790,7 @@ The contents of the optional fields depend on `Kind`:
 | `ResourceCreated` | Resource type name | — | `id`: resource handle ID |
 | `ResourceReleased` | Resource type name | — | `id`: resource handle ID |
 
-Events emitted by C# outside `Execute` or `DispatchSignals` use `Guid.Empty` for `ExecutionId`.
+Events emitted by C# outside `ExecuteAsync` or `DispatchSignalsAsync` use `Guid.Empty` for `ExecutionId`.
 `Trace` accepts an `Action<SpellkitTraceEvent>`. Unlike log handlers, trace handler exceptions are
 ignored because tracing is observational and must not alter script results.
 
@@ -873,7 +871,7 @@ a safe point:
 
 ```csharp
 instance.Environment.Signals.Emit("player.selected", selectedEntity.Name);
-var dispatch = instance.DispatchSignals(frameCancellationToken);
+var dispatch = await instance.DispatchSignalsAsync(frameCancellationToken);
 ```
 
 ## Security default
@@ -1050,18 +1048,19 @@ The `spell` executable can load optional extension assemblies listed in its
 applications choose their own module registrations and do not inherit those
 extensions automatically.
 
-An extension assembly exposes one or more public implementations of
-`ISpellkitLibrary`:
+An extension assembly exposes one or more public `[SpellkitModule]` types. The
+Spellkit source generator produces the registration code used by `spell`:
 
 ```csharp
 using Spellkit.Hosting;
 
-public sealed class ExampleLibrary : ISpellkitLibrary
+namespace Spellkit.Extra;
+
+[SpellkitModule("example")]
+public static class ExampleModule
 {
-    public void Register(SpellkitHost host)
-    {
-        host.AddExampleModule();
-    }
+    [SpellkitCommand("hello")]
+    public static string Hello() => "Hello from an extension."
 }
 ```
 
@@ -1079,7 +1078,8 @@ be absolute or relative to the directory containing the configuration file:
 The default `spellkit.json` has an empty `extensions` array. For example, add
 `Spellkit.Extra.Http.dll` only to a `spell` distribution that includes the HTTP extension.
 
-`spell` loads each assembly, creates its `ISpellkitLibrary` implementations, and
-invokes `Register`. An extension should reference `Spellkit.dll`, not
-`spell.exe`; `ISpellkitLibrary` is the public contract between the executable
-and an extension.
+`spell` loads each assembly and registers its generated modules automatically.
+Extension module types must be public and either static, derive from
+`ForeignUnit`, or have a public parameterless constructor. An extension should
+reference `Spellkit.dll`, not `spell.exe`; no executable-specific interface is
+required.

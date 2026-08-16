@@ -598,21 +598,17 @@ internal sealed partial class LoweredEmitter
         var states = new List<SelectStateDefinition>(node.States.Count);
         var initialCount = 0;
         var stateNames = new HashSet<string>(StringComparer.Ordinal);
-        var stateParameterCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var state in node.States)
         {
             if (!stateNames.Add(state.Name))
             {
                 target.AddError(CompilerError.SelectDuplicateState, node.Location, state.Name);
             }
-
-            stateParameterCounts[state.Name] = state.Parameters.Count;
         }
 
         var selectContext = ctx.WithSelectStates(
             node.Name ?? "<anonymous>",
-            stateNames,
-            stateParameterCounts);
+            stateNames);
         var closureCount = 0;
 
         for (var i = 0; i < node.States.Count; i++)
@@ -626,25 +622,25 @@ internal sealed partial class LoweredEmitter
             var stateViewSlot = EmitSelectHook(
                 state.View,
                 $"$select-view:{node.Name ?? "anonymous"}:{i}",
-                state.Parameters,
+                Array.Empty<LoweredParameter>(),
                 selectContext,
                 ref closureCount);
             var enterSlot = EmitSelectHook(
                 state.Enter,
                 $"$select-enter:{node.Name ?? "anonymous"}:{i}",
-                state.Parameters,
+                Array.Empty<LoweredParameter>(),
                 selectContext,
                 ref closureCount);
             var leaveSlot = EmitSelectHook(
                 state.Leave,
                 $"$select-leave:{node.Name ?? "anonymous"}:{i}",
-                state.Parameters,
+                Array.Empty<LoweredParameter>(),
                 selectContext,
                 ref closureCount);
             var otherwiseSlot = EmitSelectHook(
                 state.Otherwise,
                 $"$select-otherwise:{node.Name ?? "anonymous"}:{i}",
-                state.Parameters,
+                Array.Empty<LoweredParameter>(),
                 selectContext,
                 ref closureCount);
 
@@ -676,7 +672,7 @@ internal sealed partial class LoweredEmitter
                         IsIterator: false,
                         IsImplInitializer: false,
                         IsPrivate: true,
-                        Parameters: state.Parameters,
+                        Parameters: Array.Empty<LoweredParameter>(),
                         Body: choice.Guard,
                         NeedsValue: false,
                         IteratorBody: false,
@@ -688,7 +684,7 @@ internal sealed partial class LoweredEmitter
                 var viewSlot = EmitSelectHook(
                     choice.View,
                     $"$select-choice-view:{node.Name ?? "anonymous"}:{i}:{j}",
-                    state.Parameters,
+                    Array.Empty<LoweredParameter>(),
                     selectContext,
                     ref closureCount);
 
@@ -705,7 +701,7 @@ internal sealed partial class LoweredEmitter
                     IsIterator: false,
                     IsImplInitializer: false,
                     IsPrivate: true,
-                    Parameters: CombineParameters(state.Parameters, choice.Parameters),
+                    Parameters: choice.Parameters,
                     Body: choice.Body,
                     NeedsValue: false,
                     IteratorBody: false,
@@ -715,7 +711,6 @@ internal sealed partial class LoweredEmitter
                 choices.Add(new(
                     choice.Name,
                     choice.Label,
-                    choice.Description,
                     functionSlot,
                     guardSlot,
                     viewSlot,
@@ -730,11 +725,11 @@ internal sealed partial class LoweredEmitter
                 var sourceSlot = EmitSelectHook(
                     group.Source,
                     $"$select-dynamic-source:{node.Name ?? "anonymous"}:{i}:{j}",
-                    state.Parameters,
+                    Array.Empty<LoweredParameter>(),
                     selectContext,
                     ref closureCount)
                     ?? throw new InvalidOperationException("A dynamic select choice source is unavailable.");
-                var parameters = CombineParameters(state.Parameters, [group.Item]);
+                IReadOnlyList<LoweredParameter> parameters = [group.Item];
                 var templates = new List<SelectDynamicChoiceDefinition>(group.Choices.Count);
                 for (var k = 0; k < group.Choices.Count; k++)
                 {
@@ -749,12 +744,6 @@ internal sealed partial class LoweredEmitter
                     var labelSlot = EmitSelectHook(
                         choice.Label,
                         $"$select-dynamic-label:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
-                        parameters,
-                        selectContext,
-                        ref closureCount);
-                    var descriptionSlot = EmitSelectHook(
-                        choice.Description,
-                        $"$select-dynamic-description:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
                         parameters,
                         selectContext,
                         ref closureCount);
@@ -792,7 +781,6 @@ internal sealed partial class LoweredEmitter
                     templates.Add(new(
                         idSlot,
                         labelSlot,
-                        descriptionSlot,
                         guardSlot,
                         viewSlot,
                         closureCount++));
@@ -827,7 +815,7 @@ internal sealed partial class LoweredEmitter
                     IsIterator: false,
                     IsImplInitializer: false,
                     IsPrivate: true,
-                    Parameters: CombineParameters(state.Parameters, handler.Parameters),
+                    Parameters: handler.Parameters,
                     Body: handler.Body,
                     NeedsValue: false,
                     IteratorBody: false,
@@ -839,7 +827,6 @@ internal sealed partial class LoweredEmitter
             states.Add(new(
                 state.Name,
                 state.IsInitial,
-                SelectParameters(state.Parameters),
                 stateViewSlot,
                 enterSlot,
                 leaveSlot,
@@ -906,24 +893,6 @@ internal sealed partial class LoweredEmitter
             IsStdCall: !target.NoOptimizations);
         EmitFunctionBody(-1, function, selectContext, iteratorBody: false);
         return closureCount++;
-    }
-
-    private static IReadOnlyList<LoweredParameter> CombineParameters(
-        IReadOnlyList<LoweredParameter> stateParameters,
-        IReadOnlyList<LoweredParameter> actionParameters)
-    {
-        var result = new LoweredParameter[stateParameters.Count + actionParameters.Count];
-        for (var i = 0; i < stateParameters.Count; i++)
-        {
-            result[i] = stateParameters[i];
-        }
-
-        for (var i = 0; i < actionParameters.Count; i++)
-        {
-            result[stateParameters.Count + i] = actionParameters[i];
-        }
-
-        return result;
     }
 
     private static IReadOnlyList<SelectParameterDefinition> SelectParameters(

@@ -5,12 +5,10 @@ func questGame() {
 
         initial state square {
             choose "guard"
-                label "Talk to the guard"
-                description "Ask about work near the old bridge" => goto guard
+                label "Talk to the guard" => goto guard
 
             choose "board"
-                label "Check the quest board"
-                description "Review the work currently available" => {
+                label "Check the quest board" => {
                 if courierQuestAccepted {
                     print("\nQuest board: You have one active quest.")
                 } else {
@@ -20,7 +18,6 @@ func questGame() {
 
             choose "active-quest"
                 label "Review your active quest"
-                description "Confirm the courier assignment"
                 when courierQuestAccepted => {
                 print("\nActive quest: Find the missing courier.")
             }
@@ -31,7 +28,6 @@ func questGame() {
         state guard {
             choose "ask"
                 label "Ask about the missing courier"
-                description "Learn why the guard needs help"
                 when !courierQuestKnown => {
                 courierQuestKnown = true
                 print("\nGuard: A courier vanished near the old bridge.")
@@ -39,7 +35,6 @@ func questGame() {
 
             choose "accept"
                 label "Accept the courier quest"
-                description "Add the search to your active quests"
                 when courierQuestKnown && !courierQuestAccepted => {
                 courierQuestAccepted = true
                 print("\nQuest accepted: Find the missing courier.")

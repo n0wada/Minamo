@@ -20,7 +20,7 @@ using Spellkit.Hosting;
 var host = new SpellkitHost();
 using var instance = host.CreateInstance();
 
-var result = instance.Execute("40 + 2");
+var result = await instance.ExecuteAsync("40 + 2");
 ```
 
 Application code does not need to construct a parser, linker, compiler unit, runtime context, or

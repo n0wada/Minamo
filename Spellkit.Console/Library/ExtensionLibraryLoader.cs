@@ -1,4 +1,5 @@
 using Spellkit.Hosting;
+using Spellkit.Linker;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
@@ -27,24 +28,85 @@ internal static class ExtensionLibraryLoader
         {
             var assemblyPath = ResolveAssemblyPath(manifestPath, extension);
             var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);
-            var libraries = assembly.GetExportedTypes()
-                .Where(type => !type.IsAbstract && typeof(ISpellkitLibrary).IsAssignableFrom(type))
-                .Select(type => (ISpellkitLibrary?)Activator.CreateInstance(type))
-                .Where(library => library is not null)
-                .Cast<ISpellkitLibrary>()
-                .ToArray();
-            if (libraries.Length == 0)
-            {
-                throw new InvalidOperationException($"Extension assembly '{extension}' does not export an ISpellkitLibrary.");
-            }
-
-            foreach (var library in libraries)
-            {
-                library.Register(host);
-            }
+            RegisterAssembly(host, assembly, extension);
         }
 
         return host;
+    }
+
+    internal static void RegisterAssembly(SpellkitHost host, Assembly assembly, string displayName)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        ArgumentNullException.ThrowIfNull(assembly);
+
+        var modules = assembly.GetExportedTypes()
+            .Where(type => type.GetCustomAttribute<SpellkitModuleAttribute>(inherit: false) is not null)
+            .ToArray();
+        if (modules.Length == 0)
+        {
+            throw new InvalidOperationException(
+                $"Extension assembly '{displayName}' does not export a public SpellkitModule.");
+        }
+
+        foreach (var module in modules)
+        {
+            RegisterModule(host, module, displayName);
+        }
+    }
+
+    private static void RegisterModule(SpellkitHost host, Type module, string displayName)
+    {
+        var extensionTypeName = module.Namespace is null
+            ? module.Name + "HostingExtensions"
+            : module.Namespace + "." + module.Name + "HostingExtensions";
+        var extensions = module.Assembly.GetType(extensionTypeName)
+            ?? throw new InvalidOperationException(
+                $"Spellkit module '{module.FullName}' in extension assembly '{displayName}' "
+                + "does not contain generated hosting registration code.");
+
+        MethodInfo registration;
+        object?[] arguments;
+        if ((module.IsAbstract && module.IsSealed)
+            || typeof(ForeignUnit).IsAssignableFrom(module))
+        {
+            registration = extensions.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .SingleOrDefault(method =>
+                    method.ReturnType == typeof(SpellkitHost)
+                    && method.GetParameters() is [{ ParameterType: var parameterType }]
+                    && parameterType == typeof(SpellkitHost))
+                ?? throw new InvalidOperationException(
+                    $"Spellkit module '{module.FullName}' in extension assembly '{displayName}' "
+                    + "does not expose a generated static registration method.");
+            arguments = [host];
+        }
+        else
+        {
+            var instance = Activator.CreateInstance(module)
+                ?? throw new InvalidOperationException(
+                    $"Spellkit module '{module.FullName}' in extension assembly '{displayName}' "
+                    + "requires a public parameterless constructor.");
+            registration = extensions.GetMethod(
+                "AddModule",
+                BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly,
+                binder: null,
+                types: [typeof(SpellkitHost), module],
+                modifiers: null)
+                ?? throw new InvalidOperationException(
+                    $"Spellkit module '{module.FullName}' in extension assembly '{displayName}' "
+                    + "does not expose a generated instance registration method.");
+            arguments = [host, instance];
+        }
+
+        try
+        {
+            registration.Invoke(null, arguments);
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is { } inner)
+        {
+            throw new InvalidOperationException(
+                $"Failed to register Spellkit module '{module.FullName}' from extension assembly '{displayName}'.",
+                inner);
+        }
     }
 
     private static string ResolveAssemblyPath(string manifestPath, string? assembly)

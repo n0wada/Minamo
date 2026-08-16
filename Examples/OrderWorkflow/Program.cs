@@ -6,7 +6,7 @@ namespace Spellkit.Examples.OrderWorkflow;
 
 internal static class Program
 {
-    private static int Main()
+    private static async Task<int> Main()
     {
         var scripts = Path.Combine(AppContext.BaseDirectory, "Scripts");
         var ledger = new OrderLedger();
@@ -14,7 +14,7 @@ internal static class Program
 
         using var instance = host.CreateInstance(
             new SpellkitEnvironment().UseOutput(Console.Write));
-        if (!Succeeded("Load workflow", instance.ExecuteFile(Path.Combine(scripts, "main.kit"))))
+        if (!Succeeded("Load workflow", await instance.ExecuteFileAsync(Path.Combine(scripts, "main.kit"))))
         {
             return 1;
         }
@@ -24,14 +24,14 @@ internal static class Program
 
         instance.Environment.Signals.Emit("order.submitted", accepted);
         instance.Environment.Signals.Emit("order.submitted", rejected);
-        if (!Succeeded("Submitted orders", instance.DispatchSignals()))
+        if (!Succeeded("Submitted orders", await instance.DispatchSignalsAsync()))
         {
             return 1;
         }
 
         instance.Environment.Signals.Emit("order.payment.confirmed", accepted);
-        if (!Succeeded("Payment confirmed", instance.DispatchSignals())
-            || !Succeeded("Shipment requested", instance.DispatchSignals()))
+        if (!Succeeded("Payment confirmed", await instance.DispatchSignalsAsync())
+            || !Succeeded("Shipment requested", await instance.DispatchSignalsAsync()))
         {
             return 1;
         }

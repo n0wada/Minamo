@@ -13,7 +13,6 @@ internal sealed record SelectDefinition(string? Name, IReadOnlyList<SelectStateD
 internal sealed record SelectStateDefinition(
     string Name,
     bool IsInitial,
-    IReadOnlyList<SelectParameterDefinition> Parameters,
     int? ViewFunctionSlot,
     int? EnterFunctionSlot,
     int? LeaveFunctionSlot,
@@ -27,7 +26,6 @@ internal sealed record SelectParameterDefinition(string Name, string? TypeName);
 internal sealed record SelectChoiceDefinition(
     string Name,
     string Label,
-    string? Description,
     int FunctionSlot,
     int? GuardFunctionSlot,
     int? ViewFunctionSlot,
@@ -43,7 +41,6 @@ internal sealed record SelectDynamicChoiceGroupDefinition(
 internal sealed record SelectDynamicChoiceDefinition(
     int IdFunctionSlot,
     int? LabelFunctionSlot,
-    int? DescriptionFunctionSlot,
     int? GuardFunctionSlot,
     int? ViewFunctionSlot,
     int FunctionSlot);
