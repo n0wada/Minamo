@@ -3,18 +3,18 @@ using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace Spellkit.Hosting;
 
-public sealed partial class SpellkitSelectSession : IDisposable
+internal sealed partial class SpellkitSelectSession : IDisposable
 {
-    private readonly object syncRoot = new();
     private readonly System.Threading.SemaphoreSlim actionGate = new(1, 1);
     private readonly SpellkitInstance instance;
     private readonly SelectInstance selectInstance;
     private readonly SpellkitSelectRevision revision;
+    private SpellkitSelectSnapshot snapshot;
+    private IReadOnlyList<ResolvedSelectChoice> availableChoices = Array.Empty<ResolvedSelectChoice>();
     private SpellkitSelectSession? nested;
     private SpellkitMachine.VmContinuation? actionContinuation;
     private bool otherwiseRunning;
@@ -28,199 +28,111 @@ public sealed partial class SpellkitSelectSession : IDisposable
         this.instance = instance;
         this.selectInstance = selectInstance;
         this.revision = revision ?? new SpellkitSelectRevision();
-    }
-
-    internal void Initialize()
-    {
-        if (selectInstance.IsCompleted)
-        {
-            return;
-        }
-
-        if (selectInstance.Enter(selectInstance.State) is { } enter)
-        {
-            RunLifecycleHook(enter);
-        }
-
-        selectInstance.CompleteIfIdle();
-        if (!selectInstance.IsCompleted)
-        {
-            _ = GetChoices();
-        }
+        snapshot = CreateInitialSnapshot();
     }
 
     internal async Task InitializeAsync()
     {
-        if (selectInstance.IsCompleted)
-        {
-            return;
-        }
-
-        if (selectInstance.Enter(selectInstance.State) is { } enter)
+        if (!selectInstance.IsCompleted
+            && selectInstance.Enter(selectInstance.State) is { } enter)
         {
             await RunLifecycleHookAsync(enter).ConfigureAwait(false);
         }
 
         selectInstance.CompleteIfIdle();
-        if (!selectInstance.IsCompleted)
-        {
-            _ = GetChoices();
-        }
+        await PublishSnapshotAsync().ConfigureAwait(false);
     }
 
-    public string Name => selectInstance.Name;
+    internal string Name => CurrentSnapshot.Name;
 
-    public long Revision => revision.Current;
+    internal long Revision => CurrentSnapshot.Revision;
 
-    /// <summary>Gets the current UI-facing state of this select.</summary>
-    public SpellkitSelectSnapshot Snapshot
-    {
-        get
-        {
-            lock (syncRoot)
-            {
-                ThrowIfDisposed();
-                return GetSnapshot();
-            }
-        }
-    }
+    internal SpellkitSelectSnapshot Snapshot => CurrentSnapshot;
 
-    /// <summary>Gets the name of the current state.</summary>
-    public string State
-    {
-        get
-        {
-            lock (syncRoot)
-            {
-                ThrowIfDisposed();
-                return selectInstance.State.Name;
-            }
-        }
-    }
+    internal string State => CurrentSnapshot.State.Id;
 
-    public IReadOnlyList<SpellkitChoice> Choices
-    {
-        get
-        {
-            return Snapshot.Choices;
-        }
-    }
+    internal SpellkitSelectView? StateView => CurrentSnapshot.State.View;
 
-    /// <summary>Asynchronously re-evaluates and returns the current UI-facing state without changing its revision.</summary>
-    public async Task<SpellkitSelectSnapshot> RefreshAsync()
-    {
-        await actionGate.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            return RefreshCore(invalidate: false);
-        }
-        finally
-        {
-            actionGate.Release();
-        }
-    }
+    internal IReadOnlyList<SpellkitChoice> Choices => CurrentSnapshot.Choices;
 
-    /// <summary>
-    /// Asynchronously invalidates UI operations rendered from the current revision, then returns a refreshed snapshot.
-    /// </summary>
-    public async Task<SpellkitSelectSnapshot> InvalidateAsync()
-    {
-        await actionGate.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            return RefreshCore(invalidate: true);
-        }
-        finally
-        {
-            actionGate.Release();
-        }
-    }
-
-    public bool IsCompleted
-    {
-        get
-        {
-            lock (syncRoot)
-            {
-                return selectInstance.IsCompleted;
-            }
-        }
-    }
+    internal bool IsCompleted => CurrentSnapshot.IsCompleted;
 
     internal SpellkitObject CompletionValue => selectInstance.Value;
 
-    internal SpellkitSelectResult SelectSynchronously(string choiceId) =>
-        SelectCore(choiceId, null, hasArgument: false, expectedRevision: null);
+    private SpellkitSelectSnapshot CurrentSnapshot => nested?.CurrentSnapshot ?? snapshot;
 
-    internal SpellkitSelectResult SelectSynchronously(string choiceId, object? argument) =>
-        SelectCore(choiceId, argument, hasArgument: true, expectedRevision: null);
+    private SpellkitSelectSnapshot CreateInitialSnapshot() => new(
+        selectInstance.Name,
+        revision.Current,
+        new SpellkitSelectState(selectInstance.State.Name, null),
+        Array.Empty<SpellkitChoice>(),
+        selectInstance.IsCompleted);
 
-    internal SpellkitSelectResult SelectAtRevisionSynchronously(string choiceId, long expectedRevision) =>
-        SelectCore(choiceId, null, hasArgument: false, expectedRevision);
+    private void PublishCompletedSnapshot()
+    {
+        availableChoices = Array.Empty<ResolvedSelectChoice>();
+        snapshot = new(
+            selectInstance.Name,
+            revision.Current,
+            new SpellkitSelectState(selectInstance.State.Name, null),
+            Array.Empty<SpellkitChoice>(),
+            isCompleted: true);
+    }
 
-    internal SpellkitSelectResult SelectAtRevisionSynchronously(
-        string choiceId,
-        object? argument,
-        long expectedRevision) =>
-        SelectCore(choiceId, argument, hasArgument: true, expectedRevision);
+    private SpellkitSelectSnapshot CreateSnapshot(
+        SpellkitSelectView? stateView,
+        IReadOnlyList<SpellkitChoice> choices) =>
+        new(
+            selectInstance.Name,
+            revision.Current,
+            new SpellkitSelectState(selectInstance.State.Name, stateView),
+            choices,
+            selectInstance.IsCompleted);
 
-    internal SpellkitSelectResult SendSynchronously(string eventId) =>
-        SendCore(eventId, null, hasArgument: false, expectedRevision: null);
+    internal Task<SpellkitSelectSnapshot> RefreshAsync() => RefreshCoreAsync(invalidate: false);
 
-    internal SpellkitSelectResult SendSynchronously(string eventId, object? argument) =>
-        SendCore(eventId, argument, hasArgument: true, expectedRevision: null);
+    internal Task<SpellkitSelectSnapshot> InvalidateAsync() => RefreshCoreAsync(invalidate: true);
 
-    internal SpellkitSelectResult SendAtRevisionSynchronously(string eventId, long expectedRevision) =>
-        SendCore(eventId, null, hasArgument: false, expectedRevision);
-
-    internal SpellkitSelectResult SendAtRevisionSynchronously(
-        string eventId,
-        object? argument,
-        long expectedRevision) =>
-        SendCore(eventId, argument, hasArgument: true, expectedRevision);
-
-    public Task<SpellkitSelectResult> SelectAsync(string choiceId) =>
+    internal Task<SpellkitSelectResult> SelectAsync(string choiceId) =>
         SelectCoreAsync(choiceId, null, hasArgument: false, expectedRevision: null);
 
-    public Task<SpellkitSelectResult> SelectAsync(string choiceId, object? argument) =>
+    internal Task<SpellkitSelectResult> SelectAsync(string choiceId, object? argument) =>
         SelectCoreAsync(choiceId, argument, hasArgument: true, expectedRevision: null);
 
-    public Task<SpellkitSelectResult> SelectAtRevisionAsync(string choiceId, long expectedRevision) =>
+    internal Task<SpellkitSelectResult> SelectAtRevisionAsync(string choiceId, long expectedRevision) =>
         SelectCoreAsync(choiceId, null, hasArgument: false, expectedRevision);
 
-    public Task<SpellkitSelectResult> SelectAtRevisionAsync(
+    internal Task<SpellkitSelectResult> SelectAtRevisionAsync(
         string choiceId,
         object? argument,
         long expectedRevision) =>
         SelectCoreAsync(choiceId, argument, hasArgument: true, expectedRevision);
 
-    public Task<SpellkitSelectResult> SendAsync(string eventId) =>
+    internal Task<SpellkitSelectResult> SendAsync(string eventId) =>
         SendCoreAsync(eventId, null, hasArgument: false, expectedRevision: null);
 
-    public Task<SpellkitSelectResult> SendAsync(string eventId, object? argument) =>
+    internal Task<SpellkitSelectResult> SendAsync(string eventId, object? argument) =>
         SendCoreAsync(eventId, argument, hasArgument: true, expectedRevision: null);
 
-    public Task<SpellkitSelectResult> SendAtRevisionAsync(string eventId, long expectedRevision) =>
+    internal Task<SpellkitSelectResult> SendAtRevisionAsync(string eventId, long expectedRevision) =>
         SendCoreAsync(eventId, null, hasArgument: false, expectedRevision);
 
-    public Task<SpellkitSelectResult> SendAtRevisionAsync(
+    internal Task<SpellkitSelectResult> SendAtRevisionAsync(
         string eventId,
         object? argument,
         long expectedRevision) =>
         SendCoreAsync(eventId, argument, hasArgument: true, expectedRevision);
 
-    public void Cancel()
+    internal void Cancel()
     {
         actionGate.Wait();
         try
         {
-            lock (syncRoot)
-            {
-                ThrowIfDisposed();
-                nested?.Cancel();
-                selectInstance.Cancel();
-                revision.Advance();
-            }
+            ThrowIfDisposed();
+            nested?.Cancel();
+            selectInstance.Cancel();
+            revision.Advance();
+            PublishCompletedSnapshot();
         }
         finally
         {
@@ -233,19 +145,16 @@ public sealed partial class SpellkitSelectSession : IDisposable
         actionGate.Wait();
         try
         {
-            lock (syncRoot)
+            if (disposed)
             {
-                if (disposed)
-                {
-                    return;
-                }
-
-                nested?.Dispose();
-                nested = null;
-                actionContinuation = null;
-                selectInstance.Cancel();
-                disposed = true;
+                return;
             }
+
+            nested?.Dispose();
+            nested = null;
+            actionContinuation = null;
+            selectInstance.Cancel();
+            disposed = true;
         }
         finally
         {
@@ -253,94 +162,19 @@ public sealed partial class SpellkitSelectSession : IDisposable
         }
     }
 
-    private SpellkitSelectResult SelectCore(
-        string choiceId,
-        object? argument,
-        bool hasArgument,
-        long? expectedRevision)
+    private async Task<SpellkitSelectSnapshot> RefreshCoreAsync(bool invalidate)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(choiceId);
-        actionGate.Wait();
+        await actionGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            lock (syncRoot)
+            ThrowIfDisposed();
+            if (invalidate)
             {
-                ThrowIfDisposed();
-                EnsureExpectedRevision(expectedRevision);
-                if (selectInstance.IsCompleted)
-                {
-                    throw new InvalidOperationException($"Select session '{Name}' has already completed.");
-                }
-
-                if (nested is not null)
-                {
-                    return ResumeNested(choiceId, argument, hasArgument);
-                }
-
-                var choice = GetAvailableChoices().SingleOrDefault(candidate =>
-                    string.Equals(candidate.Id, choiceId, StringComparison.Ordinal));
-                if (choice is null)
-                {
-                    throw new ArgumentException(
-                        $"Choice '{choiceId}' is not available in select state '{selectInstance.State.Name}'.",
-                        nameof(choiceId));
-                }
-
-                var arguments = AddArguments(
-                    choice.BoundArguments,
-                    ConvertArguments(choice, argument, hasArgument));
-                var result = instance.InvokeSelectAction(choice.Action, arguments);
-                return ApplyActionExecution(result);
+                revision.Advance();
             }
-        }
-        finally
-        {
-            actionGate.Release();
-        }
-    }
 
-    private SpellkitSelectResult SendCore(
-        string eventId,
-        object? argument,
-        bool hasArgument,
-        long? expectedRevision)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
-        actionGate.Wait();
-        try
-        {
-            lock (syncRoot)
-            {
-                ThrowIfDisposed();
-                EnsureExpectedRevision(expectedRevision);
-                if (selectInstance.IsCompleted)
-                {
-                    throw new InvalidOperationException($"Select session '{Name}' has already completed.");
-                }
-
-                if (nested is not null)
-                {
-                    return ResumeNestedEvent(eventId, argument, hasArgument);
-                }
-
-                var handler = selectInstance.State.Events.SingleOrDefault(candidate =>
-                    string.Equals(candidate.Name, eventId, StringComparison.Ordinal));
-                if (handler is null)
-                {
-                    throw new ArgumentException(
-                        $"Event '{eventId}' is not handled in select state '{selectInstance.State.Name}'.",
-                        nameof(eventId));
-                }
-
-                var arguments = ConvertArguments(
-                    handler.Name,
-                    handler.ParameterCount,
-                    "Event",
-                    argument,
-                    hasArgument);
-                var result = instance.InvokeSelectAction(selectInstance.Event(handler), arguments);
-                return ApplyActionExecution(result);
-            }
+            await PublishSnapshotAsync().ConfigureAwait(false);
+            return CurrentSnapshot;
         }
         finally
         {
@@ -367,15 +201,19 @@ public sealed partial class SpellkitSelectSession : IDisposable
 
             if (nested is not null)
             {
-                var nestedResult = hasArgument
-                    ? await nested.SelectAsync(choiceId, argument).ConfigureAwait(false)
-                    : await nested.SelectAsync(choiceId).ConfigureAwait(false);
+                var nestedResult = expectedRevision is { } revision
+                    ? hasArgument
+                        ? await nested.SelectAtRevisionAsync(choiceId, argument, revision).ConfigureAwait(false)
+                        : await nested.SelectAtRevisionAsync(choiceId, revision).ConfigureAwait(false)
+                    : hasArgument
+                        ? await nested.SelectAsync(choiceId, argument).ConfigureAwait(false)
+                        : await nested.SelectAsync(choiceId).ConfigureAwait(false);
                 return nestedResult.IsCompleted
                     ? await ResumeCompletedNestedAsync().ConfigureAwait(false)
                     : nestedResult;
             }
 
-            var choice = GetAvailableChoices().SingleOrDefault(candidate =>
+            var choice = availableChoices.SingleOrDefault(candidate =>
                 string.Equals(candidate.Id, choiceId, StringComparison.Ordinal));
             if (choice is null)
             {
@@ -417,9 +255,13 @@ public sealed partial class SpellkitSelectSession : IDisposable
 
             if (nested is not null)
             {
-                var nestedResult = hasArgument
-                    ? await nested.SendAsync(eventId, argument).ConfigureAwait(false)
-                    : await nested.SendAsync(eventId).ConfigureAwait(false);
+                var nestedResult = expectedRevision is { } revision
+                    ? hasArgument
+                        ? await nested.SendAtRevisionAsync(eventId, argument, revision).ConfigureAwait(false)
+                        : await nested.SendAtRevisionAsync(eventId, revision).ConfigureAwait(false)
+                    : hasArgument
+                        ? await nested.SendAsync(eventId, argument).ConfigureAwait(false)
+                        : await nested.SendAsync(eventId).ConfigureAwait(false);
                 return nestedResult.IsCompleted
                     ? await ResumeCompletedNestedAsync().ConfigureAwait(false)
                     : nestedResult;
@@ -451,46 +293,6 @@ public sealed partial class SpellkitSelectSession : IDisposable
         }
     }
 
-    private SpellkitSelectResult ResumeNested(string choiceId, object? argument, bool hasArgument)
-    {
-        var nestedResult = hasArgument
-            ? nested!.SelectSynchronously(choiceId, argument)
-            : nested!.SelectSynchronously(choiceId);
-        if (!nestedResult.IsCompleted)
-        {
-            return nestedResult;
-        }
-
-        return ResumeCompletedNested();
-    }
-
-    private SpellkitSelectResult ResumeNestedEvent(string eventId, object? argument, bool hasArgument)
-    {
-        var nestedResult = hasArgument
-            ? nested!.SendSynchronously(eventId, argument)
-            : nested!.SendSynchronously(eventId);
-        if (!nestedResult.IsCompleted)
-        {
-            return nestedResult;
-        }
-
-        return ResumeCompletedNested();
-    }
-
-    private SpellkitSelectResult ResumeCompletedNested()
-    {
-        var completedNested = nested
-            ?? throw new InvalidOperationException("The nested select is unavailable.");
-        var value = completedNested.CompletionValue;
-        completedNested.Dispose();
-        nested = null;
-        var continuation = actionContinuation
-            ?? throw new InvalidOperationException("The nested select has no parent continuation.");
-        actionContinuation = null;
-        return ApplyActionExecution(
-            instance.ResumeSelectContinuation(continuation, value));
-    }
-
     private async Task<SpellkitSelectResult> ResumeCompletedNestedAsync()
     {
         var completedNested = nested
@@ -507,54 +309,6 @@ public sealed partial class SpellkitSelectSession : IDisposable
                 value).ConfigureAwait(false)).ConfigureAwait(false);
     }
 
-    private SpellkitSelectResult ApplyActionExecution(ExecutionResult result)
-    {
-        while (true)
-        {
-            if (result.Reason is TerminationReason.Suspended)
-            {
-                if (result.Continuation is null
-                    || result.Suspension is not { Select: not null } suspension)
-                {
-                    throw new InvalidOperationException("A select action suspended without a select request.");
-                }
-
-                actionContinuation = result.Continuation;
-                nested = instance.CreateSelectSession(suspension.Select, revision);
-                revision.Advance();
-                if (!nested.IsCompleted)
-                {
-                    return WaitingResult();
-                }
-
-                var value = nested.CompletionValue;
-                nested.Dispose();
-                nested = null;
-                actionContinuation = null;
-                result = instance.ResumeSelectContinuation(result.Continuation, value);
-                continue;
-            }
-
-            if (result.Reason is not TerminationReason.Complete)
-            {
-                throw new InvalidOperationException("The select action did not complete successfully.");
-            }
-
-            var outcome = selectInstance.Apply(result.Value ?? SpellkitNil.Instance);
-            ApplyLifecycleHooks(outcome);
-            selectInstance.CompleteIfIdle();
-            revision.Advance();
-            if (outcome.IsCompleted)
-            {
-                return CompletedResult(outcome.Value);
-            }
-
-            return selectInstance.IsCompleted
-                ? CompletedResult(selectInstance.Value)
-                : WaitingResult();
-        }
-    }
-
     private async Task<SpellkitSelectResult> ApplyActionExecutionAsync(ExecutionResult result)
     {
         while (true)
@@ -568,10 +322,10 @@ public sealed partial class SpellkitSelectSession : IDisposable
                 }
 
                 actionContinuation = result.Continuation;
+                revision.Advance();
                 nested = await instance.CreateSelectSessionAsync(
                     suspension.Select,
                     revision).ConfigureAwait(false);
-                revision.Advance();
                 if (!nested.IsCompleted)
                 {
                     return WaitingResult();
@@ -596,30 +350,10 @@ public sealed partial class SpellkitSelectSession : IDisposable
             await ApplyLifecycleHooksAsync(outcome).ConfigureAwait(false);
             selectInstance.CompleteIfIdle();
             revision.Advance();
-            if (outcome.IsCompleted)
-            {
-                return CompletedResult(outcome.Value);
-            }
-
+            await PublishSnapshotAsync().ConfigureAwait(false);
             return selectInstance.IsCompleted
                 ? CompletedResult(selectInstance.Value)
                 : WaitingResult();
-        }
-    }
-
-    private void ApplyLifecycleHooks(SelectActionOutcome outcome)
-    {
-        if (outcome.LeavingState is { } leaving
-            && selectInstance.Leave(leaving) is { } leave)
-        {
-            RunLifecycleHook(leave);
-        }
-
-        if (outcome.EnteringState is { } entering
-            && !selectInstance.IsCompleted
-            && selectInstance.Enter(entering) is { } enter)
-        {
-            RunLifecycleHook(enter);
         }
     }
 
@@ -637,11 +371,6 @@ public sealed partial class SpellkitSelectSession : IDisposable
         {
             await RunLifecycleHookAsync(enter).ConfigureAwait(false);
         }
-    }
-
-    private void RunLifecycleHook(SpellkitFunction hook)
-    {
-        EnsureLifecycleHookResult(instance.InvokeSelectAction(hook, Array.Empty<SpellkitObject>()));
     }
 
     private async Task RunLifecycleHookAsync(SpellkitFunction hook)
@@ -670,16 +399,21 @@ public sealed partial class SpellkitSelectSession : IDisposable
         }
     }
 
+    private SpellkitSelectResult WaitingResult() => new(CurrentSnapshot);
+
+    private SpellkitSelectResult CompletedResult(SpellkitObject value) =>
+        new(CurrentSnapshot, value);
+
     private void EnsureExpectedRevision(long? expectedRevision)
     {
-        if (expectedRevision is null || expectedRevision == revision.Current)
+        if (expectedRevision is null || expectedRevision == CurrentSnapshot.Revision)
         {
             return;
         }
 
         throw new SpellkitSelectRevisionMismatchException(
             expectedRevision.Value,
-            GetSnapshot());
+            CurrentSnapshot);
     }
 
     private void ThrowIfDisposed()

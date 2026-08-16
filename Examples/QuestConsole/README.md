@@ -11,8 +11,8 @@ It demonstrates:
 - `when` guards that read Script-owned, per-session quest flags;
 - a `questGame` function that returns a select factory with select-local state;
 - `alias(questGame(), "quest.town")` to expose that factory to the host;
-- a small C# terminal adapter that opens `quest.town`, displays `SpellkitSelectSession.Choices`,
-  and calls `Select`.
+- a small C# terminal adapter that opens `quest.town`, displays `SpellkitSelect.Choices`,
+  and calls `SelectAsync`.
 
 Run it from the repository root:
 
@@ -26,5 +26,5 @@ Talk to the guard, ask about the courier, accept the quest, return to the square
 During initialization, `alias(questGame(), "quest.town")` calls `questGame` once and registers its
 factory. Each `await instance.OpenSelectAsync("quest.town")` creates fresh cells for the two select-local
 quest flags, then binds the choice and guard closures to those cells. `Program.cs` drives the
-resulting `SpellkitSelect` by calling `Select`. This example intentionally shows the
+resulting `SpellkitSelect` by calling `SelectAsync`. This example intentionally shows the
 C#-initiated API rather than `do` and a suspended Script continuation.

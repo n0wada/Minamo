@@ -185,12 +185,12 @@ internal sealed class ReplSession : IDisposable
 
     private async Task<bool> RunSelectAsync(string name)
     {
-        using var select = await session.OpenSelectSessionAsync(name).ConfigureAwait(false);
+        using var select = await session.OpenSelectAsync(name).ConfigureAwait(false);
         await RunSelectSessionAsync(select).ConfigureAwait(false);
         return true;
     }
 
-    private async ValueTask RunSelectSessionAsync(SpellkitSelectSession select)
+    private async ValueTask RunSelectSessionAsync(SpellkitSelect select)
     {
         while (!select.IsCompleted)
         {
@@ -247,11 +247,11 @@ internal sealed class ReplSession : IDisposable
                         continue;
                     }
 
-                    await select.SelectAsync(choice.Id).ConfigureAwait(false);
+                    await select.SelectAsync(choice).ConfigureAwait(false);
                 }
                 else if (choice.ParameterCount == 1 && argument is not null)
                 {
-                    await select.SelectAsync(choice.Id, argument).ConfigureAwait(false);
+                    await select.SelectAsync(choice, argument).ConfigureAwait(false);
                 }
                 else
                 {

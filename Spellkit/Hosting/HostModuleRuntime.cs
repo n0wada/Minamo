@@ -1,11 +1,11 @@
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using Spellkit.Compiler;
 using Spellkit.Debug;
 using Spellkit.Linker;
 using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 
 namespace Spellkit.Hosting;
 

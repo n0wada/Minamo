@@ -307,8 +307,7 @@ prevents further execution.
 `ExecuteAsync`, `ExecuteFileAsync`, and `DispatchSignalsAsync` provide non-blocking host-call
 surfaces. A pending host `Task` or `ValueTask` does not occupy a worker thread while the VM is
 suspended. Instance operations remain serialized; concurrent calls wait for the active operation.
-Use the synchronous methods when the caller deliberately needs to block, and prefer the asynchronous
-methods when commands perform asynchronous work.
+Hosting exposes asynchronous execution methods only.
 
 Program-backed instances also provide `ExecuteAsync(CancellationToken)`. Interactive execution has
 matching asynchronous surfaces:
@@ -318,7 +317,7 @@ using var run = await instance.StartAsync(source);
 var step = await run.SelectAsync("continue");
 var eventResult = await run.SendAsync("loaded", payload);
 
-using var select = await instance.OpenSelectSessionAsync("dialog");
+using var select = await instance.OpenSelectAsync("dialog");
 await select.SelectAsync("confirm");
 ```
 

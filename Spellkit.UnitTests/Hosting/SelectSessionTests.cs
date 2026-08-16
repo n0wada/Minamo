@@ -33,6 +33,129 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
+    public async Task PublishedChoicesRejectInputAfterInvalidation()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialization = await instance.ExecuteAsync("""
+            select flow {
+                initial state ready {
+                    choose "finish" => exit 42
+                }
+            }
+            """);
+        Assert.True(initialization.Success, initialization.Failure?.Message);
+
+        using var select = await instance.OpenSelectAsync("flow");
+        var staleChoice = Assert.Single(select.Choices);
+        var initialRevision = select.Revision;
+
+        await select.InvalidateAsync();
+
+        Assert.Equal(initialRevision + 1, select.Revision);
+        var mismatch = await Assert.ThrowsAsync<SpellkitSelectRevisionMismatchException>(
+            () => select.SelectAsync(staleChoice));
+        Assert.Equal(initialRevision, mismatch.ExpectedRevision);
+        Assert.Equal(select.Revision, mismatch.CurrentRevision);
+
+        var result = await select.SelectAsync(Assert.Single(select.Choices));
+        Assert.True(result.IsCompleted);
+        Assert.Equal(42L, result.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task PublicSelectExposesStateViewAndKeepsTheLastPublicationOnRefreshFailure()
+    {
+        var items = new[] { "old" };
+        var failStateView = false;
+        using var instance = new SpellkitHost()
+            .Module("catalog", module =>
+            {
+                module.Command("Items", _ => items);
+                module.Command("StateView", _ =>
+                {
+                    if (failStateView)
+                    {
+                        throw new InvalidOperationException("State view failed.");
+                    }
+
+                    return "Ready";
+                });
+            })
+            .CreateInstance();
+        var initialization = await instance.ExecuteAsync("""
+            import catalog
+
+            select flow {
+                initial state ready {
+                    view => catalog.StateView()
+
+                    for item in catalog.Items() {
+                        choose item
+                            => exit item
+                    }
+                }
+            }
+            """);
+        Assert.True(initialization.Success, initialization.Failure?.Message);
+
+        using var select = await instance.OpenSelectAsync("flow");
+        Assert.Equal("Ready", select.StateView?.GetValue<string>());
+        var oldChoice = Assert.Single(select.Choices);
+        var initialRevision = select.Revision;
+        Assert.Equal("old", oldChoice.Id);
+
+        items = ["new"];
+        failStateView = true;
+        await Assert.ThrowsAnyAsync<Exception>(() => select.RefreshAsync());
+        await Assert.ThrowsAnyAsync<Exception>(() => select.InvalidateAsync());
+
+        Assert.Equal(initialRevision, select.Revision);
+        Assert.Same(oldChoice, Assert.Single(select.Choices));
+        var result = await select.SelectAsync(oldChoice);
+        Assert.True(result.IsCompleted);
+        Assert.Equal("old", result.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task RunSessionExposesPublishedSelectStateAndRejectsStaleChoices()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = await instance.StartAsync("""
+            let flow = select {
+                initial state ready {
+                    view => ["title": "Ready"]
+                    choose "finish" => exit 42
+                }
+            }
+
+            do flow
+            """);
+
+        Assert.True(run.IsWaitingForSelect);
+        Assert.Equal("ready", run.State);
+        Assert.Equal("Ready", run.StateView?
+            .GetValue<Dictionary<string, object?>>()?["title"]);
+        var staleChoice = Assert.Single(run.Choices);
+        var initialRevision = Assert.IsType<long>(run.Revision);
+
+        await run.RefreshAsync();
+        Assert.Equal(initialRevision, run.Revision);
+
+        await run.InvalidateAsync();
+
+        Assert.Equal(initialRevision + 1, run.Revision);
+        await Assert.ThrowsAsync<SpellkitSelectRevisionMismatchException>(
+            () => run.SelectAsync(staleChoice));
+
+        var result = await run.SelectAsync(Assert.Single(run.Choices));
+        Assert.True(result.IsCompleted);
+        Assert.True(run.IsCompleted);
+        Assert.Null(run.State);
+        Assert.Null(run.Revision);
+        Assert.Equal(42L, run.GetValue<long>());
+    }
+
+    [Fact]
     public async Task InteractiveSelectSendsHostEvents()
     {
         using var instance = new SpellkitHost().CreateInstance();

@@ -3,10 +3,11 @@ using Spellkit.Runtime.Types;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace Spellkit.Hosting;
 
-public sealed partial class SpellkitSelectSession
+internal sealed partial class SpellkitSelectSession
 {
     private sealed record ResolvedSelectChoice(
         string Id,
@@ -20,48 +21,69 @@ public sealed partial class SpellkitSelectSession
         internal int ParameterCount => Parameters.Count;
     }
 
-    private IReadOnlyList<SpellkitChoice> GetChoices()
+    private async Task PublishSnapshotAsync()
     {
-        if (selectInstance.IsCompleted)
+        if (nested is not null)
         {
-            return Array.Empty<SpellkitChoice>();
+            await nested.PublishSnapshotAsync().ConfigureAwait(false);
+            return;
         }
 
-        var choices = GetVisibleChoices();
+        if (selectInstance.IsCompleted)
+        {
+            PublishCompletedSnapshot();
+            return;
+        }
+
+        var choices = await GetAvailableChoicesAsync().ConfigureAwait(false);
         if (choices.Count == 0
             && selectInstance.ShouldRunOtherwise
             && !otherwiseRunning)
         {
+            availableChoices = Array.Empty<ResolvedSelectChoice>();
             selectInstance.MarkOtherwiseTriggered();
             otherwiseRunning = true;
             try
             {
                 var otherwise = selectInstance.Otherwise()
                     ?? throw new InvalidOperationException("The select otherwise handler is unavailable.");
-                var result = instance.InvokeSelectAction(
+                var result = await instance.InvokeSelectActionAsync(
                     otherwise,
-                    Array.Empty<SpellkitObject>());
-                return ApplyActionExecution(result).Choices;
+                    Array.Empty<SpellkitObject>()).ConfigureAwait(false);
+                await ApplyActionExecutionAsync(result).ConfigureAwait(false);
             }
             finally
             {
                 otherwiseRunning = false;
             }
+
+            return;
         }
 
-        return choices;
-    }
-
-    private IReadOnlyList<SpellkitChoice> GetVisibleChoices() =>
-        GetAvailableChoices()
-            .Select(choice => new SpellkitChoice(
+        var visibleChoices = new SpellkitChoice[choices.Count];
+        for (var i = 0; i < choices.Count; i++)
+        {
+            var choice = choices[i];
+            visibleChoices[i] = new SpellkitChoice(
                 choice.Id,
                 choice.Parameters,
                 choice.Label,
-                CreateView(choice.View, choice.BoundArguments)))
-            .ToArray();
+                await CreateViewAsync(choice.View, choice.BoundArguments).ConfigureAwait(false),
+                revision.Current);
+        }
 
-    private IReadOnlyList<ResolvedSelectChoice> GetAvailableChoices()
+        var state = selectInstance.State;
+        var stateView = await CreateViewAsync(
+            selectInstance.View(state),
+            Array.Empty<SpellkitObject>()).ConfigureAwait(false);
+        var publishedChoices = Array.AsReadOnly(visibleChoices);
+        var publishedSnapshot = CreateSnapshot(stateView, publishedChoices);
+
+        availableChoices = choices;
+        snapshot = publishedSnapshot;
+    }
+
+    private async Task<IReadOnlyList<ResolvedSelectChoice>> GetAvailableChoicesAsync()
     {
         var candidates = new List<ResolvedSelectChoice>();
         foreach (var choice in selectInstance.State.Choices)
@@ -82,9 +104,9 @@ public sealed partial class SpellkitSelectSession
 
         foreach (var group in selectInstance.State.DynamicChoices)
         {
-            var source = instance.EvaluateSelectDynamicChoice(
+            var source = await instance.EvaluateSelectDynamicChoiceAsync(
                 selectInstance.DynamicChoiceSource(group),
-                Array.Empty<SpellkitObject>());
+                Array.Empty<SpellkitObject>()).ConfigureAwait(false);
             if (source is not IEnumerable<SpellkitObject> items)
             {
                 throw new InvalidOperationException(
@@ -97,11 +119,16 @@ public sealed partial class SpellkitSelectSession
                 foreach (var template in group.Choices)
                 {
                     var id = RequireDynamicChoiceText(
-                        selectInstance.DynamicChoiceId(template),
-                        arguments,
+                        await instance.EvaluateSelectDynamicChoiceAsync(
+                            selectInstance.DynamicChoiceId(template),
+                            arguments).ConfigureAwait(false),
                         "ID");
                     var label = selectInstance.DynamicChoiceLabel(template) is { } labelFunction
-                        ? EvaluateDynamicChoiceText(labelFunction, arguments, "label") ?? id
+                        ? EvaluateDynamicChoiceText(
+                            await instance.EvaluateSelectDynamicChoiceAsync(
+                                labelFunction,
+                                arguments).ConfigureAwait(false),
+                            "label") ?? id
                         : id;
                     candidates.Add(new(
                         id,
@@ -125,46 +152,43 @@ public sealed partial class SpellkitSelectSession
             }
         }
 
-        return candidates.Where(IsAvailable).ToArray();
-    }
-
-    private string RequireDynamicChoiceText(
-        SpellkitFunction function,
-        SpellkitObject[] arguments,
-        string part)
-    {
-        var value = EvaluateDynamicChoiceText(function, arguments, part);
-        if (string.IsNullOrWhiteSpace(value))
+        var available = new List<ResolvedSelectChoice>(candidates.Count);
+        foreach (var candidate in candidates)
         {
-            throw new InvalidOperationException(
-                $"A dynamic select choice {part} in state '{selectInstance.State.Name}' cannot be empty.");
+            if (candidate.Guard is null
+                || await instance.EvaluateSelectGuardAsync(
+                    candidate.Guard,
+                    candidate.BoundArguments).ConfigureAwait(false))
+            {
+                available.Add(candidate);
+            }
         }
 
-        return value;
+        return available;
     }
 
-    private string? EvaluateDynamicChoiceText(
-        SpellkitFunction function,
-        SpellkitObject[] arguments,
-        string part) =>
-        SpellkitHostValueConverter.Convert<string>(
-            instance.EvaluateSelectDynamicChoice(function, arguments),
-            $"Dynamic select choice {part}");
+    private static string RequireDynamicChoiceText(SpellkitObject value, string part)
+    {
+        var text = EvaluateDynamicChoiceText(value, part);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new InvalidOperationException(
+                $"A dynamic select choice {part} in state cannot be empty.");
+        }
 
-    private SpellkitSelectView? CreateView(SpellkitFunction? view) =>
-        CreateView(view, Array.Empty<SpellkitObject>());
+        return text;
+    }
 
-    private SpellkitSelectView? CreateView(
+    private static string? EvaluateDynamicChoiceText(SpellkitObject value, string part) =>
+        SpellkitHostValueConverter.Convert<string>(value, $"Dynamic select choice {part}");
+
+    private async Task<SpellkitSelectView?> CreateViewAsync(
         SpellkitFunction? view,
         SpellkitObject[] arguments) =>
         view is null
             ? null
             : new SpellkitSelectView(
-                instance.EvaluateSelectView(view, arguments));
-
-    private bool IsAvailable(ResolvedSelectChoice choice) =>
-        choice.Guard is null
-        || instance.EvaluateSelectGuard(choice.Guard, choice.BoundArguments);
+                await instance.EvaluateSelectViewAsync(view, arguments).ConfigureAwait(false));
 
     private static SpellkitObject[] ConvertArguments(
         ResolvedSelectChoice choice,

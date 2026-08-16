@@ -9,33 +9,19 @@ namespace Spellkit.Hosting;
 
 public sealed partial class SpellkitInstance
 {
-    internal SpellkitSignalDispatchResult DispatchSignals(
-        CancellationToken cancellationToken = default) =>
-        DispatchSignalsCoreAsync(
-            cancellationToken,
-            runAsynchronously: false).GetAwaiter().GetResult();
-
     public Task<SpellkitSignalDispatchResult> DispatchSignalsAsync(
         CancellationToken cancellationToken = default) =>
-        DispatchSignalsCoreAsync(cancellationToken, runAsynchronously: true);
+        DispatchSignalsCoreAsync(cancellationToken);
 
     private async Task<SpellkitSignalDispatchResult> DispatchSignalsCoreAsync(
-        CancellationToken cancellationToken,
-        bool runAsynchronously)
+        CancellationToken cancellationToken)
     {
         if (operationScope.Value)
         {
             throw new InvalidOperationException("A host instance cannot be entered recursively.");
         }
 
-        if (runAsynchronously)
-        {
-            await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
-        }
-        else
-        {
-            operationGate.Wait();
-        }
+        await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
 
         operationScope.Value = true;
         try
@@ -78,16 +64,9 @@ public sealed partial class SpellkitInstance
                     {
                         try
                         {
-                            if (runAsynchronously)
-                            {
-                                await Task.Run(
-                                    () => handler(signal),
-                                    CancellationToken.None).ConfigureAwait(false);
-                            }
-                            else
-                            {
-                                handler(signal);
-                            }
+                            await Task.Run(
+                                () => handler(signal),
+                                CancellationToken.None).ConfigureAwait(false);
                             control?.Checkpoint();
                         }
                         catch (Exception ex)
@@ -114,17 +93,13 @@ public sealed partial class SpellkitInstance
                             var payload = SpellkitHostRootTypeInfo.Wrap(context, signal.RawPayload);
                             if (handler is SpellkitNativeFunction function)
                             {
-                                var execution = runAsynchronously
-                                    ? await Task.Run(
-                                        () => SpellkitMachine.ExecuteWithArguments(
-                                            function,
-                                            [payload],
-                                            context),
-                                        CancellationToken.None).ConfigureAwait(false)
-                                    : SpellkitMachine.ExecuteWithArguments(function, [payload], context);
-                                await CompleteExecutionAsync(
-                                    execution,
-                                    runAsynchronously).ConfigureAwait(false);
+                                var execution = await Task.Run(
+                                    () => SpellkitMachine.ExecuteWithArguments(
+                                        function,
+                                        [payload],
+                                        context),
+                                    CancellationToken.None).ConfigureAwait(false);
+                                await CompleteExecutionAsync(execution).ConfigureAwait(false);
                             }
                             else
                             {

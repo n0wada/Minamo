@@ -27,6 +27,36 @@ public sealed class SpellkitRunSession : IDisposable
 
     public Exception? Failure => failure;
 
+    /// <summary>Gets the name of the state currently waiting for host input.</summary>
+    public string? State
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return select?.State;
+        }
+    }
+
+    /// <summary>Gets the display data published for the state currently waiting for host input.</summary>
+    public SpellkitSelectView? StateView
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return select?.StateView;
+        }
+    }
+
+    /// <summary>Gets the revision of the select currently waiting for host input.</summary>
+    public long? Revision
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return select?.Revision;
+        }
+    }
+
     public IReadOnlyList<SpellkitChoice> Choices
     {
         get
@@ -42,11 +72,49 @@ public sealed class SpellkitRunSession : IDisposable
     public Task<SpellkitSelectResult> SelectAsync(string choiceId, object? argument) =>
         instance.SelectAsync(this, choiceId, argument, hasArgument: true);
 
+    /// <summary>Executes a choice from the currently published screen.</summary>
+    public Task<SpellkitSelectResult> SelectAsync(SpellkitChoice choice)
+    {
+        ArgumentNullException.ThrowIfNull(choice);
+        return instance.SelectAtRevisionAsync(this, choice.Id, null, hasArgument: false, revision: choice.Revision);
+    }
+
+    /// <summary>Executes a choice with its host-supplied argument from the published screen.</summary>
+    public Task<SpellkitSelectResult> SelectAsync(SpellkitChoice choice, object? argument)
+    {
+        ArgumentNullException.ThrowIfNull(choice);
+        return instance.SelectAtRevisionAsync(this, choice.Id, argument, hasArgument: true, revision: choice.Revision);
+    }
+
+    /// <summary>Executes a choice only if it belongs to the specified published screen.</summary>
+    public Task<SpellkitSelectResult> SelectAtRevisionAsync(string choiceId, long revision) =>
+        instance.SelectAtRevisionAsync(this, choiceId, null, hasArgument: false, revision: revision);
+
+    /// <summary>Executes a choice with its host-supplied argument only for the specified screen.</summary>
+    public Task<SpellkitSelectResult> SelectAtRevisionAsync(string choiceId, object? argument, long revision) =>
+        instance.SelectAtRevisionAsync(this, choiceId, argument, hasArgument: true, revision: revision);
+
     public Task<SpellkitSelectResult> SendAsync(string eventId) =>
         instance.SendAsync(this, eventId, null, hasArgument: false);
 
     public Task<SpellkitSelectResult> SendAsync(string eventId, object? argument) =>
         instance.SendAsync(this, eventId, argument, hasArgument: true);
+
+    /// <summary>Sends a host event only if it belongs to the specified published screen.</summary>
+    public Task<SpellkitSelectResult> SendAtRevisionAsync(string eventId, long revision) =>
+        instance.SendAtRevisionAsync(this, eventId, null, hasArgument: false, revision: revision);
+
+    /// <summary>Sends a host event with its host-supplied argument only for the specified screen.</summary>
+    public Task<SpellkitSelectResult> SendAtRevisionAsync(string eventId, object? argument, long revision) =>
+        instance.SendAtRevisionAsync(this, eventId, argument, hasArgument: true, revision: revision);
+
+    /// <summary>Reevaluates and republishes the current select without invalidating it.</summary>
+    public async Task RefreshAsync() =>
+        await instance.RefreshSelectAsync(this, invalidate: false).ConfigureAwait(false);
+
+    /// <summary>Invalidates earlier select screens, then reevaluates and republishes the current select.</summary>
+    public async Task InvalidateAsync() =>
+        await instance.RefreshSelectAsync(this, invalidate: true).ConfigureAwait(false);
 
     public T? GetValue<T>() => SpellkitHostValueConverter.Convert<T>(value, "Run result");
 
@@ -69,43 +137,6 @@ public sealed class SpellkitRunSession : IDisposable
 
     internal SpellkitMachine.VmContinuation GetContinuation() =>
         continuation ?? throw new InvalidOperationException("The script has no suspended VM continuation.");
-
-    internal void Advance(ExecutionResult result)
-    {
-        select?.Dispose();
-        select = null;
-
-        while (true)
-        {
-            if (result.Reason is TerminationReason.Complete)
-            {
-                completed = true;
-                continuation = null;
-                value = result.Value;
-                return;
-            }
-
-            if (result.Reason is TerminationReason.Suspended
-                && result.Continuation is not null
-                && result.Suspension is { Select: not null } suspension)
-            {
-                continuation = result.Continuation;
-                select = instance.CreateSelectSession(suspension.Select);
-                if (!select.IsCompleted)
-                {
-                    return;
-                }
-
-                var selectValue = select.CompletionValue;
-                select.Dispose();
-                select = null;
-                result = instance.ResumeSelectContinuation(continuation, selectValue);
-                continue;
-            }
-
-            throw new InvalidOperationException("The VM suspended without a select request.");
-        }
-    }
 
     internal async Task AdvanceAsync(ExecutionResult result)
     {

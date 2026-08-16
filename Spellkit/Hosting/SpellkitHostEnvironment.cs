@@ -1,10 +1,10 @@
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 using Spellkit.Compiler;
 using Spellkit.Debug;
 using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
 
 namespace Spellkit.Hosting;
 

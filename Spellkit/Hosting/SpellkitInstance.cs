@@ -169,17 +169,6 @@ public sealed partial class SpellkitInstance : IDisposable
 
     internal RuntimeContext? RuntimeContext => runtimeContext;
 
-    internal SpellkitExecutionResult Execute(CancellationToken cancellationToken = default)
-    {
-        if (program is null)
-        {
-            throw new InvalidOperationException(
-                "This instance was not created from a compiled Spellkit program.");
-        }
-
-        return ExecuteProgram(program, cancellationToken);
-    }
-
     public Task<SpellkitExecutionResult> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
@@ -193,22 +182,7 @@ public sealed partial class SpellkitInstance : IDisposable
             () => Result.Create(program.Composition),
             "ExecuteProgram",
             cancellationToken,
-            runAsynchronously: true,
             touchesLinker: false);
-    }
-
-    internal SpellkitExecutionResult Execute(string source, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        return ExecuteSource(source, null, "Execute", cancellationToken);
-    }
-
-    internal SpellkitRunSession Start(string source)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        return StartCore(() => linker.Make(SourceBuffer.FromString(
-            source,
-            $"<host:{++submission}>")));
     }
 
     public Task<SpellkitRunSession> StartAsync(string source)
@@ -229,47 +203,18 @@ public sealed partial class SpellkitInstance : IDisposable
                 source,
                 $"<host:{++submission}>")),
             "Execute",
-            cancellationToken,
-            runAsynchronously: true);
+            cancellationToken);
     }
 
-    internal SpellkitExecutionResult Execute(
-        string source,
-        string sourceName,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourceName);
-        return ExecuteSource(source, sourceName, "Execute", cancellationToken);
-    }
-
-    internal SpellkitExecutionResult Execute(
+    internal Task<SpellkitExecutionResult> ExecuteAsync(
         SpellkitCodeModel model,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(model);
-        return ExecuteCore(() => linker.Make(model), "ExecuteModel", cancellationToken);
-    }
-
-    internal SpellkitExecutionResult Execute(
-        SourceBuffer buffer,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(buffer);
-        return ExecuteCore(() => linker.Make(buffer), "ExecuteBuffer", cancellationToken);
-    }
-
-    internal SpellkitExecutionResult ExecuteFile(
-        string fileName,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
-        var path = Path.GetFullPath(fileName);
-        return ExecuteCore(
-            () => linker.Make(SourceBuffer.FromString(File.ReadAllText(path), path)),
-            "ExecuteFile",
-            cancellationToken,
-            SpellkitFailureKind.Input);
+        return ExecuteCoreAsync(
+            () => linker.Make(model),
+            "ExecuteModel",
+            cancellationToken);
     }
 
     public Task<SpellkitExecutionResult> ExecuteFileAsync(
@@ -282,54 +227,13 @@ public sealed partial class SpellkitInstance : IDisposable
             () => linker.Make(SourceBuffer.FromString(File.ReadAllText(path), path)),
             "ExecuteFile",
             cancellationToken,
-            runAsynchronously: true,
             SpellkitFailureKind.Input);
     }
-
-    private SpellkitExecutionResult ExecuteSource(
-        string source,
-        string? sourceName,
-        string operationName,
-        CancellationToken cancellationToken)
-    {
-        return ExecuteCore(
-            () => linker.Make(SourceBuffer.FromString(
-                source,
-                sourceName ?? $"<host:{++submission}>")),
-            operationName,
-            cancellationToken);
-    }
-
-    private SpellkitExecutionResult ExecuteProgram(
-        SpellkitProgram program,
-        CancellationToken cancellationToken)
-    {
-        return ExecuteCore(
-            () => Result.Create(program.Composition),
-            "ExecuteProgram",
-            cancellationToken,
-            touchesLinker: false);
-    }
-
-    private SpellkitExecutionResult ExecuteCore(
-        Func<Result<UnitComposition>> compile,
-        string operationName,
-        CancellationToken cancellationToken,
-        SpellkitFailureKind fallbackFailureKind = SpellkitFailureKind.Host,
-        bool touchesLinker = true) =>
-        ExecuteCoreAsync(
-            compile,
-            operationName,
-            cancellationToken,
-            runAsynchronously: false,
-            fallbackFailureKind,
-            touchesLinker).GetAwaiter().GetResult();
 
     private async Task<SpellkitExecutionResult> ExecuteCoreAsync(
         Func<Result<UnitComposition>> compile,
         string operationName,
         CancellationToken cancellationToken,
-        bool runAsynchronously,
         SpellkitFailureKind fallbackFailureKind = SpellkitFailureKind.Host,
         bool touchesLinker = true)
     {
@@ -338,14 +242,7 @@ public sealed partial class SpellkitInstance : IDisposable
             throw new InvalidOperationException("A host instance cannot be entered recursively.");
         }
 
-        if (runAsynchronously)
-        {
-            await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
-        }
-        else
-        {
-            operationGate.Wait();
-        }
+        await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
 
         operationScope.Value = true;
         try
@@ -369,9 +266,7 @@ public sealed partial class SpellkitInstance : IDisposable
                 control?.Checkpoint();
                 var compileStarted = Stopwatch.GetTimestamp();
                 linkerTouched = touchesLinker;
-                var made = runAsynchronously
-                    ? await Task.Run(compile, CancellationToken.None).ConfigureAwait(false)
-                    : compile();
+                var made = await Task.Run(compile, CancellationToken.None).ConfigureAwait(false);
                 compileDuration = Stopwatch.GetElapsedTime(compileStarted);
                 Environment.Tracing.Write(
                     SpellkitTraceKind.Compilation, duration: compileDuration);
@@ -395,12 +290,10 @@ public sealed partial class SpellkitInstance : IDisposable
                 ExecutionResult result;
                 try
                 {
-                    result = runAsynchronously
-                        ? await Task.Run(
-                            () => SpellkitMachine.Execute(context),
-                            CancellationToken.None).ConfigureAwait(false)
-                        : SpellkitMachine.Execute(context);
-                    result = await CompleteExecutionAsync(result, runAsynchronously).ConfigureAwait(false);
+                    result = await Task.Run(
+                        () => SpellkitMachine.Execute(context),
+                        CancellationToken.None).ConfigureAwait(false);
+                    result = await CompleteExecutionAsync(result).ConfigureAwait(false);
                 }
                 finally
                 {
@@ -450,9 +343,7 @@ public sealed partial class SpellkitInstance : IDisposable
         }
     }
 
-    private async ValueTask<ExecutionResult> CompleteExecutionAsync(
-        ExecutionResult result,
-        bool runAsynchronously)
+    private async ValueTask<ExecutionResult> CompleteExecutionAsync(ExecutionResult result)
     {
         while (result.Reason is TerminationReason.Suspended)
         {
@@ -463,14 +354,7 @@ public sealed partial class SpellkitInstance : IDisposable
 
             if (result.Suspension.Awaitable is { } awaitable)
             {
-                if (runAsynchronously)
-                {
-                    await awaitable.WaitAsync().ConfigureAwait(false);
-                }
-                else
-                {
-                    awaitable.Wait();
-                }
+                await awaitable.WaitAsync().ConfigureAwait(false);
 
                 result = SpellkitMachine.Resume(result.Continuation, awaitable);
                 continue;
@@ -481,19 +365,10 @@ public sealed partial class SpellkitInstance : IDisposable
                 throw new InvalidOperationException("The VM suspended without a supported request.");
             }
 
-            using var select = runAsynchronously
-                ? await CreateSelectSessionAsync(selectInstance).ConfigureAwait(false)
-                : CreateSelectSession(selectInstance);
+            using var select = await CreateSelectSessionAsync(selectInstance).ConfigureAwait(false);
             if (!select.IsCompleted)
             {
-                if (runAsynchronously)
-                {
-                    await SpellkitEnvironment.RunSelectAsync(select).ConfigureAwait(false);
-                }
-                else
-                {
-                    SpellkitEnvironment.RunSelect(select);
-                }
+                await SpellkitEnvironment.RunSelectAsync(select).ConfigureAwait(false);
             }
             result = SpellkitMachine.Resume(result.Continuation, select.CompletionValue);
         }
@@ -582,9 +457,45 @@ public sealed partial class SpellkitInstance : IDisposable
                 ? session.SendAsync(eventId, argument)
                 : session.SendAsync(eventId));
 
+    internal Task<SpellkitSelectResult> SelectAtRevisionAsync(
+        SpellkitRunSession run,
+        string choiceId,
+        object? argument,
+        bool hasArgument,
+        long revision) =>
+        DispatchSelectActionAsync(
+            run,
+            session => hasArgument
+                ? session.SelectAtRevisionAsync(choiceId, argument, revision)
+                : session.SelectAtRevisionAsync(choiceId, revision));
+
+    internal Task<SpellkitSelectResult> SendAtRevisionAsync(
+        SpellkitRunSession run,
+        string eventId,
+        object? argument,
+        bool hasArgument,
+        long revision) =>
+        DispatchSelectActionAsync(
+            run,
+            session => hasArgument
+                ? session.SendAtRevisionAsync(eventId, argument, revision)
+                : session.SendAtRevisionAsync(eventId, revision));
+
+    internal Task<SpellkitSelectResult> RefreshSelectAsync(
+        SpellkitRunSession run,
+        bool invalidate) =>
+        DispatchSelectActionAsync(
+            run,
+            async session => new SpellkitSelectResult(
+                invalidate
+                    ? await session.InvalidateAsync().ConfigureAwait(false)
+                    : await session.RefreshAsync().ConfigureAwait(false)),
+            failRunOnError: false);
+
     private async Task<SpellkitSelectResult> DispatchSelectActionAsync(
         SpellkitRunSession run,
-        Func<SpellkitSelectSession, Task<SpellkitSelectResult>> dispatch)
+        Func<SpellkitSelectSession, Task<SpellkitSelectResult>> dispatch,
+        bool failRunOnError = true)
     {
         if (operationScope.Value)
         {
@@ -618,6 +529,14 @@ public sealed partial class SpellkitInstance : IDisposable
                 }
 
                 return new SpellkitSelectResult(run.GetSelect().Snapshot);
+            }
+            catch (SpellkitSelectRevisionMismatchException)
+            {
+                throw;
+            }
+            catch (Exception) when (!failRunOnError)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -702,54 +621,6 @@ public sealed partial class SpellkitInstance : IDisposable
         return context;
     }
 
-    internal ExecutionResult InvokeSelectAction(SpellkitFunction action, SpellkitObject[] arguments)
-    {
-        var ownsGate = !operationScope.Value;
-        if (ownsGate)
-        {
-            EnterSynchronousOperationGate();
-        }
-
-        try
-        {
-            lock (syncRoot)
-            {
-                ObjectDisposedException.ThrowIf(disposed, this);
-                var nested = active;
-                if (!nested)
-                {
-                    BeginOperation();
-                }
-                try
-                {
-                    var context = CreateExecutionContext(runtimeContext!, control: null);
-                    if (action is not SpellkitNativeFunction function)
-                    {
-                        throw new InvalidOperationException("The select action function is unavailable.");
-                    }
-                    var result = SpellkitMachine.ExecuteWithArguments(function, arguments, context);
-                    return CompleteAwaitablesAsync(
-                        result,
-                        runAsynchronously: false).GetAwaiter().GetResult();
-                }
-                finally
-                {
-                    if (!nested)
-                    {
-                        active = false;
-                    }
-                }
-            }
-        }
-        finally
-        {
-            if (ownsGate)
-            {
-                ExitSynchronousOperationGate();
-            }
-        }
-    }
-
     internal async Task<ExecutionResult> InvokeSelectActionAsync(
         SpellkitFunction action,
         SpellkitObject[] arguments)
@@ -780,9 +651,7 @@ public sealed partial class SpellkitInstance : IDisposable
             var result = await Task.Run(
                 () => SpellkitMachine.ExecuteWithArguments(function, arguments, context),
                 CancellationToken.None).ConfigureAwait(false);
-            return await CompleteAwaitablesAsync(
-                result,
-                runAsynchronously: true).ConfigureAwait(false);
+            return await CompleteAwaitablesAsync(result).ConfigureAwait(false);
         }
         finally
         {
@@ -798,39 +667,30 @@ public sealed partial class SpellkitInstance : IDisposable
         }
     }
 
-    internal ExecutionResult ResumeSelectContinuation(
-        SpellkitMachine.VmContinuation continuation,
-        SpellkitObject value) =>
-        CompleteAwaitablesAsync(
-            SpellkitMachine.Resume(continuation, value),
-            runAsynchronously: false).GetAwaiter().GetResult();
-
     internal async Task<ExecutionResult> ResumeSelectContinuationAsync(
         SpellkitMachine.VmContinuation continuation,
         SpellkitObject value)
     {
         var result = SpellkitMachine.Resume(continuation, value);
-        return await CompleteAwaitablesAsync(
-            result,
-            runAsynchronously: true).ConfigureAwait(false);
+        return await CompleteAwaitablesAsync(result).ConfigureAwait(false);
     }
 
-    internal bool EvaluateSelectGuard(
+    internal async Task<bool> EvaluateSelectGuardAsync(
         SpellkitFunction guard,
         SpellkitObject[] arguments) =>
-        EvaluateSelectValue(guard, arguments, "guard").IsTrue();
+        (await EvaluateSelectValueAsync(guard, arguments, "guard").ConfigureAwait(false)).IsTrue();
 
-    internal SpellkitObject EvaluateSelectView(
+    internal Task<SpellkitObject> EvaluateSelectViewAsync(
         SpellkitFunction view,
         SpellkitObject[] arguments) =>
-        EvaluateSelectValue(view, arguments, "view");
+        EvaluateSelectValueAsync(view, arguments, "view");
 
-    internal SpellkitObject EvaluateSelectDynamicChoice(
+    internal Task<SpellkitObject> EvaluateSelectDynamicChoiceAsync(
         SpellkitFunction function,
         SpellkitObject[] arguments) =>
-        EvaluateSelectValue(function, arguments, "dynamic choice");
+        EvaluateSelectValueAsync(function, arguments, "dynamic choice");
 
-    private SpellkitObject EvaluateSelectValue(
+    private async Task<SpellkitObject> EvaluateSelectValueAsync(
         SpellkitFunction function,
         SpellkitObject[] arguments,
         string kind)
@@ -838,57 +698,53 @@ public sealed partial class SpellkitInstance : IDisposable
         var ownsGate = !operationScope.Value;
         if (ownsGate)
         {
-            EnterSynchronousOperationGate();
+            await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            operationScope.Value = true;
         }
 
         try
         {
-            lock (syncRoot)
+            ObjectDisposedException.ThrowIf(disposed, this);
+            var nested = active;
+            if (!nested)
             {
-                ObjectDisposedException.ThrowIf(disposed, this);
-                var nested = active;
+                if (suspendedRun is null)
+                {
+                    BeginOperation();
+                }
+                else
+                {
+                    active = true;
+                }
+            }
+            try
+            {
+                var context = CreateExecutionContext(runtimeContext!, control: null);
+                SpellkitObject value;
+                if (function is SpellkitNativeFunction nativeFunction)
+                {
+                    var execution = await Task.Run(
+                        () => SpellkitMachine.ExecuteWithArguments(nativeFunction, arguments, context),
+                        CancellationToken.None).ConfigureAwait(false);
+                    execution = await CompleteAwaitablesAsync(execution).ConfigureAwait(false);
+                    if (execution.Reason is TerminationReason.Suspended)
+                    {
+                        throw new InvalidOperationException($"A select {kind} cannot start a select.");
+                    }
+                    value = execution.Value ?? SpellkitNil.Instance;
+                }
+                else
+                {
+                    value = function.Call(context, arguments);
+                }
+                context.ThrowIf();
+                return value;
+            }
+            finally
+            {
                 if (!nested)
                 {
-                    // Reading Choices for the one suspended run is safe: the continuation stays
-                    // suspended while this short, serialized guard evaluation executes.
-                    if (suspendedRun is null)
-                    {
-                        BeginOperation();
-                    }
-                    else
-                    {
-                        active = true;
-                    }
-                }
-                try
-                {
-                    var context = CreateExecutionContext(runtimeContext!, control: null);
-                    SpellkitObject value;
-                    if (function is SpellkitNativeFunction nativeFunction)
-                    {
-                        var execution = SpellkitMachine.ExecuteWithArguments(nativeFunction, arguments, context);
-                        execution = CompleteAwaitablesAsync(
-                            execution,
-                            runAsynchronously: false).GetAwaiter().GetResult();
-                        if (execution.Reason is TerminationReason.Suspended)
-                        {
-                            throw new InvalidOperationException($"A select {kind} cannot start a select.");
-                        }
-                        value = execution.Value ?? SpellkitNil.Instance;
-                    }
-                    else
-                    {
-                        value = function.Call(context, arguments);
-                    }
-                    context.ThrowIf();
-                    return value;
-                }
-                finally
-                {
-                    if (!nested)
-                    {
-                        active = false;
-                    }
+                    active = false;
                 }
             }
         }
@@ -896,7 +752,8 @@ public sealed partial class SpellkitInstance : IDisposable
         {
             if (ownsGate)
             {
-                ExitSynchronousOperationGate();
+                operationScope.Value = false;
+                operationGate.Release();
             }
         }
     }
@@ -949,22 +806,13 @@ public sealed partial class SpellkitInstance : IDisposable
             cancellationToken);
     }
 
-    private async ValueTask<ExecutionResult> CompleteAwaitablesAsync(
-        ExecutionResult result,
-        bool runAsynchronously)
+    private async ValueTask<ExecutionResult> CompleteAwaitablesAsync(ExecutionResult result)
     {
         while (result.Reason is TerminationReason.Suspended
             && result.Continuation is not null
             && result.Suspension?.Awaitable is { } awaitable)
         {
-            if (runAsynchronously)
-            {
-                await awaitable.WaitAsync().ConfigureAwait(false);
-            }
-            else
-            {
-                awaitable.Wait();
-            }
+            await awaitable.WaitAsync().ConfigureAwait(false);
 
             result = SpellkitMachine.Resume(result.Continuation, awaitable);
         }

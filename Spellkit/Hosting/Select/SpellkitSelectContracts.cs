@@ -22,11 +22,10 @@ public sealed class SpellkitSelectView
         SpellkitHostValueConverter.TryConvert(value, out result);
 }
 
-/// <summary>The currently active state and its display data.</summary>
-public sealed record SpellkitSelectState(string Id, SpellkitSelectView? View);
+internal sealed record SpellkitSelectState(string Id, SpellkitSelectView? View);
 
-/// <summary>An immutable UI-facing view of a select session.</summary>
-public sealed class SpellkitSelectSnapshot
+/// <summary>Immutable data published internally for the current select screen.</summary>
+internal sealed class SpellkitSelectSnapshot
 {
     internal SpellkitSelectSnapshot(
         string name,
@@ -67,19 +66,22 @@ public sealed record SpellkitChoice
         Label = label ?? id;
         View = view;
         Parameters = Array.Empty<SpellkitChoiceParameter>();
+        Revision = 0;
     }
 
     internal SpellkitChoice(
         string id,
         IReadOnlyList<SpellkitChoiceParameter> parameters,
         string? label = null,
-        SpellkitSelectView? view = null)
+        SpellkitSelectView? view = null,
+        long revision = 0)
     {
         Id = id;
         Parameters = parameters.ToArray();
         ParameterCount = Parameters.Count;
         Label = label ?? id;
         View = view;
+        Revision = revision;
     }
 
     public string Id { get; }
@@ -91,6 +93,9 @@ public sealed record SpellkitChoice
     public int ParameterCount { get; }
 
     public IReadOnlyList<SpellkitChoiceParameter> Parameters { get; }
+
+    /// <summary>Identifies the published select screen that produced this choice.</summary>
+    public long Revision { get; }
 }
 
 public sealed class SpellkitSelectResult
@@ -102,14 +107,16 @@ public sealed class SpellkitSelectResult
         SpellkitObject? value = null)
     {
         Snapshot = snapshot;
+        Choices = snapshot.Choices;
+        IsCompleted = snapshot.IsCompleted;
         this.value = value;
     }
 
-    public SpellkitSelectSnapshot Snapshot { get; }
+    internal SpellkitSelectSnapshot Snapshot { get; }
 
-    public IReadOnlyList<SpellkitChoice> Choices => Snapshot.Choices;
+    public IReadOnlyList<SpellkitChoice> Choices { get; }
 
-    public bool IsCompleted => Snapshot.IsCompleted;
+    public bool IsCompleted { get; }
 
     internal SpellkitObject Value => value ?? SpellkitNil.Instance;
 
@@ -138,11 +145,14 @@ public sealed class SpellkitSelectRevisionMismatchException : InvalidOperationEx
             $"Select revision {expectedRevision} does not match current revision {snapshot.Revision}.")
     {
         ExpectedRevision = expectedRevision;
+        CurrentRevision = snapshot.Revision;
         Snapshot = snapshot;
     }
 
     public long ExpectedRevision { get; }
 
-    /// <summary>Gets the current snapshot that supersedes the rejected action.</summary>
-    public SpellkitSelectSnapshot Snapshot { get; }
+    /// <summary>Gets the revision that supersedes the rejected action.</summary>
+    public long CurrentRevision { get; }
+
+    internal SpellkitSelectSnapshot Snapshot { get; }
 }

@@ -5,8 +5,8 @@ script decides which actions are available and where they lead; the C# host disp
 and sends the selected ID back to the script.
 
 This page covers the normal host integration. It uses `OpenSelectAsync` and its small
-`SpellkitSelect` API. For web UIs, dynamic choices, nested selects, and the Snapshot/Revision
-protocol, see [Advanced interactive selects](InteractiveSelectAdvanced.md).
+`SpellkitSelect` API. For web UIs, dynamic choices, nested selects, and revision-aware input,
+see [Advanced interactive selects](InteractiveSelectAdvanced.md).
 
 ## Quick start
 
@@ -37,7 +37,7 @@ using var town = await instance.OpenSelectAsync("town");
 while (!town.IsCompleted)
 {
     var choice = ui.Pick(town.Choices);
-    var result = await town.SelectAsync(choice.Id);
+    var result = await town.SelectAsync(choice);
 
     if (result.IsCompleted)
         Console.WriteLine(result.GetValue<string>());
@@ -49,10 +49,13 @@ while (!town.IsCompleted)
 | Member | Purpose |
 | --- | --- |
 | `State` | Current script state name. |
+| `StateView` | Display data published for the current state. |
 | `Choices` | The currently visible choices. |
+| `Revision` | Generation of the currently published UI state. |
 | `IsCompleted` | Whether the select has exited or was cancelled. |
-| `SelectAsync(id, argument?)` | Runs a visible choice. |
+| `SelectAsync(choice, argument?)` | Runs a visible choice from the published UI state. |
 | `SendAsync(id, argument?)` | Delivers a hidden host event declared with `on`. |
+| `RefreshAsync()` / `InvalidateAsync()` | Republishes host-dependent choices; the latter rejects older UI input. |
 | `Cancel()` / `Dispose()` | Ends the interaction without an exit result. |
 
 Each call to `OpenSelectAsync` creates a new interaction with its own current state and
@@ -121,8 +124,9 @@ choose "accept"
 }
 ```
 
-A false guard removes the choice from `Choices`. Guards run when choices are read and again before
-the selected action runs, so guard expressions should be free of side effects.
+A false guard removes the choice from `Choices`. Guards run when Spellkit publishes a select screen:
+on opening, after an action, and after `RefreshAsync` or `InvalidateAsync`. They should be free of
+side effects.
 
 ## Host events
 

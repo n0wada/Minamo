@@ -7,62 +7,6 @@ namespace Spellkit.Hosting;
 
 public sealed partial class SpellkitInstance
 {
-    private SpellkitRunSession StartCore(Func<Result<UnitComposition>> compile)
-    {
-        EnterSynchronousOperationGate();
-        try
-        {
-            lock (syncRoot)
-            {
-                ObjectDisposedException.ThrowIf(disposed, this);
-                BeginOperation();
-                var linkerTouched = false;
-                try
-                {
-                    linkerTouched = true;
-                    var made = compile();
-                    if (!made.Success || made.Value is null)
-                    {
-                        TryRollback();
-                        return new SpellkitRunSession(this, new InvalidOperationException(
-                            string.Join(System.Environment.NewLine, made.Messages)));
-                    }
-
-                    var result = SpellkitMachine.Execute(CreateExecutionContext(made.Value, control: null));
-                    result = CompleteAwaitablesAsync(
-                        result,
-                        runAsynchronously: false).GetAwaiter().GetResult();
-                    linker.Commit();
-                    var run = new SpellkitRunSession(this, result);
-                    run.Advance(result);
-                    if (!run.IsCompleted)
-                    {
-                        suspendedRun = run;
-                    }
-
-                    return run;
-                }
-                catch (Exception ex)
-                {
-                    if (linkerTouched)
-                    {
-                        TryRollback();
-                    }
-
-                    return new SpellkitRunSession(this, ex);
-                }
-                finally
-                {
-                    active = false;
-                }
-            }
-        }
-        finally
-        {
-            ExitSynchronousOperationGate();
-        }
-    }
-
     private async Task<SpellkitRunSession> StartCoreAsync(
         Func<Result<UnitComposition>> compile)
     {
@@ -93,9 +37,7 @@ public sealed partial class SpellkitInstance
                 var result = await Task.Run(
                     () => SpellkitMachine.Execute(context),
                     CancellationToken.None).ConfigureAwait(false);
-                result = await CompleteAwaitablesAsync(
-                    result,
-                    runAsynchronously: true).ConfigureAwait(false);
+                result = await CompleteAwaitablesAsync(result).ConfigureAwait(false);
                 linker.Commit();
                 var run = new SpellkitRunSession(this, result);
                 await run.AdvanceAsync(result).ConfigureAwait(false);

@@ -4,50 +4,50 @@ This page covers the parts of `select` intended for richer UI integrations and s
 Start with [Interactive selects](InteractiveSelect.md) for the ordinary `OpenSelectAsync`
 loop.
 
-## Advanced sessions and snapshots
+## Published UI state and revisions
 
-`SpellkitInstance.OpenSelectSessionAsync` returns `SpellkitSelectSession`. Use it when the host needs a stable
-UI frame, stale-input rejection, invalidation after host-owned changes, or select actions that
-await host work. Session operations that can run Spellkit code are asynchronous.
+`OpenSelectAsync` returns one live `SpellkitSelect` object. Its `State`, `StateView`, `Choices`,
+and `IsCompleted` properties are the most recently published UI state. Reading them does not
+execute Spellkit code; opening the select, completing an action, refreshing, and invalidating
+publish a new state asynchronously. A failed publication leaves the preceding published state
+unchanged.
 
-`Snapshot` is not required for ordinary local UI loops. It is one coherent description of a render:
-the interactive select name, state and state view, visible choices and choice views, completion
-state, and a Revision number. When a nested select is active, the snapshot follows the nested
-interaction because that is the one that can receive input.
+Each published choice has a `Revision`. A local UI can pass the choice object directly to
+`SelectAsync`. A remote UI can send its ID and revision back to the host, which rejects input from
+an earlier published state.
 
 ```csharp
-using var town = await instance.OpenSelectSessionAsync("game.town");
+using var town = await instance.OpenSelectAsync("game.town");
 
-var snapshot = town.Snapshot;
-ui.Render(snapshot.State.Id, snapshot.Choices);
+ui.Render(town.State, town.Choices);
 
 try
 {
-    var result = await town.SelectAtRevisionAsync("accept", snapshot.Revision);
-    ui.Render(result.Snapshot.State.Id, result.Snapshot.Choices);
+    await town.SelectAtRevisionAsync(request.ChoiceId, request.Revision);
+    ui.Render(town.State, town.Choices);
 }
 catch (SpellkitSelectRevisionMismatchException stale)
 {
-    ui.Render(stale.Snapshot.State.Id, stale.Snapshot.Choices);
+    ui.Render(town.State, town.Choices);
 }
 ```
 
 The revision starts at zero and advances after a successful action, cancellation, or invalidation.
-Pass the revision that produced a UI event to `SelectAtRevision` or `SendAtRevision`; a mismatch
-leaves the session unchanged and provides a current snapshot in
-`SpellkitSelectRevisionMismatchException`.
+Pass the revision that produced a UI event to `SelectAtRevisionAsync` or `SendAtRevisionAsync`.
+A mismatch leaves the select unchanged; read `State` and `Choices` again to render the current
+published state.
 
 ### Refreshing host-owned data
 
-`RefreshAsync` reevaluates a snapshot without changing its revision. Use it when a UI needs an
-ordinary resync. `InvalidateAsync` reevaluates the snapshot and advances its revision, making
-input from older renders stale.
+`RefreshAsync` republishes choices and views without changing the revision. Use it when older UI
+input remains valid. `InvalidateAsync` advances the revision, then republishes, making input from
+older renders stale.
 
 ```csharp
 inventory.Changed += async (_, _) =>
 {
-    var snapshot = await town.InvalidateAsync();
-    ui.Render(snapshot.State.Id, snapshot.Choices);
+    await town.InvalidateAsync();
+    ui.Render(town.State, town.Choices);
 };
 ```
 
@@ -57,8 +57,8 @@ already executing one of the session's actions; queue that notification instead.
 
 ### Display views
 
-`view` puts rendering data next to the state or choice it describes. Views are evaluated when a
-snapshot is created and must be side-effect free.
+`view` puts rendering data next to the state or choice it describes. Views are evaluated when
+Spellkit publishes the current screen and must be side-effect free.
 
 ```kit
 select courierQuest {
@@ -88,7 +88,7 @@ example, a dictionary view can be read as `Dictionary<string, object?>`.
 
 ## Stateful select declarations
 
-A select expression is a reusable factory. Each `OpenSelectAsync`, `OpenSelectSessionAsync`, or `do`
+A select expression is a reusable factory. Each `OpenSelectAsync` or `do`
 creates a new interaction instance, including its state and select-local values. Captured outer
 variables belong to the factory and are shared by its instances.
 
@@ -181,9 +181,10 @@ initial state browse {
 }
 ```
 
-The source is reevaluated whenever the host reads choices or a snapshot and again immediately
-before selection. Generated IDs must be nonempty and unique among all choices in the state. Dynamic
-choices currently have no host-supplied parameters: the loop item is their action input.
+The source is reevaluated when Spellkit publishes the UI state: on opening, after an action, and
+after `RefreshAsync` or `InvalidateAsync`. Generated IDs must be nonempty and unique among all
+choices in the state. Dynamic choices currently have no host-supplied parameters: the loop item is
+their action input.
 
 ## Script-initiated and nested selects
 
@@ -197,8 +198,8 @@ func visitTown() {
 }
 ```
 
-A choice can start another select. While it is active, the host sees only the inner select's choices
-or snapshot. When it exits, the parent choice resumes after `do`.
+A choice can start another select. While it is active, the host sees only the inner select's current
+state and choices. When it exits, the parent choice resumes after `do`.
 
 ```kit
 choose "shop" => {
@@ -214,22 +215,24 @@ Disposing or cancelling an outer session also cancels its active nested select.
 ## Asynchronous and event-driven hosts
 
 Use `SelectAsync`, `SendAsync`, `SelectAtRevisionAsync`, and `SendAtRevisionAsync` to drive a
-session. Calls on one session are serialized; do not issue concurrent actions.
+select. Calls on one select are serialized; do not issue concurrent actions.
 
 ```csharp
-using var select = await instance.OpenSelectSessionAsync("dialog");
+using var select = await instance.OpenSelectAsync("dialog");
 var result = await select.SelectAsync("confirm");
 ```
 
 When a script itself executes `do`, start it with `StartAsync`. The resulting
-`SpellkitRunSession` exposes the active choices and resumes the suspended VM as selections arrive.
+`SpellkitRunSession` exposes the active `State`, `StateView`, `Choices`, and nullable `Revision`.
+It also supports the same choice, revision, refresh, and invalidation operations while the VM is
+waiting for a select.
 
 ```csharp
 using var run = await instance.StartAsync(source);
 while (!run.IsCompleted)
 {
     var choice = await ui.PickAsync(run.Choices);
-    await run.SelectAsync(choice.Id);
+    await run.SelectAsync(choice);
 }
 ```
 

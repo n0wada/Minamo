@@ -11,51 +11,7 @@ public sealed partial class SpellkitInstance
     public async Task<SpellkitSelect> OpenSelectAsync(string name) =>
         new(await OpenSelectSessionAsync(name).ConfigureAwait(false));
 
-    internal SpellkitSelect OpenSelect(string name) => new(OpenSelectSession(name));
-
-    internal SpellkitSelectSession OpenSelectSession(string name)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (runtimeContext is null)
-        {
-            if (program is null)
-            {
-                throw new InvalidOperationException(
-                    "Execute source containing the select before opening a select session.");
-            }
-
-            var initialization = Execute();
-            if (!initialization.Success)
-            {
-                throw new InvalidOperationException(
-                    "The select program could not be initialized.", initialization.Failure?.Exception);
-            }
-        }
-
-        EnterSynchronousOperationGate();
-        try
-        {
-            lock (syncRoot)
-            {
-                ObjectDisposedException.ThrowIf(disposed, this);
-                if (suspendedRun is not null)
-                {
-                    throw new InvalidOperationException("A script run is already waiting for a select.");
-                }
-
-                return CreateSelectSession(name);
-            }
-        }
-        finally
-        {
-            ExitSynchronousOperationGate();
-        }
-    }
-
-    /// <summary>
-    /// Asynchronously opens a named select session with snapshots, revision checks, and invalidation.
-    /// </summary>
-    public async Task<SpellkitSelectSession> OpenSelectSessionAsync(string name)
+    internal async Task<SpellkitSelectSession> OpenSelectSessionAsync(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (runtimeContext is null)
@@ -99,15 +55,6 @@ public sealed partial class SpellkitInstance
             operationScope.Value = false;
             operationGate.Release();
         }
-    }
-
-    internal SpellkitSelectSession CreateSelectSession(string name)
-    {
-        var factory = ResolveSelectFactory(name)
-            ?? throw new ArgumentException($"No select named '{name}' is available.", nameof(name));
-        var session = new SpellkitSelectSession(this, CreateSelectInstance(factory));
-        session.Initialize();
-        return session;
     }
 
     private SelectInstance CreateSelectInstance(SpellkitSelectFactory factory)
@@ -172,15 +119,6 @@ public sealed partial class SpellkitInstance
         return matches[0];
     }
 
-    internal SpellkitSelectSession CreateSelectSession(
-        SelectInstance select,
-        SpellkitSelectRevision? revision = null)
-    {
-        var session = new SpellkitSelectSession(this, select, revision);
-        session.Initialize();
-        return session;
-    }
-
     internal async Task<SpellkitSelectSession> CreateSelectSessionAsync(
         SelectInstance select,
         SpellkitSelectRevision? revision = null)
@@ -189,4 +127,12 @@ public sealed partial class SpellkitInstance
         await session.InitializeAsync().ConfigureAwait(false);
         return session;
     }
+}
+
+/// <summary>Resolves legacy dotted select names while the VM evaluates <c>do</c>.</summary>
+internal sealed class SpellkitSelectFactoryResolver(SpellkitInstance instance)
+{
+    internal const string ContextKey = "Spellkit.Hosting.SelectFactoryResolver";
+
+    internal SpellkitSelectFactory? Resolve(string name) => instance.ResolveSelectFactory(name);
 }

@@ -35,7 +35,7 @@ public sealed class SpellkitEnvironment
     private readonly Dictionary<string, object?> bindings = new(StringComparer.OrdinalIgnoreCase);
     private Func<CancellationToken, string?>? input;
     private Action<string>? output;
-    private Func<SpellkitSelectSession, ValueTask>? asyncSelectRunner;
+    private Func<SpellkitSelect, ValueTask>? asyncSelectRunner;
 
     public SpellkitEnvironment(object? hostContext = null) => HostContext = hostContext;
 
@@ -67,7 +67,7 @@ public sealed class SpellkitEnvironment
     }
 
     public SpellkitEnvironment UseSelectAsync(
-        Func<SpellkitSelectSession, ValueTask> run)
+        Func<SpellkitSelect, ValueTask> run)
     {
         asyncSelectRunner = run ?? throw new ArgumentNullException(nameof(run));
         return this;
@@ -89,15 +89,12 @@ public sealed class SpellkitEnvironment
         write(value);
     }
 
-    internal void RunSelect(SpellkitSelectSession session) =>
-        RunSelectAsync(session).AsTask().GetAwaiter().GetResult();
-
     internal async ValueTask RunSelectAsync(SpellkitSelectSession session)
     {
         var runAsync = asyncSelectRunner
             ?? throw new InvalidOperationException(
                 "No asynchronous select runner is configured for this Spellkit environment.");
-        await runAsync(session).ConfigureAwait(false);
+        await runAsync(new SpellkitSelect(session)).ConfigureAwait(false);
 
         EnsureSelectCompleted(session);
     }
@@ -122,23 +119,4 @@ public sealed class SpellkitEnvironment
         value = TypeConverter.ConvertFrom(raw);
         return true;
     }
-}
-
-public sealed class SpellkitExecution
-{
-    internal SpellkitExecution(
-        Guid id,
-        string operation,
-        SpellkitExecutionMetrics metrics)
-    {
-        Id = id;
-        Operation = operation;
-        Metrics = metrics;
-    }
-
-    public Guid Id { get; }
-
-    public string Operation { get; }
-
-    public SpellkitExecutionMetrics Metrics { get; }
 }
