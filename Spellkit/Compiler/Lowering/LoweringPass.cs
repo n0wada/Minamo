@@ -93,6 +93,9 @@ internal sealed class LoweringPass
 
     public LoweredSelectDeclaration Lower(SelectDeclarationSyntax node, CompilerContext ctx)
     {
+        var description = node.Description is null
+            ? null
+            : Lower(node.Description, new CompilerContext());
         var locals = new LoweredBinding[node.Locals.Count];
         for (var i = 0; i < node.Locals.Count; i++)
         {
@@ -113,7 +116,6 @@ internal sealed class LoweringPass
                     LowerParameters(choice.Parameters),
                     choice.Label ?? choice.Name,
                     choice.Guard is null ? null : LowerNode(choice.Guard, new CompilerContext()),
-                    choice.View is null ? null : LowerNode(choice.View, new CompilerContext()),
                     LowerNode(choice.Body, new CompilerContext()));
             }
 
@@ -141,7 +143,6 @@ internal sealed class LoweringPass
                         LowerNode(choice.Id, new CompilerContext()),
                         choice.Label is null ? null : LowerNode(choice.Label, new CompilerContext()),
                         choice.Guard is null ? null : LowerNode(choice.Guard, new CompilerContext()),
-                        choice.View is null ? null : LowerNode(choice.View, new CompilerContext()),
                         LowerNode(choice.Body, new CompilerContext()));
                 }
 
@@ -160,20 +161,29 @@ internal sealed class LoweringPass
                     templates);
             }
 
+            var choiceSpreads = new LoweredSelectChoiceSpread[state.ChoiceSpreads.Count];
+            for (var j = 0; j < state.ChoiceSpreads.Count; j++)
+            {
+                var spread = state.ChoiceSpreads[j];
+                choiceSpreads[j] = new(
+                    spread.Location,
+                    LowerNode(spread.Target, new CompilerContext()));
+            }
+
             states[i] = new(
                 state.Location,
                 state.Name,
                 state.IsInitial,
                 state.Enter is null ? null : LowerNode(state.Enter, new CompilerContext()),
                 state.Leave is null ? null : LowerNode(state.Leave, new CompilerContext()),
-                state.View is null ? null : LowerNode(state.View, new CompilerContext()),
-                state.Otherwise is null ? null : LowerNode(state.Otherwise, new CompilerContext()),
+                state.Empty is null ? null : LowerNode(state.Empty, new CompilerContext()),
                 choices,
                 dynamicChoices,
+                choiceSpreads,
                 events);
         }
 
-        return new(node.Location, node.Name, locals, states);
+        return new(node.Location, node.Name, description, locals, states);
     }
 
     public LoweredSelectInvocation Lower(SelectInvocationSyntax node, CompilerContext ctx) =>
@@ -317,7 +327,7 @@ internal sealed class LoweringPass
         new(node.Location, LowerNodeList(node.Elements, ctx));
 
     public LoweredArray Lower(ArrayLiteralSyntax node, CompilerContext ctx) =>
-        new(node.Location, LowerNodeList(node.Elements, ctx));
+        new(node.Location, LowerNodeList(node.Elements, ctx), node.IsDictionaryLiteral);
 
     public LoweredComprehension Lower(ComprehensionSyntax node, CompilerContext ctx)
     {

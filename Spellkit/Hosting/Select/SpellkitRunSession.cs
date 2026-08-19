@@ -37,13 +37,13 @@ public sealed class SpellkitRunSession : IDisposable
         }
     }
 
-    /// <summary>Gets the display data published for the state currently waiting for host input.</summary>
-    public SpellkitSelectView? StateView
+    /// <summary>Gets the dictionary metadata declared for the select currently waiting for host input.</summary>
+    public SpellkitSelectDescription? Description
     {
         get
         {
             ThrowIfDisposed();
-            return select?.StateView;
+            return select?.Description;
         }
     }
 

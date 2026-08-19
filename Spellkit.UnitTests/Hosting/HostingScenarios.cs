@@ -248,7 +248,7 @@ internal static class HostingScenarios
         AssertHasMethod<SpellkitSelect>("InvalidateAsync", "asynchronous select invalidation");
         AssertHasMethod<SpellkitSelect>("SelectAtRevisionAsync", "revision-aware select choice");
         AssertHasMethod<SpellkitSelect>("SendAtRevisionAsync", "revision-aware select host event delivery");
-        AssertHasProperty<SpellkitSelect>("StateView", "select state view");
+        AssertHasProperty<SpellkitSelect>("Description", "select description");
         Assert(!typeof(SpellkitSelectSession).IsPublic, "select session stays internal");
         Assert(!typeof(SpellkitSelectSnapshot).IsPublic, "select snapshot stays internal");
         AssertNoProperty<SpellkitSelectResult>("Snapshot", "internal select result snapshot");
@@ -262,7 +262,7 @@ internal static class HostingScenarios
         AssertHasMethod<SpellkitRunSession>("SelectAtRevisionAsync", "revision-aware suspended run choice");
         AssertHasMethod<SpellkitRunSession>("SendAtRevisionAsync", "revision-aware suspended run host event delivery");
         AssertHasProperty<SpellkitRunSession>("State", "suspended run select state");
-        AssertHasProperty<SpellkitRunSession>("StateView", "suspended run select state view");
+        AssertHasProperty<SpellkitRunSession>("Description", "suspended run select description");
         AssertHasProperty<SpellkitRunSession>("Revision", "suspended run select revision");
         AssertHasMethod<SpellkitExecutionResult>("GetValue", "typed execution result");
         AssertHasMethod<SpellkitExecutionResult>("TryGetValue", "optional typed execution result");
@@ -272,7 +272,8 @@ internal static class HostingScenarios
         AssertHasProperty<SpellkitProgram>("Diagnostics", "compiled program diagnostics");
         AssertHasMethod<SpellkitEnvironment>("Expose", "environment name exposure");
         AssertHasMethod<SpellkitEnvironment>("Set", "environment bindings");
-        AssertHasMethod<SpellkitEnvironment>("UseInput", "instance input setup");
+        AssertNoMethod<SpellkitEnvironment>("UseInput", "synchronous instance input setup");
+        AssertHasMethod<SpellkitEnvironment>("UseInputAsync", "asynchronous instance input setup");
         AssertHasMethod<SpellkitEnvironment>("UseOutput", "instance output setup");
         AssertNoMethod<SpellkitEnvironment>("UseSelect", "synchronous select runner setup");
         AssertHasMethod<SpellkitEnvironment>("UseSelectAsync", "asynchronous select runner setup");

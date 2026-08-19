@@ -114,6 +114,7 @@ internal sealed partial class LoweredEmitter
     private void EmitGoto(LoweredControlTransfer node, CompilerContext ctx)
     {
         if (node.SelectState is not null
+            && !ctx.SelectIsStateLess
             && (ctx.SelectStates is null || !ctx.SelectStates.Contains(node.SelectState)))
         {
             target.AddError(

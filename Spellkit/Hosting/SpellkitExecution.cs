@@ -1,8 +1,130 @@
+using Spellkit.Compiler;
+using Spellkit.Runtime;
+using Spellkit.Runtime.Types;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading;
 
 namespace Spellkit.Hosting;
+
+public enum SpellkitDiagnosticSeverity
+{
+    Information,
+    Warning,
+    Error
+}
+
+public sealed record SpellkitDiagnostic(
+    SpellkitDiagnosticSeverity Severity,
+    int Code,
+    string Message,
+    string? File,
+    int Line,
+    int Column)
+{
+    internal static SpellkitDiagnostic From(BuildMessage message) => new(
+        message.Type switch
+        {
+            BuildMessageType.Error => SpellkitDiagnosticSeverity.Error,
+            BuildMessageType.Warning => SpellkitDiagnosticSeverity.Warning,
+            _ => SpellkitDiagnosticSeverity.Information
+        },
+        message.Code,
+        message.Message,
+        message.File,
+        message.Line,
+        message.Column);
+}
+
+public enum SpellkitFailureKind
+{
+    Compilation,
+    Runtime,
+    Host,
+    Input,
+    Cancelled,
+    Limit
+}
+
+public sealed record SpellkitFailure(
+    SpellkitFailureKind Kind,
+    string Message,
+    Exception? Exception = null,
+    SpellkitExecutionLimitKind? Limit = null)
+{
+    internal static SpellkitFailure Compilation(IReadOnlyList<SpellkitDiagnostic> diagnostics) => new(
+        SpellkitFailureKind.Compilation,
+        diagnostics.FirstOrDefault(diagnostic => diagnostic.Severity == SpellkitDiagnosticSeverity.Error)?.Message
+            ?? "Compilation failed.");
+
+    internal static SpellkitFailure From(Exception exception, SpellkitFailureKind fallback) => exception switch
+    {
+        SpellkitBuildException { InnerException: { } inner } =>
+            From(inner, fallback),
+        SpellkitExecutionLimitException limit => new(
+            SpellkitFailureKind.Limit,
+            limit.Message,
+            limit,
+            limit.Kind),
+        OperationCanceledException => new(SpellkitFailureKind.Cancelled, exception.Message, exception),
+        SpellkitRuntimeException => new(SpellkitFailureKind.Runtime, exception.Message, exception),
+        _ => new(fallback, exception.Message, exception)
+    };
+}
+
+public interface ISpellkitOperationResult
+{
+    bool Success { get; }
+    IReadOnlyList<SpellkitFailure> Failures { get; }
+    Guid ExecutionId { get; }
+    SpellkitExecutionMetrics Metrics { get; }
+    SpellkitExecution Execution { get; }
+}
+
+public sealed class SpellkitExecutionResult : ISpellkitOperationResult
+{
+    private readonly SpellkitObject? value;
+
+    internal SpellkitExecutionResult(
+        SpellkitObject? value,
+        IReadOnlyList<BuildMessage> messages,
+        SpellkitFailure? failure,
+        string operation,
+        Guid executionId,
+        SpellkitExecutionMetrics metrics)
+    {
+        this.value = value;
+        Diagnostics = messages.Select(SpellkitDiagnostic.From).ToArray();
+        Failure = failure ?? (messages.Any(message => message.Type == BuildMessageType.Error)
+            ? SpellkitFailure.Compilation(Diagnostics)
+            : null);
+        Failures = Failure is null ? Array.Empty<SpellkitFailure>() : new[] { Failure };
+        ExecutionId = executionId;
+        Metrics = metrics;
+        Execution = new(executionId, operation, metrics);
+    }
+
+    public bool Success => Failure is null;
+
+    public T? GetValue<T>() =>
+        SpellkitHostValueConverter.Convert<T>(value, "Execution result");
+
+    public bool TryGetValue<T>(out T? value) =>
+        SpellkitHostValueConverter.TryConvert(this.value, out value);
+
+    public IReadOnlyList<SpellkitDiagnostic> Diagnostics { get; }
+
+    public SpellkitFailure? Failure { get; }
+
+    public IReadOnlyList<SpellkitFailure> Failures { get; }
+
+    public Guid ExecutionId { get; }
+
+    public SpellkitExecutionMetrics Metrics { get; }
+
+    public SpellkitExecution Execution { get; }
+}
 
 public sealed class SpellkitExecutionLimits
 {

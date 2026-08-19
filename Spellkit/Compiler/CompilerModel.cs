@@ -158,6 +158,7 @@ internal sealed class CompilerContext
         IsTailPosition = old.IsTailPosition;
         SelectName = old.SelectName;
         SelectStates = old.SelectStates;
+        SelectIsStateLess = old.SelectIsStateLess;
     }
 
     public Stack<int> Errors { get; }
@@ -185,6 +186,8 @@ internal sealed class CompilerContext
     public string? SelectName { get; set; }
 
     public IReadOnlySet<string>? SelectStates { get; set; }
+
+    public bool SelectIsStateLess { get; set; }
 
     public bool HasFunctionExit => !FunctionExit.IsEmpty();
 
@@ -236,12 +239,14 @@ internal sealed class CompilerContext
 
     public CompilerContext WithSelectStates(
         string name,
-        IReadOnlySet<string> states)
+        IReadOnlySet<string> states,
+        bool isStateLess)
     {
         var ctx = new CompilerContext(this)
         {
             SelectName = name,
-            SelectStates = states
+            SelectStates = states,
+            SelectIsStateLess = isStateLess
         };
         return ctx;
     }

@@ -7,22 +7,22 @@ namespace Spellkit.Hosting;
 
 public sealed record SpellkitChoiceParameter(string Name, string? TypeName);
 
-/// <summary>Display data evaluated by a select state or choice.</summary>
-public sealed class SpellkitSelectView
+/// <summary>Dictionary metadata declared for a select.</summary>
+public sealed class SpellkitSelectDescription
 {
-    private readonly SpellkitObject value;
+    private readonly SpellkitDictionary value;
 
-    internal SpellkitSelectView(SpellkitObject value) => this.value = value;
+    internal SpellkitSelectDescription(SpellkitDictionary value) => this.value = value;
 
-    /// <summary>Converts the display data to a host type.</summary>
-    public T? GetValue<T>() => SpellkitHostValueConverter.Convert<T>(value, "Select view");
+    /// <summary>Converts the description dictionary to a host type.</summary>
+    public T? GetValue<T>() => SpellkitHostValueConverter.Convert<T>(value, "Select description");
 
     /// <summary>Attempts to convert the display data to a host type.</summary>
     public bool TryGetValue<T>(out T? result) =>
         SpellkitHostValueConverter.TryConvert(value, out result);
 }
 
-internal sealed record SpellkitSelectState(string Id, SpellkitSelectView? View);
+internal sealed record SpellkitSelectState(string Id);
 
 /// <summary>Immutable data published internally for the current select screen.</summary>
 internal sealed class SpellkitSelectSnapshot
@@ -31,12 +31,14 @@ internal sealed class SpellkitSelectSnapshot
         string name,
         long revision,
         SpellkitSelectState state,
+        SpellkitSelectDescription? description,
         IReadOnlyList<SpellkitChoice> choices,
         bool isCompleted)
     {
         Name = name;
         Revision = revision;
         State = state;
+        Description = description;
         Choices = choices;
         IsCompleted = isCompleted;
     }
@@ -48,6 +50,8 @@ internal sealed class SpellkitSelectSnapshot
 
     public SpellkitSelectState State { get; }
 
+    public SpellkitSelectDescription? Description { get; }
+
     public IReadOnlyList<SpellkitChoice> Choices { get; }
 
     public bool IsCompleted { get; }
@@ -58,13 +62,11 @@ public sealed record SpellkitChoice
     public SpellkitChoice(
         string id,
         int parameterCount,
-        string? label = null,
-        SpellkitSelectView? view = null)
+        string? label = null)
     {
         Id = id;
         ParameterCount = parameterCount;
         Label = label ?? id;
-        View = view;
         Parameters = Array.Empty<SpellkitChoiceParameter>();
         Revision = 0;
     }
@@ -73,22 +75,18 @@ public sealed record SpellkitChoice
         string id,
         IReadOnlyList<SpellkitChoiceParameter> parameters,
         string? label = null,
-        SpellkitSelectView? view = null,
         long revision = 0)
     {
         Id = id;
         Parameters = parameters.ToArray();
         ParameterCount = Parameters.Count;
         Label = label ?? id;
-        View = view;
         Revision = revision;
     }
 
     public string Id { get; }
 
     public string Label { get; }
-
-    public SpellkitSelectView? View { get; }
 
     public int ParameterCount { get; }
 

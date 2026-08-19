@@ -14,10 +14,12 @@ internal sealed partial class SpellkitSelectSession : IDisposable
     private readonly SelectInstance selectInstance;
     private readonly SpellkitSelectRevision revision;
     private SpellkitSelectSnapshot snapshot;
+    private SpellkitSelectDescription? description;
     private IReadOnlyList<ResolvedSelectChoice> availableChoices = Array.Empty<ResolvedSelectChoice>();
     private SpellkitSelectSession? nested;
+    private readonly Dictionary<SelectChoiceSpreadDefinition, SelectInstance> expandedSelects = new();
     private SpellkitMachine.VmContinuation? actionContinuation;
-    private bool otherwiseRunning;
+    private bool actionChangedControl;
     private bool disposed;
 
     internal SpellkitSelectSession(
@@ -33,11 +35,11 @@ internal sealed partial class SpellkitSelectSession : IDisposable
 
     internal async Task InitializeAsync()
     {
-        if (!selectInstance.IsCompleted
-            && selectInstance.Enter(selectInstance.State) is { } enter)
-        {
-            await RunLifecycleHookAsync(enter).ConfigureAwait(false);
-        }
+        description = await CreateDescriptionAsync(
+            selectInstance.Description(),
+            Array.Empty<SpellkitObject>()).ConfigureAwait(false);
+
+        await EnterCurrentStateAsync().ConfigureAwait(false);
 
         selectInstance.CompleteIfIdle();
         await PublishSnapshotAsync().ConfigureAwait(false);
@@ -51,7 +53,7 @@ internal sealed partial class SpellkitSelectSession : IDisposable
 
     internal string State => CurrentSnapshot.State.Id;
 
-    internal SpellkitSelectView? StateView => CurrentSnapshot.State.View;
+    internal SpellkitSelectDescription? Description => CurrentSnapshot.Description;
 
     internal IReadOnlyList<SpellkitChoice> Choices => CurrentSnapshot.Choices;
 
@@ -64,7 +66,8 @@ internal sealed partial class SpellkitSelectSession : IDisposable
     private SpellkitSelectSnapshot CreateInitialSnapshot() => new(
         selectInstance.Name,
         revision.Current,
-        new SpellkitSelectState(selectInstance.State.Name, null),
+        new SpellkitSelectState(selectInstance.State.Name),
+        description,
         Array.Empty<SpellkitChoice>(),
         selectInstance.IsCompleted);
 
@@ -74,18 +77,19 @@ internal sealed partial class SpellkitSelectSession : IDisposable
         snapshot = new(
             selectInstance.Name,
             revision.Current,
-            new SpellkitSelectState(selectInstance.State.Name, null),
+            new SpellkitSelectState(selectInstance.State.Name),
+            description,
             Array.Empty<SpellkitChoice>(),
             isCompleted: true);
     }
 
     private SpellkitSelectSnapshot CreateSnapshot(
-        SpellkitSelectView? stateView,
         IReadOnlyList<SpellkitChoice> choices) =>
         new(
             selectInstance.Name,
             revision.Current,
-            new SpellkitSelectState(selectInstance.State.Name, stateView),
+            new SpellkitSelectState(selectInstance.State.Name),
+            description,
             choices,
             selectInstance.IsCompleted);
 
@@ -130,6 +134,7 @@ internal sealed partial class SpellkitSelectSession : IDisposable
         {
             ThrowIfDisposed();
             nested?.Cancel();
+            expandedSelects.Clear();
             selectInstance.Cancel();
             revision.Advance();
             PublishCompletedSnapshot();
@@ -152,6 +157,7 @@ internal sealed partial class SpellkitSelectSession : IDisposable
 
             nested?.Dispose();
             nested = null;
+            expandedSelects.Clear();
             actionContinuation = null;
             selectInstance.Cancel();
             disposed = true;
@@ -226,7 +232,7 @@ internal sealed partial class SpellkitSelectSession : IDisposable
                 choice.BoundArguments,
                 ConvertArguments(choice, argument, hasArgument));
             var result = await instance.InvokeSelectActionAsync(
-                choice.Action,
+                choice.Action ?? throw new InvalidOperationException("The select choice action is unavailable."),
                 arguments).ConfigureAwait(false);
             return await ApplyActionExecutionAsync(result).ConfigureAwait(false);
         }
@@ -267,25 +273,36 @@ internal sealed partial class SpellkitSelectSession : IDisposable
                     : nestedResult;
             }
 
-            var handler = selectInstance.State.Events.SingleOrDefault(candidate =>
-                string.Equals(candidate.Name, eventId, StringComparison.Ordinal));
-            if (handler is null)
+            var handlers = await GetEventHandlersAsync(eventId).ConfigureAwait(false);
+            if (handlers.Count == 0)
             {
                 throw new ArgumentException(
                     $"Event '{eventId}' is not handled in select state '{selectInstance.State.Name}'.",
                     nameof(eventId));
             }
 
-            var arguments = ConvertArguments(
-                handler.Name,
-                handler.ParameterCount,
-                "Event",
-                argument,
-                hasArgument);
-            var result = await instance.InvokeSelectActionAsync(
-                selectInstance.Event(handler),
-                arguments).ConfigureAwait(false);
-            return await ApplyActionExecutionAsync(result).ConfigureAwait(false);
+            SpellkitSelectResult? applied = null;
+            foreach (var handler in handlers)
+            {
+                var arguments = ConvertArguments(
+                    handler.Handler.Name,
+                    handler.Handler.ParameterCount,
+                    "Event",
+                    argument,
+                    hasArgument);
+                var result = await instance.InvokeSelectActionAsync(
+                    handler.Owner.Event(handler.Handler),
+                    arguments).ConfigureAwait(false);
+                applied = await ApplyActionExecutionAsync(result).ConfigureAwait(false);
+                if (selectInstance.IsCompleted
+                    || actionChangedControl
+                    || nested is not null)
+                {
+                    return applied;
+                }
+            }
+
+            return applied ?? WaitingResult();
         }
         finally
         {
@@ -311,6 +328,7 @@ internal sealed partial class SpellkitSelectSession : IDisposable
 
     private async Task<SpellkitSelectResult> ApplyActionExecutionAsync(ExecutionResult result)
     {
+        actionChangedControl = false;
         while (true)
         {
             if (result.Reason is TerminationReason.Suspended)
@@ -347,6 +365,7 @@ internal sealed partial class SpellkitSelectSession : IDisposable
             }
 
             var outcome = selectInstance.Apply(result.Value ?? SpellkitNil.Instance);
+            actionChangedControl = outcome.LeavingState is not null;
             await ApplyLifecycleHooksAsync(outcome).ConfigureAwait(false);
             selectInstance.CompleteIfIdle();
             revision.Advance();
@@ -359,17 +378,19 @@ internal sealed partial class SpellkitSelectSession : IDisposable
 
     private async Task ApplyLifecycleHooksAsync(SelectActionOutcome outcome)
     {
-        if (outcome.LeavingState is { } leaving
-            && selectInstance.Leave(leaving) is { } leave)
+        if (outcome.LeavingState is { } leaving)
         {
-            await RunLifecycleHookAsync(leave).ConfigureAwait(false);
+            await RunExpandedLifecycleHooksAsync(leaving, entering: false).ConfigureAwait(false);
+            if (selectInstance.Leave(leaving) is { } leave)
+            {
+                await RunLifecycleHookAsync(leave).ConfigureAwait(false);
+            }
         }
 
-        if (outcome.EnteringState is { } entering
-            && !selectInstance.IsCompleted
-            && selectInstance.Enter(entering) is { } enter)
+        if (outcome.EnteringState is not null)
         {
-            await RunLifecycleHookAsync(enter).ConfigureAwait(false);
+            expandedSelects.Clear();
+            await EnterCurrentStateAsync().ConfigureAwait(false);
         }
     }
 

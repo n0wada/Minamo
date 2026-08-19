@@ -72,12 +72,14 @@ public sealed partial class SpellkitConsoleTypeInfo : SpellkitForeignTypeInfo
     internal static char Read() => (char)Console.Read();
 
     [SpellkitStaticMethod]
-    internal static string ReadLine(ExecutionContext ctx)
+    internal static async ValueTask<string> ReadLine(ExecutionContext ctx)
     {
         var environment = ctx.GetContextVariable<SpellkitEnvironment>(SpellkitEnvironment.ContextKey);
         return environment is null
-            ? Console.ReadLine() ?? string.Empty
-            : environment.ReadLine(ctx.Control?.CancellationToken ?? default);
+            ? await Console.In.ReadLineAsync(
+                ctx.Control?.CancellationToken ?? default).ConfigureAwait(false) ?? string.Empty
+            : await environment.ReadLineAsync(
+                ctx.Control?.CancellationToken ?? default).ConfigureAwait(false);
     }
 
     [SpellkitStaticMethod]

@@ -608,8 +608,15 @@ internal sealed partial class LoweredEmitter
 
         var selectContext = ctx.WithSelectStates(
             node.Name ?? "<anonymous>",
-            stateNames);
+            stateNames,
+            node.States.Count == 1 && node.States[0].Name.Length == 0);
         var closureCount = 0;
+        var descriptionSlot = EmitSelectHook(
+            node.Description,
+            $"$select-description:{node.Name ?? "anonymous"}",
+            Array.Empty<LoweredParameter>(),
+            selectContext,
+            ref closureCount);
 
         for (var i = 0; i < node.States.Count; i++)
         {
@@ -619,12 +626,16 @@ internal sealed partial class LoweredEmitter
                 initialCount++;
             }
 
-            var stateViewSlot = EmitSelectHook(
-                state.View,
-                $"$select-view:{node.Name ?? "anonymous"}:{i}",
-                Array.Empty<LoweredParameter>(),
-                selectContext,
-                ref closureCount);
+            if (state.Name.Length == 0)
+            {
+                foreach (var spread in state.ChoiceSpreads)
+                {
+                    target.AddError(
+                        CompilerError.SelectChoiceSpreadRequiresNamedState,
+                        spread.Location);
+                }
+            }
+
             var enterSlot = EmitSelectHook(
                 state.Enter,
                 $"$select-enter:{node.Name ?? "anonymous"}:{i}",
@@ -637,9 +648,9 @@ internal sealed partial class LoweredEmitter
                 Array.Empty<LoweredParameter>(),
                 selectContext,
                 ref closureCount);
-            var otherwiseSlot = EmitSelectHook(
-                state.Otherwise,
-                $"$select-otherwise:{node.Name ?? "anonymous"}:{i}",
+            var emptySlot = EmitSelectHook(
+                state.Empty,
+                $"$select-empty:{node.Name ?? "anonymous"}:{i}",
                 Array.Empty<LoweredParameter>(),
                 selectContext,
                 ref closureCount);
@@ -681,13 +692,6 @@ internal sealed partial class LoweredEmitter
                     guardSlot = closureCount++;
                 }
 
-                var viewSlot = EmitSelectHook(
-                    choice.View,
-                    $"$select-choice-view:{node.Name ?? "anonymous"}:{i}:{j}",
-                    Array.Empty<LoweredParameter>(),
-                    selectContext,
-                    ref closureCount);
-
                 var function = new LoweredFunctionDeclaration(
                     choice.Location,
                     TypeName: null,
@@ -713,7 +717,6 @@ internal sealed partial class LoweredEmitter
                     choice.Label,
                     functionSlot,
                     guardSlot,
-                    viewSlot,
                     SelectParameters(choice.Parameters)));
             }
 
@@ -753,12 +756,6 @@ internal sealed partial class LoweredEmitter
                         parameters,
                         selectContext,
                         ref closureCount);
-                    var viewSlot = EmitSelectHook(
-                        choice.View,
-                        $"$select-dynamic-view:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
-                        parameters,
-                        selectContext,
-                        ref closureCount);
                     var action = new LoweredFunctionDeclaration(
                         choice.Location,
                         TypeName: null,
@@ -782,11 +779,24 @@ internal sealed partial class LoweredEmitter
                         idSlot,
                         labelSlot,
                         guardSlot,
-                        viewSlot,
                         closureCount++));
                 }
 
                 dynamicChoices.Add(new(sourceSlot, templates));
+            }
+
+            var choiceSpreads = new List<SelectChoiceSpreadDefinition>(state.ChoiceSpreads.Count);
+            for (var j = 0; j < state.ChoiceSpreads.Count; j++)
+            {
+                var spread = state.ChoiceSpreads[j];
+                var sourceSlot = EmitSelectHook(
+                    spread.Target,
+                    $"$select-spread:{node.Name ?? "anonymous"}:{i}:{j}",
+                    Array.Empty<LoweredParameter>(),
+                    selectContext,
+                    ref closureCount)
+                    ?? throw new InvalidOperationException("A select choice spread source is unavailable.");
+                choiceSpreads.Add(new(sourceSlot));
             }
 
             var events = new List<SelectEventDefinition>(state.Events.Count);
@@ -827,12 +837,12 @@ internal sealed partial class LoweredEmitter
             states.Add(new(
                 state.Name,
                 state.IsInitial,
-                stateViewSlot,
                 enterSlot,
                 leaveSlot,
-                otherwiseSlot,
+                emptySlot,
                 choices,
                 dynamicChoices,
+                choiceSpreads,
                 events));
         }
 
@@ -845,7 +855,7 @@ internal sealed partial class LoweredEmitter
             target.AddError(CompilerError.SelectRequiresOneInitialState, node.Location);
         }
 
-        cw.CreateSelectFactory(new SpellkitSelectDefinitionValue(new SelectDefinition(node.Name, states), closureCount), closureCount);
+        cw.CreateSelectFactory(new SpellkitSelectDefinitionValue(new SelectDefinition(node.Name, descriptionSlot, states), closureCount), closureCount);
         if (node.Name is not null && !node.IsInstanceFactory)
         {
             if (keepResult)

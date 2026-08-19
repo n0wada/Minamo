@@ -21,8 +21,8 @@ public sealed class SpellkitSelect : IDisposable
     /// <summary>Gets the name of the current state.</summary>
     public string State => session.State;
 
-    /// <summary>Gets the display data published for the current state.</summary>
-    public SpellkitSelectView? StateView => session.StateView;
+    /// <summary>Gets the dictionary metadata declared for this select.</summary>
+    public SpellkitSelectDescription? Description => session.Description;
 
     /// <summary>Gets the revision of the currently published select screen.</summary>
     public long Revision => session.Revision;

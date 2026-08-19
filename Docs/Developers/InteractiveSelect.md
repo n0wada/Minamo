@@ -10,13 +10,12 @@ see [Advanced interactive selects](InteractiveSelectAdvanced.md).
 
 ## Quick start
 
-Declare a named select at module scope. It has one initial state and one or more visible choices.
+Declare a named select at module scope. For a single-screen interaction, choices can appear directly
+in the select body.
 
 ```kit
 select town {
-    initial state square {
-        choose "leave" => exit "goodbye"
-    }
+    choose "leave" => exit "goodbye"
 }
 ```
 
@@ -25,9 +24,7 @@ Execute the script, then open a new interaction and drive it with the currently 
 ```csharp
 var initialization = await instance.ExecuteAsync("""
     select town {
-        initial state square {
-            choose "leave" => exit "goodbye"
-        }
+        choose "leave" => exit "goodbye"
     }
     """);
 if (!initialization.Success)
@@ -48,8 +45,8 @@ while (!town.IsCompleted)
 
 | Member | Purpose |
 | --- | --- |
-| `State` | Current script state name. |
-| `StateView` | Display data published for the current state. |
+| `State` | Current script state name, or an empty string for a state-less select. |
+| `Description` | Dictionary metadata declared for the select. |
 | `Choices` | The currently visible choices. |
 | `Revision` | Generation of the currently published UI state. |
 | `IsCompleted` | Whether the select has exited or was cancelled. |
@@ -59,9 +56,13 @@ while (!town.IsCompleted)
 | `Cancel()` / `Dispose()` | Ends the interaction without an exit result. |
 
 Each call to `OpenSelectAsync` creates a new interaction with its own current state and
-select-local values.
+select-local values. A state-less select remains active and republishes its choices after an action
+unless that action exits.
 
 ## States and choices
+
+A select that declares states is a state machine. Exactly one state is `initial`; `goto` moves
+between its named states.
 
 A state contains the choices available at that point. `choose` IDs are the stable values sent by
 the host. `label` is display text; when omitted, it defaults to the ID.
@@ -158,4 +159,4 @@ select, or select actions perform asynchronous work.
 
 For the complete grammar, see the [grammar reference](../Reference/Grammar.md). The advanced guide
 also covers select-local values, state parameters, lifecycle hooks, fallback actions, dynamic
-choices, display views, script-initiated selects, and nested selects.
+choices, state display views, script-initiated selects, and nested selects.

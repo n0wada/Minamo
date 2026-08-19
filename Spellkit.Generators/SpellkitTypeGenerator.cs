@@ -610,6 +610,13 @@ public sealed class SpellkitTypeGenerator : IIncrementalGenerator
 
     private bool EmitReturnType(SourceProductionContext ctx, CodeWriter builder, ITypeSymbol t, IMethodSymbol m)
     {
+        if (IsAsyncReturnType(m.ReturnType))
+        {
+            builder.AppendLine(
+                $"return global::Spellkit.Hosting.SpellkitCommandConvert.FromAwaitable({t.Name}.{m.Name}({m.Parameters.ToString("{0}", p => p.Name)}));");
+            return true;
+        }
+
         if (m.ReturnType.ToString() != "void")
         {
             var returnTypeName = m.ReturnType.GetSafeName();
@@ -662,6 +669,20 @@ public sealed class SpellkitTypeGenerator : IIncrementalGenerator
             builder.AppendLine($"return {Types.SpellkitNil}.Instance;");
             return true;
         }
+    }
+
+    private static bool IsAsyncReturnType(ITypeSymbol type)
+    {
+        if (type is not INamedTypeSymbol namedType)
+        {
+            return false;
+        }
+
+        var definition = namedType.ConstructedFrom.ToDisplayString();
+        return definition is "System.Threading.Tasks.Task"
+            or "System.Threading.Tasks.Task<TResult>"
+            or "System.Threading.Tasks.ValueTask"
+            or "System.Threading.Tasks.ValueTask<TResult>";
     }
 
     private void ConvertToSpellkitObject(CodeWriter builder, string targetType, string oldVar, string newVar, bool nullable = false)

@@ -9,20 +9,48 @@ namespace Spellkit.UnitTesting.Hosting;
 public sealed class InstanceIoTests
 {
     [Fact]
-    public void RoutesInputAndOutputThroughTheInstanceEnvironment()
+    public async Task RoutesInputAndOutputThroughTheInstanceEnvironment()
     {
         var output = new StringBuilder();
         using var instance = new SpellkitHost()
             .AddStandardLibrary()
             .CreateInstance(
             new SpellkitEnvironment()
-                .UseInput(_ => "instance input")
+                .UseInputAsync(_ => ValueTask.FromResult<string?>("instance input"))
                 .UseOutput(value => output.Append(value)));
 
-        var result = instance.Execute("import * from readline\nprint(readLine(), terminator: nil)");
+        var result = await instance.ExecuteAsync("import * from readline\nprint(readLine(), terminator: nil)");
 
         Assert.True(result.Success, result.Failure?.Message);
         Assert.Equal("instance input", output.ToString());
+    }
+
+    [Fact]
+    public async Task ReadLineAwaitsTheConfiguredAsyncInput()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var output = new StringBuilder();
+        using var instance = new SpellkitHost()
+            .AddStandardLibrary()
+            .CreateInstance(
+                new SpellkitEnvironment()
+                    .UseInputAsync(async _ =>
+                    {
+                        entered.SetResult();
+                        return await completion.Task.ConfigureAwait(false);
+                    })
+                    .UseOutput(value => output.Append(value)));
+
+        var execution = instance.ExecuteAsync("import * from readline\nprint(readLine(), terminator: nil)");
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(execution.IsCompleted);
+
+        completion.SetResult("async input");
+        var result = await execution;
+
+        Assert.True(result.Success, result.Failure?.Message);
+        Assert.Equal("async input", output.ToString());
     }
 
     [Fact]
@@ -62,10 +90,10 @@ public sealed class InstanceIoTests
         StringBuilder output,
         Barrier rendezvous) =>
         new SpellkitEnvironment()
-            .UseInput(_ =>
+            .UseInputAsync(_ =>
             {
                 Assert.True(rendezvous.SignalAndWait(TimeSpan.FromSeconds(5)));
-                return input;
+                return ValueTask.FromResult<string?>(input);
             })
             .UseOutput(value => output.Append(value));
 }

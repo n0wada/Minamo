@@ -85,6 +85,8 @@ public sealed class ArrayLiteralSyntax : SyntaxNode, INodeContainer
 
     public List<SyntaxNode> Elements { get; } = new();
 
+    internal bool IsDictionaryLiteral { get; set; }
+
     public int NodeCount => 
         Elements.Count == 1 && Elements[0].NodeType == NodeType.Range ? -1 : Elements.Count;
 

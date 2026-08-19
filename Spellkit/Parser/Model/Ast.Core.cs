@@ -104,6 +104,7 @@ public enum NodeType
     ,SelectEvent
     ,SelectDynamicChoices
     ,SelectDynamicChoice
+    ,SelectChoiceSpread
 }
 
 public interface INamedNode

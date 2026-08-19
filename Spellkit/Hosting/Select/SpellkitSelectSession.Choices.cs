@@ -1,3 +1,4 @@
+using Spellkit.Compiler;
 using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System.Collections.Generic;
@@ -13,13 +14,17 @@ internal sealed partial class SpellkitSelectSession
         string Id,
         string Label,
         IReadOnlyList<SpellkitChoiceParameter> Parameters,
-        SpellkitFunction Action,
+        SpellkitFunction? Action,
         SpellkitFunction? Guard,
-        SpellkitFunction? View,
-        SpellkitObject[] BoundArguments)
+        SpellkitObject[] BoundArguments,
+        SelectInstance Owner)
     {
         internal int ParameterCount => Parameters.Count;
     }
+
+    private sealed record ResolvedSelectEvent(
+        SelectInstance Owner,
+        SelectEventDefinition Handler);
 
     private async Task PublishSnapshotAsync()
     {
@@ -35,27 +40,24 @@ internal sealed partial class SpellkitSelectSession
             return;
         }
 
-        var choices = await GetAvailableChoicesAsync().ConfigureAwait(false);
+        if (await RunExpandedEmptyHandlerAsync().ConfigureAwait(false))
+        {
+            return;
+        }
+
+        var choices = await GetAvailableChoicesAsync(selectInstance).ConfigureAwait(false);
         if (choices.Count == 0
-            && selectInstance.ShouldRunOtherwise
-            && !otherwiseRunning)
+            && selectInstance.ShouldRunEmpty
+            && !HasExpandedEvents())
         {
             availableChoices = Array.Empty<ResolvedSelectChoice>();
-            selectInstance.MarkOtherwiseTriggered();
-            otherwiseRunning = true;
-            try
-            {
-                var otherwise = selectInstance.Otherwise()
-                    ?? throw new InvalidOperationException("The select otherwise handler is unavailable.");
-                var result = await instance.InvokeSelectActionAsync(
-                    otherwise,
-                    Array.Empty<SpellkitObject>()).ConfigureAwait(false);
-                await ApplyActionExecutionAsync(result).ConfigureAwait(false);
-            }
-            finally
-            {
-                otherwiseRunning = false;
-            }
+            selectInstance.MarkEmptyTriggered();
+            var empty = selectInstance.Empty()
+                ?? throw new InvalidOperationException("The select empty handler is unavailable.");
+            var result = await instance.InvokeSelectActionAsync(
+                empty,
+                Array.Empty<SpellkitObject>()).ConfigureAwait(false);
+            await ApplyActionExecutionAsync(result).ConfigureAwait(false);
 
             return;
         }
@@ -68,77 +70,28 @@ internal sealed partial class SpellkitSelectSession
                 choice.Id,
                 choice.Parameters,
                 choice.Label,
-                await CreateViewAsync(choice.View, choice.BoundArguments).ConfigureAwait(false),
                 revision.Current);
         }
 
-        var state = selectInstance.State;
-        var stateView = await CreateViewAsync(
-            selectInstance.View(state),
-            Array.Empty<SpellkitObject>()).ConfigureAwait(false);
         var publishedChoices = Array.AsReadOnly(visibleChoices);
-        var publishedSnapshot = CreateSnapshot(stateView, publishedChoices);
+        var publishedSnapshot = CreateSnapshot(publishedChoices);
 
         availableChoices = choices;
         snapshot = publishedSnapshot;
     }
 
-    private async Task<IReadOnlyList<ResolvedSelectChoice>> GetAvailableChoicesAsync()
+    private async Task<IReadOnlyList<ResolvedSelectChoice>> GetAvailableChoicesAsync(
+        SelectInstance owner)
     {
         var candidates = new List<ResolvedSelectChoice>();
-        foreach (var choice in selectInstance.State.Choices)
-        {
-            candidates.Add(new(
-                choice.Name,
-                choice.Label,
-                choice.Parameters
-                    .Select(parameter => new SpellkitChoiceParameter(
-                        parameter.Name,
-                        parameter.TypeName))
-                    .ToArray(),
-                selectInstance.Choice(choice),
-                selectInstance.Guard(choice),
-                selectInstance.View(choice),
-                Array.Empty<SpellkitObject>()));
-        }
+        await AddAvailableChoicesAsync(owner, candidates).ConfigureAwait(false);
 
-        foreach (var group in selectInstance.State.DynamicChoices)
+        if (ReferenceEquals(owner, selectInstance))
         {
-            var source = await instance.EvaluateSelectDynamicChoiceAsync(
-                selectInstance.DynamicChoiceSource(group),
-                Array.Empty<SpellkitObject>()).ConfigureAwait(false);
-            if (source is not IEnumerable<SpellkitObject> items)
+            foreach (var spread in selectInstance.State.ChoiceSpreads)
             {
-                throw new InvalidOperationException(
-                    $"The dynamic choices in select state '{selectInstance.State.Name}' must be a collection.");
-            }
-
-            foreach (var item in items)
-            {
-                SpellkitObject[] arguments = [item];
-                foreach (var template in group.Choices)
-                {
-                    var id = RequireDynamicChoiceText(
-                        await instance.EvaluateSelectDynamicChoiceAsync(
-                            selectInstance.DynamicChoiceId(template),
-                            arguments).ConfigureAwait(false),
-                        "ID");
-                    var label = selectInstance.DynamicChoiceLabel(template) is { } labelFunction
-                        ? EvaluateDynamicChoiceText(
-                            await instance.EvaluateSelectDynamicChoiceAsync(
-                                labelFunction,
-                                arguments).ConfigureAwait(false),
-                            "label") ?? id
-                        : id;
-                    candidates.Add(new(
-                        id,
-                        label,
-                        Array.Empty<SpellkitChoiceParameter>(),
-                        selectInstance.DynamicChoiceAction(template),
-                        selectInstance.DynamicChoiceGuard(template),
-                        selectInstance.DynamicChoiceView(template),
-                        arguments));
-                }
+                var child = await GetExpandedSelectAsync(spread).ConfigureAwait(false);
+                await AddAvailableChoicesAsync(child, candidates).ConfigureAwait(false);
             }
         }
 
@@ -167,6 +120,187 @@ internal sealed partial class SpellkitSelectSession
         return available;
     }
 
+    private async Task AddAvailableChoicesAsync(
+        SelectInstance owner,
+        List<ResolvedSelectChoice> candidates)
+    {
+        foreach (var choice in owner.State.Choices)
+        {
+            candidates.Add(new(
+                choice.Name,
+                choice.Label,
+                choice.Parameters
+                    .Select(parameter => new SpellkitChoiceParameter(
+                        parameter.Name,
+                        parameter.TypeName))
+                    .ToArray(),
+                owner.Choice(choice),
+                owner.Guard(choice),
+                Array.Empty<SpellkitObject>(),
+                owner));
+        }
+
+        foreach (var group in owner.State.DynamicChoices)
+        {
+            var source = await instance.EvaluateSelectDynamicChoiceAsync(
+                owner.DynamicChoiceSource(group),
+                Array.Empty<SpellkitObject>()).ConfigureAwait(false);
+            if (source is not IEnumerable<SpellkitObject> items)
+            {
+                throw new InvalidOperationException(
+                    $"The dynamic choices in select state '{owner.State.Name}' must be a collection.");
+            }
+
+            foreach (var item in items)
+            {
+                SpellkitObject[] arguments = [item];
+                foreach (var template in group.Choices)
+                {
+                    var id = RequireDynamicChoiceText(
+                        await instance.EvaluateSelectDynamicChoiceAsync(
+                            owner.DynamicChoiceId(template),
+                            arguments).ConfigureAwait(false),
+                        "ID");
+                    var label = owner.DynamicChoiceLabel(template) is { } labelFunction
+                        ? EvaluateDynamicChoiceText(
+                            await instance.EvaluateSelectDynamicChoiceAsync(
+                                labelFunction,
+                                arguments).ConfigureAwait(false),
+                            "label") ?? id
+                        : id;
+                    candidates.Add(new(
+                        id,
+                        label,
+                        Array.Empty<SpellkitChoiceParameter>(),
+                        owner.DynamicChoiceAction(template),
+                        owner.DynamicChoiceGuard(template),
+                        arguments,
+                        owner));
+                }
+            }
+        }
+    }
+
+    private async Task<SelectInstance> GetExpandedSelectAsync(
+        SelectChoiceSpreadDefinition spread)
+    {
+        if (expandedSelects.TryGetValue(spread, out var expanded))
+        {
+            return expanded;
+        }
+
+        var value = await instance.EvaluateSelectChoiceSpreadAsync(
+            selectInstance.ChoiceSpreadSource(spread),
+            Array.Empty<SpellkitObject>()).ConfigureAwait(false);
+        if (value is not SpellkitSelectFactory factory)
+        {
+            throw new InvalidOperationException("A select choice spread must evaluate to a select.");
+        }
+
+        var child = instance.CreateSelectInstance(factory);
+        if (child.State.Name.Length != 0)
+        {
+            throw new InvalidOperationException("A select choice spread must use a state-less select.");
+        }
+        expanded = child;
+        expandedSelects.Add(spread, expanded);
+        return expanded;
+    }
+
+    private async Task EnterCurrentStateAsync()
+    {
+        if (selectInstance.IsCompleted)
+        {
+            return;
+        }
+
+        await EnsureExpandedSelectsAsync().ConfigureAwait(false);
+        await RunExpandedLifecycleHooksAsync(selectInstance.State, entering: true).ConfigureAwait(false);
+        if (selectInstance.Enter(selectInstance.State) is { } enter)
+        {
+            await RunLifecycleHookAsync(enter).ConfigureAwait(false);
+        }
+    }
+
+    private async Task EnsureExpandedSelectsAsync()
+    {
+        foreach (var spread in selectInstance.State.ChoiceSpreads)
+        {
+            _ = await GetExpandedSelectAsync(spread).ConfigureAwait(false);
+        }
+    }
+
+    private async Task RunExpandedLifecycleHooksAsync(
+        SelectStateDefinition state,
+        bool entering)
+    {
+        foreach (var spread in state.ChoiceSpreads)
+        {
+            if (!expandedSelects.TryGetValue(spread, out var child))
+            {
+                continue;
+            }
+
+            var hook = entering
+                ? child.Enter(child.State)
+                : child.Leave(child.State);
+            if (hook is not null)
+            {
+                await RunLifecycleHookAsync(hook).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task<bool> RunExpandedEmptyHandlerAsync()
+    {
+        foreach (var spread in selectInstance.State.ChoiceSpreads)
+        {
+            var child = await GetExpandedSelectAsync(spread).ConfigureAwait(false);
+            var choices = await GetAvailableChoicesAsync(child).ConfigureAwait(false);
+            if (choices.Count != 0 || !child.ShouldRunEmpty)
+            {
+                continue;
+            }
+
+            child.MarkEmptyTriggered();
+            var empty = child.Empty()
+                ?? throw new InvalidOperationException("The expanded select empty handler is unavailable.");
+            var result = await instance.InvokeSelectActionAsync(
+                empty,
+                Array.Empty<SpellkitObject>()).ConfigureAwait(false);
+            await ApplyActionExecutionAsync(result).ConfigureAwait(false);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool HasExpandedEvents() => expandedSelects.Values.Any(child =>
+        child.State.Events.Count != 0);
+
+    private async Task<IReadOnlyList<ResolvedSelectEvent>> GetEventHandlersAsync(string eventId)
+    {
+        await EnsureExpandedSelectsAsync().ConfigureAwait(false);
+        var handlers = new List<ResolvedSelectEvent>();
+        foreach (var spread in selectInstance.State.ChoiceSpreads)
+        {
+            var child = await GetExpandedSelectAsync(spread).ConfigureAwait(false);
+            foreach (var handler in child.State.Events.Where(candidate =>
+                string.Equals(candidate.Name, eventId, StringComparison.Ordinal)))
+            {
+                handlers.Add(new(child, handler));
+            }
+        }
+
+        foreach (var handler in selectInstance.State.Events.Where(candidate =>
+            string.Equals(candidate.Name, eventId, StringComparison.Ordinal)))
+        {
+            handlers.Add(new(selectInstance, handler));
+        }
+
+        return handlers;
+    }
+
     private static string RequireDynamicChoiceText(SpellkitObject value, string part)
     {
         var text = EvaluateDynamicChoiceText(value, part);
@@ -182,13 +316,22 @@ internal sealed partial class SpellkitSelectSession
     private static string? EvaluateDynamicChoiceText(SpellkitObject value, string part) =>
         SpellkitHostValueConverter.Convert<string>(value, $"Dynamic select choice {part}");
 
-    private async Task<SpellkitSelectView?> CreateViewAsync(
-        SpellkitFunction? view,
+    private async Task<SpellkitSelectDescription?> CreateDescriptionAsync(
+        SpellkitFunction? description,
         SpellkitObject[] arguments) =>
-        view is null
+        description is null
             ? null
-            : new SpellkitSelectView(
-                await instance.EvaluateSelectViewAsync(view, arguments).ConfigureAwait(false));
+            : new SpellkitSelectDescription(
+                await EvaluateDescriptionAsync(description, arguments).ConfigureAwait(false));
+
+    private async Task<SpellkitDictionary> EvaluateDescriptionAsync(
+        SpellkitFunction description,
+        SpellkitObject[] arguments)
+    {
+        var value = await instance.EvaluateSelectDescriptionAsync(description, arguments).ConfigureAwait(false);
+        return value as SpellkitDictionary
+            ?? throw new InvalidOperationException("A select description must evaluate to a dictionary.");
+    }
 
     private static SpellkitObject[] ConvertArguments(
         ResolvedSelectChoice choice,

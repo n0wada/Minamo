@@ -53,6 +53,7 @@
     <message id="SelectDuplicateState">The select state '{0}' is already declared.</message>
     <message id="SelectDuplicateChoice">The choice '{0}' is already declared in state '{1}'.</message>
     <message id="SelectOnlyGlobalScope">Select declarations are permitted only at global (module) scope.</message>
+    <message id="SelectChoiceSpreadRequiresNamedState">A select choice spread must be declared inside a named state.</message>
     <message id="SelectStateNotFound">The select state '{0}' does not exist in select '{1}'.</message>
     <message id="SelectDuplicateEvent">The event '{0}' is already declared in state '{1}'.</message>
     <message id="SelectStateParameterCount">The select state '{0}' expects {1} transition argument(s), but {2} were provided.</message>

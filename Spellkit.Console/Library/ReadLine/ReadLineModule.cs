@@ -1,6 +1,7 @@
 using Spellkit.Hosting;
 using Spellkit.Library.ConsoleLibrary;
 using Spellkit.Runtime;
+using System.Threading.Tasks;
 
 namespace Spellkit.Library.ReadLineLibrary;
 
@@ -9,12 +10,14 @@ namespace Spellkit.Library.ReadLineLibrary;
 public static class ReadLineModule
 {
     [SpellkitCommand("readLine")]
-    internal static string ReadLine(SpellkitCommandContext host)
+    internal static async ValueTask<string> ReadLine(SpellkitCommandContext host)
     {
         var context = host.ExecutionContext;
         var environment = context.GetContextVariable<SpellkitEnvironment>(SpellkitEnvironment.ContextKey);
         return environment is null
-            ? System.Console.ReadLine() ?? string.Empty
-            : environment.ReadLine(context.Control?.CancellationToken ?? default);
+            ? await System.Console.In.ReadLineAsync(
+                context.Control?.CancellationToken ?? default).ConfigureAwait(false) ?? string.Empty
+            : await environment.ReadLineAsync(
+                context.Control?.CancellationToken ?? default).ConfigureAwait(false);
     }
 }

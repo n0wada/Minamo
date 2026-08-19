@@ -117,6 +117,7 @@ internal sealed record LoweredFunctionDeclaration(
 internal sealed record LoweredSelectDeclaration(
     Location Location,
     string? Name,
+    LoweredArray? Description,
     IReadOnlyList<LoweredBinding> Locals,
     IReadOnlyList<LoweredSelectState> States,
     bool IsInstanceFactory = false) : LoweredNode(Location);
@@ -131,10 +132,10 @@ internal sealed record LoweredSelectState(
     bool IsInitial,
     LoweredNode? Enter,
     LoweredNode? Leave,
-    LoweredNode? View,
-    LoweredNode? Otherwise,
+    LoweredNode? Empty,
     IReadOnlyList<LoweredSelectChoice> Choices,
     IReadOnlyList<LoweredSelectDynamicChoiceGroup> DynamicChoices,
+    IReadOnlyList<LoweredSelectChoiceSpread> ChoiceSpreads,
     IReadOnlyList<LoweredSelectEvent> Events);
 
 internal sealed record LoweredSelectChoice(
@@ -143,7 +144,6 @@ internal sealed record LoweredSelectChoice(
     IReadOnlyList<LoweredParameter> Parameters,
     string Label,
     LoweredNode? Guard,
-    LoweredNode? View,
     LoweredNode Body);
 
 internal sealed record LoweredSelectDynamicChoiceGroup(
@@ -157,8 +157,11 @@ internal sealed record LoweredSelectDynamicChoice(
     LoweredNode Id,
     LoweredNode? Label,
     LoweredNode? Guard,
-    LoweredNode? View,
     LoweredNode Body);
+
+internal sealed record LoweredSelectChoiceSpread(
+    Location Location,
+    LoweredNode Target);
 
 internal sealed record LoweredSelectEvent(
     Location Location,
@@ -325,7 +328,8 @@ internal sealed record LoweredTuple(
 
 internal sealed record LoweredArray(
     Location Location,
-    IReadOnlyList<LoweredNode> Elements) : LoweredNode(Location);
+    IReadOnlyList<LoweredNode> Elements,
+    bool IsDictionary) : LoweredNode(Location);
 
 internal sealed record LoweredComprehension(
     Location Location,

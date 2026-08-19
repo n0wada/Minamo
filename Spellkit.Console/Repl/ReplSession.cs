@@ -29,7 +29,7 @@ internal sealed class ReplSession : IDisposable
             nofn ? Environment.CurrentDirectory! : Path.GetDirectoryName(options.FileNames![0])!, options.Paths);
         host.UseFileLookup(lookup);
         var spellkitEnvironment = new SpellkitEnvironment()
-                .UseInput(_ => Console.ReadLine())
+                .UseInputAsync(cancellationToken => Console.In.ReadLineAsync(cancellationToken))
                 .UseOutput(Console.Write)
                 .UseSelectAsync(RunSelectSessionAsync);
         session = host.CreateInstance(spellkitEnvironment, options.UserArguments);
@@ -205,7 +205,7 @@ internal sealed class ReplSession : IDisposable
             for (var i = 0; i < choices.Count; i++)
             {
                 var renderedChoice = choices[i];
-                ConsoleOutput.Output($"{i + 1}. {renderedChoice.Label} [{renderedChoice.Id}]");
+                ConsoleOutput.Output($"{i + 1}. {renderedChoice.Label}");
             }
 
             ConsoleOutput.Prefix("select> ");

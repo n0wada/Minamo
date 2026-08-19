@@ -51,7 +51,7 @@ use when while with yield
 ```
 
 `const`, `struct`, `enum`, `trait`, `impl`, `guard`, `finally`, `select`, `initial`, `state`,
-`choose`, `on`, `goto`, `exit`, `label`, `enter`, `leave`, and `otherwise` are
+`choose`, `on`, `empty`, `desc`, `goto`, `exit`, `label`, `enter`, and `leave` are
 contextual keywords.
 
 ## Numeric literals
@@ -191,26 +191,42 @@ asynchronous hosts and nested interactions.
 
 ```text
 select-declaration
-    ::= "select" [ identifier ] "{" select-local* state-declaration+ "}"
+    ::= "select" [ identifier ] "{" [ select-description ] select-local*
+        ( state-declaration+ | select-body ) "}"
+
+select-description
+    ::= "desc" string-key-dictionary-literal
+
+string-key-dictionary-literal
+    ::= "[" [ string ":" expression { "," string ":" expression } ] "]"
 
 select-local
     ::= ( "let" | "mut" ) pattern "=" expression
 
 state-declaration
     ::= [ "initial" ] "state" identifier
-        "{" { state-hook | otherwise-declaration | choice-declaration | event-declaration } "}"
+        "{" { state-hook | empty-declaration | choice-declaration | event-declaration } "}"
+
+select-body
+    ::= { state-hook | empty-declaration | choice-declaration | event-declaration }
 
 state-hook
     ::= ( "enter" | "leave" ) "=>" block
 
-otherwise-declaration
-    ::= "otherwise" "=>" choice-body
+empty-declaration
+    ::= "on" "empty" "=>" choice-body
 
 choice-declaration
     ::= "choose" string [ parameters ]
         [ "label" string ]
         [ "when" expression ]
         "=>" choice-body
+     |  "choose" expression
+        [ "label" expression ]
+        "for" identifier "in" expression
+        [ "when" expression ]
+        "=>" choice-body
+     |  "choose" "..." expression
 
 event-declaration
     ::= "on" string [ parameters ]
@@ -237,21 +253,38 @@ select-invocation
     ::= "do" expression
 ```
 
-Named select declarations are permitted only at global (module) scope. Exactly one state is marked
-`initial`. Select locals are created for each select instance and must appear before the state
-declarations. Without `goto`, an action remains in its current state. `goto` exposes the target
-state directly, and a state without choices, events, or an `otherwise` handler completes
-immediately. `exit` completes the session. Choice and event names are unique within their
+Named select declarations are permitted only at global (module) scope. A select either declares
+one or more states, exactly one of which is marked `initial`, or it uses a state-less `select-body`.
+The two forms cannot be mixed. Select locals are created for each select instance and must appear
+before states or choices. Without `goto`, an action remains in its current state. A state-less
+select has one implicit state and republishes its choices after an action unless it exits. A
+state-less select may use `goto` only when it is expanded into a parent state; its target is then
+resolved against that parent at run time. Used directly, such a `goto` fails at run time. `goto`
+exposes the target state directly, and a state without choices,
+events, or an `on empty` handler completes immediately. `exit` completes the session. Choice and event names are unique within their
 respective channels in one state. Both receive either no argument, one value, or a tuple whose
 elements bind to their parameters. `choose` declarations are visible through `Choices`; `on`
 declarations are hidden and delivered through the host's `Send` API. `label` provides host-facing
 display text; `when` controls whether a choice is currently available.
-`otherwise` runs at most once after entering a state when no choice is available and the state has
+`on empty` runs at most once after entering a state when no choice is available and the state has
 no host events; its body may `goto` or `exit`. `enter` runs when a state is entered, including the
 initial state, and `leave` runs before a `goto` or `exit` leaves it. Lifecycle hooks are blocks and
-cannot themselves change state, exit, or suspend. `goto` targets must name a state declared by the
-same select. Select-local values are available to all states in an interaction. `do expression`
-invokes a factory and evaluates to its exit value.
+cannot themselves change state, exit, or suspend. In a named select, `goto` targets must name a
+state declared by that select. Select-local values are available to all states in an interaction. `do expression`
+invokes a factory and evaluates to its exit value. A `choose` declaration with a `for` clause
+generates one choice for each item in its source. Its ID, label, guard, and action receive
+the loop item; dynamic choices do not accept host-supplied parameters.
+A `choose ...` declaration directly expands a state-less child select into the current parent
+state. The child keeps its own select-local values. Its choices, `on empty`, lifecycle hooks, and
+host events participate in the parent interaction; child behavior runs before parent behavior.
+`exit` in the child exits the parent select, while `goto target` is resolved against the parent's
+states at run time. Child `desc` metadata remains metadata of the child factory and is not merged
+into the parent description. Choice spreads require an explicit named parent state and cannot
+appear in a state-less select. If child and parent declarations overlap (for example, host event
+names), their ordering is defined but avoiding conflicting effects is the script author's
+responsibility.
+`desc` is optional select-level dictionary metadata. It must be a dictionary literal whose keys are
+strings, and is evaluated once when an interaction instance opens.
 
 ```swift
 select player {

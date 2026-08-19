@@ -33,7 +33,7 @@ public sealed class SpellkitEnvironment
     internal const string ContextKey = "Spellkit.Hosting.SpellkitEnvironment";
 
     private readonly Dictionary<string, object?> bindings = new(StringComparer.OrdinalIgnoreCase);
-    private Func<CancellationToken, string?>? input;
+    private Func<CancellationToken, ValueTask<string?>>? input;
     private Action<string>? output;
     private Func<SpellkitSelect, ValueTask>? asyncSelectRunner;
 
@@ -54,7 +54,7 @@ public sealed class SpellkitEnvironment
     public SpellkitEnvironment Set(string name, object? value) =>
         Expose(name, value);
 
-    public SpellkitEnvironment UseInput(Func<CancellationToken, string?> readLine)
+    public SpellkitEnvironment UseInputAsync(Func<CancellationToken, ValueTask<string?>> readLine)
     {
         input = readLine ?? throw new ArgumentNullException(nameof(readLine));
         return this;
@@ -76,12 +76,15 @@ public sealed class SpellkitEnvironment
     public bool TryGet(string name, out object? value) =>
         bindings.TryGetValue(name, out value);
 
-    internal string ReadLine(CancellationToken cancellationToken)
+    internal async ValueTask<string> ReadLineAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var readLine = input ?? (_ => Console.ReadLine());
-        return readLine(cancellationToken) ?? string.Empty;
+        var readLine = input ?? ReadConsoleLineAsync;
+        return await readLine(cancellationToken).ConfigureAwait(false) ?? string.Empty;
     }
+
+    private static async ValueTask<string?> ReadConsoleLineAsync(CancellationToken cancellationToken) =>
+        await Console.In.ReadLineAsync(cancellationToken).ConfigureAwait(false);
 
     internal void Write(string value)
     {

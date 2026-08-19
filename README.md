@@ -65,7 +65,7 @@ Start an interactive select declared by the file:
 ```
 
 Inside the REPL, use `do "music.player"`. The console displays the currently available choices;
-enter their number or stable choice ID.
+enter their number.
 
 Use `--help` or `--version` for command-line information; enter `#help` in the REPL for
 interactive commands.

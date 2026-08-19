@@ -338,6 +338,33 @@ public sealed class GeneratorContractTests
         Assert.Contains("FromAwaitable", result.GeneratedSource, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ValueTaskTypeMethodsAreGenerated()
+    {
+        const string source = """
+            using Spellkit.Codegen;
+            using Spellkit.Runtime.Types;
+            using System.Threading.Tasks;
+
+            namespace GeneratorFixture;
+
+            [SpellkitType]
+            public sealed partial class AsyncTypeInfo : SpellkitForeignTypeInfo
+            {
+                public override string ReflectedTypeName => "Async";
+
+                [SpellkitStaticMethod]
+                public static ValueTask<int> Value() => ValueTask.FromResult(1);
+            }
+            """;
+
+        var result = Generate(source);
+
+        AssertNoErrors(result.Diagnostics);
+        AssertNoErrors(result.Compilation.GetDiagnostics());
+        Assert.Contains("FromAwaitable", result.GeneratedSource, StringComparison.Ordinal);
+    }
+
     private static GeneratorResult Generate(
         string source,
         string assemblyName = "Spellkit.GeneratorFixture")
@@ -355,7 +382,11 @@ public sealed class GeneratorContractTests
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            new[] { new SpellkitCommandGenerator().AsSourceGenerator() },
+            new ISourceGenerator[]
+            {
+                new SpellkitCommandGenerator().AsSourceGenerator(),
+                new SpellkitTypeGenerator().AsSourceGenerator()
+            },
             parseOptions: parseOptions);
 
         driver = driver.RunGeneratorsAndUpdateCompilation(

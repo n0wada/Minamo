@@ -6,7 +6,7 @@ loop.
 
 ## Published UI state and revisions
 
-`OpenSelectAsync` returns one live `SpellkitSelect` object. Its `State`, `StateView`, `Choices`,
+`OpenSelectAsync` returns one live `SpellkitSelect` object. Its `State`, `Description`, `Choices`,
 and `IsCompleted` properties are the most recently published UI state. Reading them does not
 execute Spellkit code; opening the select, completing an action, refreshing, and invalidating
 publish a new state asynchronously. A failed publication leaves the preceding published state
@@ -39,7 +39,7 @@ published state.
 
 ### Refreshing host-owned data
 
-`RefreshAsync` republishes choices and views without changing the revision. Use it when older UI
+`RefreshAsync` republishes choices without changing the revision. Use it when older UI
 input remains valid. `InvalidateAsync` advances the revision, then republishes, making input from
 older renders stale.
 
@@ -55,21 +55,21 @@ These operations serialize with select actions without blocking the caller. Upda
 and invalidate it through the host's own dispatcher. Do not await an invalidation from a callback
 already executing one of the session's actions; queue that notification instead.
 
-### Display views
+### Select descriptions
 
-`view` puts rendering data next to the state or choice it describes. Views are evaluated when
-Spellkit publishes the current screen and must be side-effect free.
+`desc` puts host-facing dictionary metadata next to a select. It appears first in the select body,
+uses no `=>`, and must be a dictionary literal with string keys. It is evaluated once when the
+interaction opens.
 
 ```kit
 select courierQuest {
+    desc ["template": "quest", "title": "Courier needed"]
+
     mut questId = ""
 
     initial state offer {
-        view => ["template": "quest.offer", "title": "Courier needed"]
-
         choose "accept"
             label "Accept"
-            view => ["style": "primary", "icon": "check"]
             => {
                 questId = "courier"
                 goto active
@@ -77,14 +77,13 @@ select courierQuest {
     }
 
     state active {
-        view => ["template": "quest.active", "questId": questId]
         choose "leave" => exit
     }
 }
 ```
 
-`SpellkitSelectView.GetValue<T>()` and `TryGetValue<T>()` use standard host conversion. For
-example, a dictionary view can be read as `Dictionary<string, object?>`.
+`SpellkitSelectDescription.GetValue<T>()` and `TryGetValue<T>()` use standard host conversion. For
+example, a dictionary description can be read as `Dictionary<string, object?>`.
 
 ## Stateful select declarations
 
@@ -145,15 +144,15 @@ select counter {
 `exit` leaves a state. Both are side-effect hooks: they cannot themselves `goto`, `exit`, or start
 a nested select.
 
-### Fallback actions
+### Empty-choice actions
 
-`otherwise` runs once after entering a state when no choice is available and the state has no host
+`on empty` runs once after entering a state when no choice is available and the state has no host
 event. It can use `goto` or `exit` to recover from an empty state.
 
 ```kit
 initial state gate {
     choose "continue" when account.ready => goto next
-    otherwise => exit "Account is not ready"
+    on empty => exit "Account is not ready"
 }
 ```
 
@@ -162,21 +161,19 @@ stays active with an empty choice list.
 
 ### Dynamic choices
 
-Use a state-local `for` group to generate choices from a Spellkit collection.
+Put `for` on a `choose` declaration to generate one choice for each item in a Spellkit collection.
 
 ```kit
 initial state browse {
     choose "leave" => exit
 
-    for item in shop.Stock {
-        choose item.id
-            label item.name
-            when item.available
-            view => ["price": item.price]
-            => {
-            cart.Add(item)
-            goto browse
-        }
+    choose item.id
+        label item.name
+        for item in shop.Stock
+        when item.available
+        => {
+        cart.Add(item)
+        goto browse
     }
 }
 ```
@@ -212,6 +209,33 @@ choose "shop" => {
 `do "dotted.name"` resolves a Script alias registered with `alias(factory, "dotted.name")`.
 Disposing or cancelling an outer session also cancels its active nested select.
 
+## Expanded child choices
+
+Use `choose ...child` inside a named parent state to add the choices of a state-less child select.
+The child keeps its own select-local values, but is directly composed into the parent interaction.
+State-less parent selects cannot use choice spreads.
+
+```kit
+select filters {
+    mut showArchived = false
+
+    choose "toggle archived" => { showArchived = not showArchived }
+}
+
+select browser {
+    initial state browsing {
+        choose "close" => exit
+        choose ...filters
+    }
+}
+```
+
+The child must be state-less. Its `on empty`, `enter` / `leave`, and host-event handlers run before
+the corresponding parent handlers. Child `exit` exits the parent select; child `goto` targets a
+state of the parent and is resolved at run time. A child `desc` is valid but does not change the
+parent's `Description`. If the child and parent both handle the same event or both define related
+hooks, that composition is intentional and its effects are the script author's responsibility.
+
 ## Asynchronous and event-driven hosts
 
 Use `SelectAsync`, `SendAsync`, `SelectAtRevisionAsync`, and `SendAtRevisionAsync` to drive a
@@ -223,7 +247,7 @@ var result = await select.SelectAsync("confirm");
 ```
 
 When a script itself executes `do`, start it with `StartAsync`. The resulting
-`SpellkitRunSession` exposes the active `State`, `StateView`, `Choices`, and nullable `Revision`.
+`SpellkitRunSession` exposes the active `State`, `Description`, `Choices`, and nullable `Revision`.
 It also supports the same choice, revision, refresh, and invalidation operations while the VM is
 waiting for a select.
 

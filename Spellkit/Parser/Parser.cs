@@ -828,7 +828,10 @@ internal sealed partial class HandwrittenParser
             return comprehension;
         }
 
-        var array = new ArrayLiteralSyntax(open.Location);
+        var array = new ArrayLiteralSyntax(open.Location)
+        {
+            IsDictionaryLiteral = dictionaryKey is not null || first is LabelLiteralSyntax
+        };
         if (dictionaryKey is not null && first is not null)
         {
             if (dictionaryKey is NameSyntax name)

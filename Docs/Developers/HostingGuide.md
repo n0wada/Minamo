@@ -277,18 +277,19 @@ Configure text I/O on the `SpellkitEnvironment` when an instance needs isolated 
 ```csharp
 var output = new StringBuilder();
 var environment = new SpellkitEnvironment(game)
-    .UseInput(cancellationToken => commandQueue.Read(cancellationToken))
+    .UseInputAsync(async cancellationToken => await commandQueue.ReadAsync(cancellationToken))
     .UseOutput(text => output.Append(text));
 
 using var instance = host.CreateInstance(environment);
 var result = await instance.ExecuteAsync("print(\"ready\", terminator: nil)");
 ```
 
-The input delegate receives the current operation's cancellation token. Returning `null` represents
-end of input and produces an empty Spellkit string. The optional `readline` library exposes that input
-as `readLine` after `import * from readline`; the output delegate receives the text chunks that
-`print` writes: values, separators, and terminators. Without delegates, the `readline` library and
-`print` retain their process Console behavior.
+The input delegate receives the current operation's cancellation token and returns a
+`ValueTask<string?>`. Returning `null` represents end of input and produces an empty Spellkit
+string. The optional `readline` library exposes that input as `readLine` after `import * from
+readline`; it suspends while input is pending without blocking the caller of `ExecuteAsync`. The
+output delegate receives the text chunks that `print` writes: values, separators, and terminators.
+Without delegates, the `readline` library and `print` retain their process Console behavior.
 
 Use `ExecuteFileAsync` when the host has explicitly selected an entry script:
 

@@ -675,7 +675,7 @@ internal sealed partial class LoweredEmitter
             target.AddLinePragma(node.Location);
             cw.InvokePreparedCall(0);
         }
-        else if (node.Elements.Count > 0 && node.Elements[0] is LoweredLabel)
+        else if (node.IsDictionary || (node.Elements.Count > 0 && node.Elements[0] is LoweredLabel))
         {
             EmitDictionary(node.Elements, ctx);
         }

@@ -212,6 +212,8 @@ public enum CompilerError
 
     SelectDuplicateEvent = 292,
 
+    SelectChoiceSpreadRequiresNamedState = 293,
+
     IfExpressionRequiresElse = 279,
 
     TraitMixinNotAllowed = 280,

@@ -33,6 +33,257 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
+    public async Task StatelessSelectRepublishesChoicesUntilExit()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = instance.Execute("""
+            select flow {
+                mut count = 0
+
+                choose "add" when count == 0 => {
+                    count += 1
+                }
+
+                choose "finish" when count == 1 => exit count
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        using var select = instance.OpenSelectSession("flow");
+        Assert.Equal(string.Empty, select.Snapshot.State.Id);
+        Assert.Equal("add", Assert.Single(select.Snapshot.Choices).Id);
+
+        var afterAdd = await select.SelectAsync("add");
+        Assert.False(afterAdd.IsCompleted);
+        Assert.Equal("finish", Assert.Single(afterAdd.Choices).Id);
+
+        var completed = await select.SelectAsync("finish");
+        Assert.True(completed.IsCompleted);
+        Assert.Equal(1L, completed.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task StatelessSelectResolvesGotoAtRunTime()
+    {
+        var compiled = new SpellkitHost().Compile("""
+            select flow {
+                choose "next" => goto another
+            }
+            """);
+
+        Assert.True(compiled.Success);
+
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = instance.Execute("""
+            select flow {
+                choose "next" => goto another
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+        using var select = instance.OpenSelectSession("flow");
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => select.SelectAsync("next"));
+        Assert.Contains("no state named 'another'", error.Message);
+    }
+
+    [Fact]
+    public void StatelessSelectRejectsChoiceSpreads()
+    {
+        var compiled = new SpellkitHost().Compile("""
+            select child {
+                choose "finish" => exit
+            }
+
+            select parent {
+                choose ...child
+            }
+            """);
+
+        Assert.False(compiled.Success);
+        Assert.Contains(compiled.Errors, error =>
+            error.Code == (int)Spellkit.Compiler.CompilerError.SelectChoiceSpreadRequiresNamedState);
+    }
+
+    [Fact]
+    public void SelectDescriptionRequiresAStringKeyDictionaryLiteral()
+    {
+        var host = new SpellkitHost();
+        var nonDictionary = host.Compile("""
+            select flow {
+                desc ["title"]
+                initial state ready { choose "finish" => exit }
+            }
+            """);
+        var nonStringKey = host.Compile("""
+            select flow {
+                desc [title: "Ready"]
+                initial state ready { choose "finish" => exit }
+            }
+            """);
+        var stateDescription = host.Compile("""
+            select flow {
+                initial state ready {
+                    desc ["title": "Ready"]
+                    choose "finish" => exit
+                }
+            }
+            """);
+
+        Assert.False(nonDictionary.Success);
+        Assert.False(nonStringKey.Success);
+        Assert.False(stateDescription.Success);
+    }
+
+    [Fact]
+    public async Task StatelessChildSelectChoicesCanBeSpreadIntoAParentState()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            select child {
+                mut count = 0
+
+                choose "next" when count == 0 => { count += 1 }
+                choose "finish" when count == 1 => exit "child"
+            }
+
+            select parent {
+                initial state open {
+                    choose "cancel" => exit "cancel"
+                    choose ...child
+                }
+            }
+
+            do parent
+            """);
+
+        Assert.Equal(new[] { "cancel", "next" }, run.Choices.Select(choice => choice.Id));
+
+        var afterNext = await run.SelectAsync("next");
+        Assert.False(afterNext.IsCompleted);
+        Assert.Equal(new[] { "cancel", "finish" }, run.Choices.Select(choice => choice.Id));
+
+        var afterFinish = await run.SelectAsync("finish");
+        Assert.True(afterFinish.IsCompleted);
+        Assert.Equal("child", run.GetValue<string>());
+    }
+
+    [Fact]
+    public void ChoiceSpreadRejectsAStatefulChildSelect()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        var initialized = instance.Execute("""
+            select child {
+                initial state open {
+                    choose "finish" => exit
+                }
+            }
+
+            select parent {
+                initial state open {
+                    choose ...child
+                }
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+
+        var error = Assert.Throws<InvalidOperationException>(() => instance.OpenSelectSession("parent"));
+        Assert.Contains("state-less select", error.Message);
+    }
+
+    [Fact]
+    public async Task ExpandedChildGotoMovesTheParentToItsState()
+    {
+        using var instance = new SpellkitHost().CreateInstance();
+        using var run = instance.Start("""
+            select child {
+                choose "next" => goto done
+            }
+
+            select parent {
+                initial state open {
+                    choose ...child
+                }
+
+                state done {
+                    choose "finish" => exit "done"
+                }
+            }
+
+            do parent
+            """);
+
+        Assert.Equal("next", Assert.Single(run.Choices).Id);
+        var afterNext = await run.SelectAsync("next");
+        Assert.False(afterNext.IsCompleted);
+        Assert.Equal("done", run.State);
+        Assert.Equal("finish", Assert.Single(run.Choices).Id);
+        Assert.Equal("done", (await run.SelectAsync("finish")).GetValue<string>());
+    }
+
+    [Fact]
+    public async Task ExpandedChildHooksAndEventsRunBeforeTheParent()
+    {
+        var output = new StringBuilder();
+        using var instance = new SpellkitHost().CreateInstance(
+            new SpellkitEnvironment().UseOutput(value => output.Append(value)));
+        using var run = instance.Start("""
+            select child {
+                desc ["kind": "child"]
+                enter => { print("child-enter", terminator: ",") }
+                leave => { print("child-leave", terminator: ",") }
+                on "tick" => { print("child-event", terminator: ",") }
+                choose "finish" => exit
+            }
+
+            select parent {
+                initial state open {
+                    enter => { print("parent-enter", terminator: ",") }
+                    leave => { print("parent-leave", terminator: ",") }
+                    on "tick" => { print("parent-event", terminator: ",") }
+                    choose ...child
+                }
+            }
+
+            do parent
+            """);
+
+        Assert.Equal("child-enter,parent-enter,", output.ToString());
+        await run.SendAsync("tick");
+        Assert.Equal("child-enter,parent-enter,child-event,parent-event,", output.ToString());
+
+        Assert.True((await run.SelectAsync("finish")).IsCompleted);
+        Assert.Equal(
+            "child-enter,parent-enter,child-event,parent-event,child-leave,parent-leave,",
+            output.ToString());
+    }
+
+    [Fact]
+    public void AnEmptyExpandedChildAllowsTheParentEmptyHandlerToRun()
+    {
+        var output = new StringBuilder();
+        using var instance = new SpellkitHost().CreateInstance(
+            new SpellkitEnvironment().UseOutput(value => output.Append(value)));
+        using var run = instance.Start("""
+            select child {
+                choose "hidden" when false => exit
+                on empty => { print("child", terminator: ",") }
+            }
+
+            select parent {
+                initial state open {
+                    choose ...child
+                    on empty => { print("parent", terminator: ","); exit "parent" }
+                }
+            }
+
+            do parent
+            """);
+
+        Assert.True(run.IsCompleted, run.Failure?.ToString());
+        Assert.Equal("parent", run.GetValue<string>());
+        Assert.Equal("child,parent,", output.ToString());
+    }
+
+    [Fact]
     public async Task PublishedChoicesRejectInputAfterInvalidation()
     {
         using var instance = new SpellkitHost().CreateInstance();
@@ -63,53 +314,56 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public async Task PublicSelectExposesStateViewAndKeepsTheLastPublicationOnRefreshFailure()
+    public async Task PublicSelectExposesDescriptionAndKeepsTheLastPublicationOnRefreshFailure()
     {
         var items = new[] { "old" };
-        var failStateView = false;
+        var failItems = false;
+        var descriptionCalls = 0;
         using var instance = new SpellkitHost()
             .Module("catalog", module =>
             {
-                module.Command("Items", _ => items);
-                module.Command("StateView", _ =>
+                module.Command("Items", _ =>
                 {
-                    if (failStateView)
+                    if (failItems)
                     {
-                        throw new InvalidOperationException("State view failed.");
+                        throw new InvalidOperationException("Items failed.");
                     }
 
-                    return "Ready";
+                    return items;
                 });
+                module.Command("Description", _ => $"Description {++descriptionCalls}");
             })
             .CreateInstance();
         var initialization = await instance.ExecuteAsync("""
             import catalog
 
             select flow {
-                initial state ready {
-                    view => catalog.StateView()
+                desc ["title": catalog.Description()]
 
-                    for item in catalog.Items() {
-                        choose item
-                            => exit item
-                    }
+                initial state ready {
+                    choose item
+                        for item in catalog.Items()
+                        => exit item
                 }
             }
             """);
         Assert.True(initialization.Success, initialization.Failure?.Message);
 
         using var select = await instance.OpenSelectAsync("flow");
-        Assert.Equal("Ready", select.StateView?.GetValue<string>());
+        Assert.Equal("Description 1", select.Description?
+            .GetValue<Dictionary<string, object?>>()?["title"]);
+        Assert.Equal(1, descriptionCalls);
         var oldChoice = Assert.Single(select.Choices);
         var initialRevision = select.Revision;
         Assert.Equal("old", oldChoice.Id);
 
         items = ["new"];
-        failStateView = true;
+        failItems = true;
         await Assert.ThrowsAnyAsync<Exception>(() => select.RefreshAsync());
         await Assert.ThrowsAnyAsync<Exception>(() => select.InvalidateAsync());
 
         Assert.Equal(initialRevision, select.Revision);
+        Assert.Equal(1, descriptionCalls);
         Assert.Same(oldChoice, Assert.Single(select.Choices));
         var result = await select.SelectAsync(oldChoice);
         Assert.True(result.IsCompleted);
@@ -122,8 +376,9 @@ public sealed class SelectSessionTests
         using var instance = new SpellkitHost().CreateInstance();
         using var run = await instance.StartAsync("""
             let flow = select {
+                desc ["title": "Ready"]
+
                 initial state ready {
-                    view => ["title": "Ready"]
                     choose "finish" => exit 42
                 }
             }
@@ -133,7 +388,7 @@ public sealed class SelectSessionTests
 
         Assert.True(run.IsWaitingForSelect);
         Assert.Equal("ready", run.State);
-        Assert.Equal("Ready", run.StateView?
+        Assert.Equal("Ready", run.Description?
             .GetValue<Dictionary<string, object?>>()?["title"]);
         var staleChoice = Assert.Single(run.Choices);
         var initialRevision = Assert.IsType<long>(run.Revision);
@@ -421,28 +676,23 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public async Task SelectSnapshotsExposeRevisionsAndViews()
+    public async Task SelectSnapshotsExposeRevisionsAndDescription()
     {
         using var instance = new SpellkitHost().CreateInstance();
         var initialized = instance.Execute("""
             select flow {
-                mut title = ""
+                desc ["title": "Flow", "step": 1]
 
                 initial state start {
-                    view => ["title": "Start", "step": 1]
                     choose "next"
-                        view => ["style": "primary"]
                         => {
-                            title = "Done"
                             goto finish
                         }
                 }
 
                 state finish {
-                    view => ["title": title, "step": 2]
                     choose "exit"
-                        view => ["style": "danger"]
-                        => exit title
+                        => exit "Done"
                 }
             }
             """);
@@ -450,32 +700,23 @@ public sealed class SelectSessionTests
 
         using var session = instance.OpenSelectSession("flow");
         var initial = session.Snapshot;
-        var initialStateView = initial.State.View?
+        var initialDescription = initial.Description?
             .GetValue<Dictionary<string, object?>>()
-            ?? throw new InvalidOperationException("The initial state view is unavailable.");
-        var initialChoiceView = Assert.Single(initial.Choices).View?
-            .GetValue<Dictionary<string, object?>>()
-            ?? throw new InvalidOperationException("The initial choice view is unavailable.");
-
+            ?? throw new InvalidOperationException("The select description is unavailable.");
         Assert.Equal("flow", initial.Name);
         Assert.Equal(0L, initial.Revision);
         Assert.Equal("start", initial.State.Id);
-        Assert.Equal("Start", initialStateView["title"]);
-        Assert.Equal(1, initialStateView["step"]);
-        Assert.Equal("primary", initialChoiceView["style"]);
+        Assert.Equal("Flow", initialDescription["title"]);
+        Assert.Equal(1, initialDescription["step"]);
 
         var next = await session.SelectAtRevisionAsync("next", initial.Revision);
-        var nextStateView = next.Snapshot.State.View?
+        var nextDescription = next.Snapshot.Description?
             .GetValue<Dictionary<string, object?>>()
-            ?? throw new InvalidOperationException("The next state view is unavailable.");
-        var nextChoiceView = Assert.Single(next.Snapshot.Choices).View?
-            .GetValue<Dictionary<string, object?>>()
-            ?? throw new InvalidOperationException("The next choice view is unavailable.");
-
+            ?? throw new InvalidOperationException("The select description is unavailable.");
         Assert.Equal(initial.Revision + 1, next.Snapshot.Revision);
         Assert.Equal("finish", next.Snapshot.State.Id);
-        Assert.Equal("Done", nextStateView["title"]);
-        Assert.Equal("danger", nextChoiceView["style"]);
+        Assert.Same(initial.Description, next.Snapshot.Description);
+        Assert.Equal("Flow", nextDescription["title"]);
         Assert.Equal(next.Snapshot.Revision, session.Revision);
         Assert.Equal(next.Snapshot.Revision, session.Snapshot.Revision);
 
@@ -602,7 +843,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public async Task DynamicChoicesExposeViewsAndBindTheirItems()
+    public async Task DynamicChoicesBindTheirItems()
     {
         using var instance = new SpellkitHost().CreateInstance();
         var initialized = instance.Execute("""
@@ -610,16 +851,14 @@ public sealed class SelectSessionTests
                 initial state browse {
                     choose "leave" => exit "left"
 
-                    for item in [
+                    choose item.id
+                        label item.name
+                        for item in [
                         (id: "apple", name: "Apple", enabled: true, price: 3),
                         (id: "pear", name: "Pear", enabled: false, price: 5)
-                    ] {
-                        choose item.id
-                            label item.name
-                            when item.enabled
-                            view => ["price": item.price]
-                            => exit item.price
-                    }
+                        ]
+                        when item.enabled
+                        => exit item.price
                 }
             }
             """);
@@ -631,9 +870,6 @@ public sealed class SelectSessionTests
         Assert.Equal(new[] { "leave", "apple" }, snapshot.Choices.Select(choice => choice.Id));
         var apple = snapshot.Choices.Single(choice => choice.Id == "apple");
         Assert.Equal("Apple", apple.Label);
-        var appleView = apple.View?.GetValue<Dictionary<string, object?>>()
-            ?? throw new InvalidOperationException("The dynamic choice view is unavailable.");
-        Assert.Equal(3, appleView["price"]);
         await Assert.ThrowsAsync<ArgumentException>(() => session.SelectAsync("apple", 1));
 
         var completed = await session.SelectAtRevisionAsync("apple", snapshot.Revision);
@@ -649,10 +885,9 @@ public sealed class SelectSessionTests
         var initialized = instance.Execute("""
             select flow {
                 initial state waiting {
-                    for item in [] {
-                        choose item
-                            => exit item
-                    }
+                    choose item
+                        for item in []
+                        => exit item
                 }
             }
             """);
@@ -671,10 +906,9 @@ public sealed class SelectSessionTests
         var initialized = instance.Execute("""
             select flow {
                 initial state waiting {
-                    for item in ["same", "same"] {
-                        choose item
-                            => exit
-                    }
+                    choose item
+                        for item in ["same", "same"]
+                        => exit
                 }
             }
             """);
@@ -685,18 +919,62 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void OtherwiseRunsWhenDynamicChoicesAreEmpty()
+    public void LegacyDynamicChoiceGroupSyntaxIsRejected()
+    {
+        var compiled = new SpellkitHost().Compile("""
+            select flow {
+                initial state waiting {
+                    for item in ["only"] {
+                        choose item => exit
+                    }
+                }
+            }
+            """);
+
+        Assert.False(compiled.Success);
+    }
+
+    [Fact]
+    public void ViewKeywordIsRejected()
+    {
+        var compiled = new SpellkitHost().Compile("""
+            select flow {
+                initial state waiting {
+                    view => ["style": "primary"]
+                    choose "continue" => exit
+                }
+            }
+            """);
+
+        Assert.False(compiled.Success);
+    }
+
+    [Fact]
+    public void OtherwiseSyntaxIsRejected()
+    {
+        var compiled = new SpellkitHost().Compile("""
+            select flow {
+                initial state waiting {
+                    otherwise => exit
+                }
+            }
+            """);
+
+        Assert.False(compiled.Success);
+    }
+
+    [Fact]
+    public void EmptyHandlerRunsWhenDynamicChoicesAreEmpty()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
             let flow = select {
                 initial state waiting {
-                    for item in [] {
-                        choose item
-                            => exit item
-                    }
+                    choose item
+                        for item in []
+                        => exit item
 
-                    otherwise => exit "empty"
+                    on empty => exit "empty"
                 }
             }
 
@@ -1050,7 +1328,7 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void OtherwiseHandlesAStateWithoutAvailableChoices()
+    public void EmptyHandlerHandlesAStateWithoutAvailableChoices()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -1058,7 +1336,7 @@ public sealed class SelectSessionTests
             let flow = select {
                 initial state waiting {
                     choose "finish" when available => exit "choice"
-                    otherwise => exit "otherwise"
+                    on empty => exit "empty"
                 }
             }
 
@@ -1066,11 +1344,11 @@ public sealed class SelectSessionTests
             """);
 
         Assert.True(run.IsCompleted, run.Failure?.ToString());
-        Assert.Equal("otherwise", run.GetValue<string>());
+        Assert.Equal("empty", run.GetValue<string>());
     }
 
     [Fact]
-    public async Task OtherwiseRunsAfterTheLastChoiceBecomesUnavailable()
+    public async Task EmptyHandlerRunsAfterTheLastChoiceBecomesUnavailable()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
@@ -1080,7 +1358,7 @@ public sealed class SelectSessionTests
                 initial state waiting {
                     choose "disable" when available => { available = false }
                     choose "finish" when available => exit "choice"
-                    otherwise => exit "otherwise"
+                    on empty => exit "empty"
                 }
             }
 
@@ -1092,18 +1370,18 @@ public sealed class SelectSessionTests
 
         Assert.True(result.IsCompleted);
         Assert.True(run.IsCompleted);
-        Assert.Equal("otherwise", run.GetValue<string>());
+        Assert.Equal("empty", run.GetValue<string>());
     }
 
     [Fact]
-    public async Task OtherwiseDoesNotHideHostEvents()
+    public async Task EmptyHandlerDoesNotHideHostEvents()
     {
         using var instance = new SpellkitHost().CreateInstance();
         using var run = instance.Start("""
             let flow = select {
                 initial state waiting {
                     on "completed" => exit "event"
-                    otherwise => exit "otherwise"
+                    on empty => exit "empty"
                 }
             }
 
@@ -1161,7 +1439,7 @@ public sealed class SelectSessionTests
                         value += delta
                         goto counter
                     }
-                    otherwise => exit value
+                    on empty => exit value
                 }
             }
 
