@@ -118,7 +118,7 @@ internal sealed partial class SpellkitIteratorTypeInfo : SpellkitTypeInfo
             return Nil;
         }
 
-        return new SpellkitSet(new HashSet<SpellkitObject>(seq));
+        return new SpellkitSet(seq);
     }
     #endregion
 
@@ -132,18 +132,29 @@ internal sealed partial class SpellkitIteratorTypeInfo : SpellkitTypeInfo
     [SpellkitMethod(BuiltinMethodNames.ToDictionary)]
     internal static SpellkitObject ToDictionary(ExecutionContext ctx, IEnumerable<SpellkitObject> self, SpellkitFunction keySelector, SpellkitFunction? valueSelector = null)
     {
-        try
+        var map = new SpellkitDictionary();
+
+        foreach (var item in self)
         {
-            var map =
-                valueSelector is not null
-                ? self.ToDictionary(item => keySelector.Call(ctx, item), item => valueSelector.Call(ctx, item))
-                : self.ToDictionary(item => keySelector.Call(ctx, item));
-            return new SpellkitDictionary(map);
+            var key = keySelector.Call(ctx, item);
+            if (ctx.HasErrors)
+            {
+                return Nil;
+            }
+
+            var value = valueSelector is null ? item : valueSelector.Call(ctx, item);
+            if (ctx.HasErrors)
+            {
+                return Nil;
+            }
+
+            if (!map.TryAdd(key, value))
+            {
+                return ctx.KeyAlreadyPresent(key);
+            }
         }
-        catch (ArgumentException)
-        {
-            return ctx.KeyAlreadyPresent();
-        }
+
+        return map;
     }
 
     [SpellkitMethod]
@@ -231,24 +242,21 @@ internal sealed partial class SpellkitIteratorTypeInfo : SpellkitTypeInfo
     }
 
     [SpellkitMethod(BuiltinMethodNames.Shuffle)]
-    internal static IEnumerable<SpellkitObject> Shuffle(IEnumerable<SpellkitObject> self)
+    internal static IEnumerable<SpellkitObject> Shuffle(IEnumerable<SpellkitObject> self) => ShuffleCore(self);
+
+    private static IEnumerable<SpellkitObject> ShuffleCore(IEnumerable<SpellkitObject> self)
     {
-        var rnd = new Random();
-        var last = 0;
-
-        int sorter(SpellkitObject _)
+        var values = self.ToArray();
+        for (var i = values.Length - 1; i > 0; i--)
         {
-            var n = rnd.Next();
-            if (last != 0 && n > last)
-            {
-                n = -n;
-            }
-
-            last = n;
-            return n;
+            var j = Random.Shared.Next(i + 1);
+            (values[i], values[j]) = (values[j], values[i]);
         }
 
-        return self.OrderBy(sorter);
+        foreach (var value in values)
+        {
+            yield return value;
+        }
     }
 
     [SpellkitMethod(BuiltinMethodNames.Count)]
@@ -305,11 +313,11 @@ internal sealed partial class SpellkitIteratorTypeInfo : SpellkitTypeInfo
     {
         if (selector is not null)
         {
-            return self.Distinct(new EqualityComparer(ctx, selector));
+            return new DistinctByEnumerable(ctx, self, selector);
         }
         else
         {
-            return self.Distinct();
+            return self.Distinct(SpellkitObjectKeyComparer.Instance);
         }
     }
 

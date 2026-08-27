@@ -22,6 +22,9 @@
     xs = 1..5
     res = Iterator(xs)
     assert((1,2,3,4,5), res.ToTuple())
+
+    assert([1], Iterator.Concat(Iterator.Empty(), [1]).ToArray())
+    assert([1], Iterator.Concat(Iterator.Empty(), Iterator.Empty(), [1]).ToArray())
 #endregion
 
 #region "Methods: GetType"
@@ -533,7 +536,7 @@
     let xs = Iterator([1,2,3,4,5,6])
     mut ys = xs.Shuffle().ToArray()
     assert(6, ys.Length())
-    assert(true, !eq(xs.ToArray(), ys))
+    assert([1,2,3,4,5,6], Iterator(ys).Sort().ToArray())
 #endregion
 
 #region "Methods: Count"
@@ -740,6 +743,13 @@
     let xs = Iterator([1,1,1,2,3,3,3,4,4,5])
     assert([1..5], xs.Distinct().ToArray())
     assert([1..5], xs.Distinct(x => x).ToArray())
+    let calls = [0]
+    let once = Iterator([1,1,2]).Distinct(x => {
+        calls[0] += 1
+        x
+    }).ToArray()
+    assert([1,2], once)
+    assert(3, calls[0])
     let ys = Iterator([
         (id: 1, stub: "F"),
         (id: 2, stub: "R"),

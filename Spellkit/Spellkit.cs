@@ -7,7 +7,6 @@ using Spellkit.Runtime.Types;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Reflection;
 
 namespace Spellkit;
@@ -150,16 +149,6 @@ public static partial class SpellkitTypeCodes
     }
     static partial void GetMixinByCodeGenerated(int code, ref SpellkitTypeInfo name);
 
-}
-
-internal static class FileProbe
-{
-    public static string GetExecutablePath() => Assembly.GetExecutingAssembly().Location;
-
-    public static string GetExecutableDirectory() =>
-        Path.GetDirectoryName(GetExecutablePath()) ?? string.Empty;
-
-    public static DateTime GetAssembyTimeStamp() => File.GetLastWriteTime(GetExecutablePath());
 }
 
 public struct HashString : IEquatable<HashString>

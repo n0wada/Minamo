@@ -34,8 +34,11 @@ public sealed class SpellkitPriorityQueue : SpellkitForeignObject
 
     public override string ToString() => $"PriorityQueue({Count})";
 
-    internal void Enqueue(SpellkitObject value, SpellkitObject priority) =>
+    internal void Enqueue(SpellkitObject value, SpellkitObject priority)
+    {
         entries.Add(new(value, priority, nextSequence++));
+        SiftUp(entries.Count - 1);
+    }
 
     internal bool TryPeek(out SpellkitObject value, out SpellkitObject priority)
     {
@@ -53,16 +56,23 @@ public sealed class SpellkitPriorityQueue : SpellkitForeignObject
 
     internal bool TryDequeue(out SpellkitObject value, out SpellkitObject priority)
     {
-        var index = NextIndex();
-        if (index < 0)
+        if (entries.Count == 0)
         {
             value = Nil;
             priority = Nil;
             return false;
         }
 
-        var entry = entries[index];
-        entries.RemoveAt(index);
+        var entry = entries[0];
+        var lastIndex = entries.Count - 1;
+        var last = entries[lastIndex];
+        entries.RemoveAt(lastIndex);
+        if (entries.Count > 0)
+        {
+            entries[0] = last;
+            SiftDown(0);
+        }
+
         value = entry.Value;
         priority = entry.Priority;
         return true;
@@ -72,18 +82,22 @@ public sealed class SpellkitPriorityQueue : SpellkitForeignObject
 
     internal IEnumerable<SpellkitObject> Values()
     {
-        foreach (var entry in entries.OrderBy(entry => entry, Comparer<Entry>.Create(Compare)))
+        var snapshot = new SpellkitPriorityQueue(
+            (SpellkitPriorityQueueTypeInfo)TypeInfo,
+            entries,
+            nextSequence);
+
+        while (snapshot.TryDequeue(out var value, out _))
         {
-            yield return entry.Value;
+            yield return value;
         }
     }
 
     private bool TryGetNext(out Entry entry)
     {
-        var index = NextIndex();
-        if (index >= 0)
+        if (entries.Count > 0)
         {
-            entry = entries[index];
+            entry = entries[0];
             return true;
         }
 
@@ -91,23 +105,43 @@ public sealed class SpellkitPriorityQueue : SpellkitForeignObject
         return false;
     }
 
-    private int NextIndex()
+    private void SiftUp(int index)
     {
-        if (entries.Count == 0)
+        while (index > 0)
         {
-            return -1;
-        }
-
-        var result = 0;
-        for (var i = 1; i < entries.Count; i++)
-        {
-            if (Compare(entries[i], entries[result]) < 0)
+            var parent = (index - 1) / 2;
+            if (Compare(entries[index], entries[parent]) >= 0)
             {
-                result = i;
+                break;
             }
-        }
 
-        return result;
+            (entries[index], entries[parent]) = (entries[parent], entries[index]);
+            index = parent;
+        }
+    }
+
+    private void SiftDown(int index)
+    {
+        while (true)
+        {
+            var left = index * 2 + 1;
+            if (left >= entries.Count)
+            {
+                return;
+            }
+
+            var right = left + 1;
+            var next = right < entries.Count && Compare(entries[right], entries[left]) < 0
+                ? right
+                : left;
+            if (Compare(entries[index], entries[next]) <= 0)
+            {
+                return;
+            }
+
+            (entries[index], entries[next]) = (entries[next], entries[index]);
+            index = next;
+        }
     }
 
     private int Compare(Entry left, Entry right)

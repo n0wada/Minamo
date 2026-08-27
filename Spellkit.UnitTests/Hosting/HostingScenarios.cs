@@ -143,7 +143,6 @@ internal static class HostingScenarios
         foreach (var name in new[]
         {
             "Spellkit.CultureInfoSettings",
-            "Spellkit.FileProbe",
             "Spellkit.Runtime.SpellkitMachine",
             "Spellkit.Runtime.EvalStack",
             "Spellkit.Runtime.ExecutionResult",

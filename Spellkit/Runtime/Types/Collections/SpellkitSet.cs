@@ -13,7 +13,7 @@ public class SpellkitSet : SpellkitEnumerable
 
     public override string TypeName => nameof(SpellkitTypeCodes.Set);
     
-    public SpellkitSet() : base(SpellkitTypeCodes.Set) => Set = new();
+    public SpellkitSet() : base(SpellkitTypeCodes.Set) => Set = new(SpellkitObjectKeyComparer.Instance);
 
     public SpellkitSet(params SpellkitObject[] args) : this((IEnumerable<SpellkitObject>)args) { }
 
@@ -27,7 +27,7 @@ public class SpellkitSet : SpellkitEnumerable
     
     public override IEnumerator<SpellkitObject> GetEnumerator() => new SpellkitSetEnumerator(this);
 
-    public override object ToObject() => new HashSet<SpellkitObject>(Set.Keys);
+    public override object ToObject() => new HashSet<SpellkitObject>(Set.Keys, SpellkitObjectKeyComparer.Instance);
 
     public override int Count => Set.Count;
 
@@ -104,7 +104,7 @@ public class SpellkitSet : SpellkitEnumerable
             return;
         }
 
-        var values = new HashSet<SpellkitObject>(seq);
+        var values = new HashSet<SpellkitObject>(seq, SpellkitObjectKeyComparer.Instance);
         var removed = false;
         foreach (var value in Set.Keys.ToArray())
         {
@@ -158,7 +158,7 @@ public class SpellkitSet : SpellkitEnumerable
             return;
         }
 
-        var values = new HashSet<SpellkitObject>(seq);
+        var values = new HashSet<SpellkitObject>(seq, SpellkitObjectKeyComparer.Instance);
         var removed = false;
         foreach (var value in Set.Keys.ToArray())
         {
@@ -206,7 +206,7 @@ public class SpellkitSet : SpellkitEnumerable
             return false;
         }
 
-        var values = new HashSet<SpellkitObject>(seq);
+        var values = new HashSet<SpellkitObject>(seq, SpellkitObjectKeyComparer.Instance);
         return Set.Keys.All(values.Contains);
     }
 
@@ -219,7 +219,7 @@ public class SpellkitSet : SpellkitEnumerable
             return false;
         }
 
-        return new HashSet<SpellkitObject>(Set.Keys).IsSupersetOf(seq);
+        return new HashSet<SpellkitObject>(Set.Keys, SpellkitObjectKeyComparer.Instance).IsSupersetOf(seq);
     }
 
     public override int GetHashCode()
@@ -230,7 +230,7 @@ public class SpellkitSet : SpellkitEnumerable
             var xor = 0;
             foreach (var v in Set.Keys)
             {
-                var valueHash = v.GetHashCode();
+                var valueHash = SpellkitObjectKeyComparer.Instance.GetHashCode(v);
                 sum += valueHash;
                 xor ^= valueHash;
             }
@@ -250,7 +250,7 @@ public class SpellkitSet : SpellkitEnumerable
     }
 
     private bool SetEquals(IEnumerable<SpellkitObject> values) =>
-        new HashSet<SpellkitObject>(Set.Keys).SetEquals(values);
+        new HashSet<SpellkitObject>(Set.Keys, SpellkitObjectKeyComparer.Instance).SetEquals(values);
 }
 
 [SpellkitType]

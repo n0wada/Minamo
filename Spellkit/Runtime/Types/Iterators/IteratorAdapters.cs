@@ -44,29 +44,36 @@ internal sealed class SpellkitNativeIterator : SpellkitIterator
     public override bool Equals(SpellkitObject? other) => ReferenceEquals(this, other);
 }
 
-public sealed class EqualityComparer : IEqualityComparer<SpellkitObject>
+internal sealed class DistinctByEnumerable : IEnumerable<SpellkitObject>
 {
     private readonly ExecutionContext ctx;
-    private readonly SpellkitFunction func;
+    private readonly IEnumerable<SpellkitObject> source;
+    private readonly SpellkitFunction selector;
 
-    public EqualityComparer(ExecutionContext ctx, SpellkitObject functor)
-    {
-        this.ctx = ctx;
-        func = functor.ToFunction(ctx)!;
-        ctx.ThrowIf();
-    }
+    public DistinctByEnumerable(ExecutionContext ctx, IEnumerable<SpellkitObject> source, SpellkitFunction selector) =>
+        (this.ctx, this.source, this.selector) = (ctx, source, selector);
 
-    public bool Equals(SpellkitObject? x, SpellkitObject? y)
-    {
-        var fst = func.Call(ctx, x!);
-        var snd = func.Call(ctx, y!);
-        return fst.Equals(snd, ctx);
-    }
+    public IEnumerator<SpellkitObject> GetEnumerator() => Iterate().GetEnumerator();
 
-    public int GetHashCode([DisallowNull] SpellkitObject obj)
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    private IEnumerable<SpellkitObject> Iterate()
     {
-        var x = func.Call(ctx, obj);
-        return x.GetHashCode();
+        var keys = new HashSet<SpellkitObject>(SpellkitObjectKeyComparer.Instance);
+
+        foreach (var item in source)
+        {
+            var key = selector.Call(ctx, item);
+            if (ctx.HasErrors)
+            {
+                yield break;
+            }
+
+            if (keys.Add(key))
+            {
+                yield return item;
+            }
+        }
     }
 }
 
@@ -212,33 +219,34 @@ internal sealed class MultiPartEnumerator : IEnumerator<SpellkitObject>
 
     object IEnumerator.Current => current!.Current;
 
-    public void Dispose() { }
+    public void Dispose() => current?.Dispose();
 
     public bool MoveNext()
     {
-        if (current is null || !current.MoveNext())
+        while (true)
         {
-            if (iterators.Length > nextIterator)
+            if (current is not null && current.MoveNext())
             {
-                var it = SpellkitIterator.ToEnumerable(ctx, iterators[nextIterator]);
-                ctx.ThrowIf();
-                nextIterator++;
-                current = it.GetEnumerator();
-                return current.MoveNext();
+                return true;
             }
-            else
+
+            current?.Dispose();
+            current = null;
+
+            if (nextIterator >= iterators.Length)
             {
                 return false;
             }
-        }
-        else
-        {
-            return true;
+
+            var next = SpellkitIterator.ToEnumerable(ctx, iterators[nextIterator++]);
+            ctx.ThrowIf();
+            current = next.GetEnumerator();
         }
     }
 
     public void Reset()
     {
+        current?.Dispose();
         current = null;
         nextIterator = 0;
     }

@@ -39,10 +39,12 @@ public class SpellkitArray : SpellkitCollection, IEnumerable<SpellkitObject>
 
     public void RemoveRange(int start, int count)
     {
-        var xs = new List<SpellkitObject>(values);
-        xs.RemoveRange(start, count);
-        values = xs.ToArray();
-        Count = values.Length;
+        var remaining = Count - count;
+        var result = new SpellkitObject[remaining];
+        Array.Copy(values, 0, result, 0, start);
+        Array.Copy(values, start + count, result, start, remaining - start);
+        values = result;
+        Count = remaining;
         Version++;
     }
 

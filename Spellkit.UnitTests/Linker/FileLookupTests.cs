@@ -23,16 +23,15 @@ public sealed class FileLookupTests
     }
 
     [Fact]
-    public void SearchesLibBelowStartupPath()
+    public void DoesNotSearchLibBelowStartupPathImplicitly()
     {
         using var paths = new LookupPaths();
-        var library = paths.Write(Path.Combine(paths.First, "lib"), "helper.kit", "let answer = 42");
+        paths.Write(Path.Combine(paths.First, "lib"), "helper.kit", "let answer = 42");
         var lookup = FileLookup.Restricted(BuilderOptions.Default())
             .AddStartupPath(paths.First)
             .Build();
 
-        Assert.True(lookup.Find(null, "helper.kit", out var resolved));
-        Assert.Equal(Path.GetFullPath(library), resolved);
+        Assert.False(lookup.Find(null, "helper.kit", out _));
     }
 
     [Fact]

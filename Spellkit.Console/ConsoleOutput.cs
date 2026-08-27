@@ -2,6 +2,7 @@ using Spellkit.Runtime;
 using Spellkit.Runtime.Types;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using static System.Console;
 
 namespace Spellkit;
@@ -76,8 +77,9 @@ internal static class ConsoleOutput
     {
         if (!NoLogo)
         {
-            var ts = FileProbe.GetAssembyTimeStamp();
-            Title = $"Spellkit - {FileProbe.GetExecutablePath()}";
+            var assemblyPath = typeof(ConsoleOutput).Assembly.Location;
+            var ts = File.GetLastWriteTime(assemblyPath);
+            Title = $"Spellkit - {assemblyPath}";
             Header($"Spellkit (Spellkit Console). Build {ts.ToString().Trim()}");
             Subheader($"Version {GetVersion()}");
             Subheader($"Running {Environment.OSVersion}");

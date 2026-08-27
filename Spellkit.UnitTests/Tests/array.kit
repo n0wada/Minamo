@@ -57,6 +57,15 @@
     assert([1,2,3,5], arr)
 #endregion
 
+#region "Methods: RemoveRangeAt after capacity growth"
+    let arr = [1]
+    arr.Add(2)
+    arr.Add(3)
+    arr.RemoveRangeAt(0, 3)
+    assert(0, arr.Length())
+    assert([], arr)
+#endregion
+
 #region "Methods: Add, Clear, Insert, Remove"
     let arr = [1,2,3,4,5]
     arr.Clear()

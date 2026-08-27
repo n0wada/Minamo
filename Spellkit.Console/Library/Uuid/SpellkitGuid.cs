@@ -11,6 +11,8 @@ public sealed class SpellkitGuid : SpellkitForeignObject
 
     public override int GetHashCode() => Value.GetHashCode();
 
+    public override bool HasStableValueEquality => true;
+
     public override object ToObject() => Value;
 
     public override string ToString() => Value.ToString();

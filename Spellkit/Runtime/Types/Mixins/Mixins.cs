@@ -340,9 +340,7 @@ internal sealed class SpellkitSequenceMixin : SpellkitMixin<SpellkitSequenceMixi
 
     private static SpellkitObject ToSet(ExecutionContext ctx, SpellkitObject? self, SpellkitObject[] _)
     {
-        var values = new HashSet<SpellkitObject>();
-        values.UnionWith(Source(ctx, self));
-        return new SpellkitSet(values);
+        return new SpellkitSet(Source(ctx, self));
     }
 
     private static IEnumerable<SpellkitObject> Source(ExecutionContext ctx, SpellkitObject? self) =>

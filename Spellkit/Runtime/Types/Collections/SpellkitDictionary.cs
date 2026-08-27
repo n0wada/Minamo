@@ -21,12 +21,12 @@ public class SpellkitDictionary : SpellkitEnumerable
 
     internal SpellkitDictionary() : base(SpellkitTypeCodes.Dictionary)
     {
-        Dictionary = new OrderedDictionary<SpellkitObject, SpellkitObject>();
+        Dictionary = new OrderedDictionary<SpellkitObject, SpellkitObject>(SpellkitObjectKeyComparer.Instance);
     }
 
     internal SpellkitDictionary(IEnumerable<KeyValuePair<SpellkitObject, SpellkitObject>> values) : base(SpellkitTypeCodes.Dictionary)
     {
-        Dictionary = new OrderedDictionary<SpellkitObject, SpellkitObject>();
+        Dictionary = new OrderedDictionary<SpellkitObject, SpellkitObject>(SpellkitObjectKeyComparer.Instance);
         foreach (var (key, value) in values)
         {
             Dictionary.Add(key, value);
@@ -133,7 +133,20 @@ public class SpellkitDictionary : SpellkitEnumerable
             return false;
         }
 
-        return d.Dictionary.Equals(Dictionary);
+        if (d.Dictionary.Count != Dictionary.Count)
+        {
+            return false;
+        }
+
+        foreach (var (key, value) in Dictionary)
+        {
+            if (!d.Dictionary.TryGetValue(key, out var otherValue) || !value.Equals(otherValue))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     internal SpellkitObject[] GetArrayOfLabels()
@@ -153,7 +166,16 @@ public class SpellkitDictionary : SpellkitEnumerable
 
     public override IEnumerator<SpellkitObject> GetEnumerator() => new SpellkitDictionaryEnumerator(this);
 
-    public override int GetHashCode() => Dictionary.GetHashCode();
+    public override int GetHashCode()
+    {
+        var hash = 0;
+        foreach (var (key, value) in Dictionary)
+        {
+            hash += HashCode.Combine(SpellkitObjectKeyComparer.Instance.GetHashCode(key), value.GetHashCode());
+        }
+
+        return HashCode.Combine(TypeId, Dictionary.Count, hash);
+    }
 }
 
 [SpellkitType]

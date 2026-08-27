@@ -114,6 +114,18 @@
     assert([4,5,6], map[key])
 #endregion
 
+#region "Mutable keys use identity"
+    let key = [1]
+    let sameContents = [1]
+    let map = Dictionary()
+    map[key] = "first"
+    map[sameContents] = "second"
+    key.Add(2)
+    assert(2, map.Length())
+    assert("first", map[key])
+    assert("second", map[sameContents])
+#endregion
+
 #region "Field access"
     mut map = Dictionary()
     map.name = "John"
@@ -140,6 +152,13 @@
             assert("Zoo", value)
         }
     }
+#endregion
+
+#region "Iterator to dictionary with mutable keys"
+    let key = [1]
+    let map = Iterator((key,)).ToDictionary(value => value)
+    key.Add(2)
+    assert(true, map.ContainsKey(key))
 #endregion
 
 #region "Methods: Compact"

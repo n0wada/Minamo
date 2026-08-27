@@ -142,7 +142,7 @@ internal abstract partial class SpellkitCollTypeInfo : SpellkitTypeInfo
             SpellkitTypeCodes.Tuple => new SpellkitTuple(xs.ToArray()),
             SpellkitTypeCodes.Array => new SpellkitArray(xs.ToArray()),
             SpellkitTypeCodes.Iterator => SpellkitIterator.Create(xs),
-            SpellkitTypeCodes.Set => new SpellkitSet(new HashSet<SpellkitObject>(xs.ToArray())),
+            SpellkitTypeCodes.Set => new SpellkitSet(xs.ToArray()),
             _ => base.CastOp(ctx, self, targetType)
         };
     }
@@ -213,7 +213,8 @@ internal abstract partial class SpellkitCollTypeInfo : SpellkitTypeInfo
     }
 
     [SpellkitMethod(BuiltinMethodNames.ToSet)]
-    internal static HashSet<SpellkitObject> ToSet(SpellkitCollection self) => new (self.ToArray());
+    internal static HashSet<SpellkitObject> ToSet(SpellkitCollection self) =>
+        new(self.ToArray(), SpellkitObjectKeyComparer.Instance);
 }
 
 public abstract class SpellkitEnumerable : SpellkitObject, IEnumerable<SpellkitObject>, IMeasurable

@@ -153,40 +153,31 @@ for item in items when item.Enabled {
 
 ## Interactive selects
 
-`select` defines a host-driven interaction with named states and choices, suitable for menus,
-dialogue, and quests. A select expression produces a reusable factory; each invocation creates a
-new interaction instance.
+`select` defines a host-driven interaction with choices, suitable for menus, dialogue, and
+quests. A select expression produces a reusable factory; each invocation creates a new
+interaction instance.
 
 ```swift
 let shop = select {
-    initial state open {
-        choose "browse" => {
-            print("You browse the shelves.")
-            goto browsing
-        }
-
-        choose "leave" => exit "closed"
+    choose "browse" => {
+        print("You browse the shelves.")
     }
 
-    state browsing {
-        enter => { print("You enter the browsing state.") }
-        choose "back" => goto open
-        choose "leave" => exit "closed"
-        on empty => exit "nothing to browse"
-    }
+    choose "leave" => exit "closed"
 }
-
-let result = do shop
-print("The shop is ", result, ".")
 ```
 
-`do shop` suspends the script while the host presents choices and evaluates to the value supplied
-by `exit`. Selecting `"browse"` runs its choice body and moves the same interaction instance to
-`browsing`; selecting `"leave"` exits and resumes execution after `do`. Hidden host events may be
-declared with `on` and delivered from C# with `Send`. `enter` and `leave` blocks run on state
-transitions, while `on empty` handles a state with no available choices and no host events. State
-parameters receive values from `goto` and are available to the entered state's actions and hooks.
-Named selects can also be opened from C#.
+Save the script as `shop.kit`, then start its named select from the console:
+
+```powershell
+spell.exe shop.kit --do shop
+```
+
+The console presents the choices after it executes the file. Selecting `"browse"` runs its choice
+body and republishes the same interaction; selecting `"leave"` exits it. Hidden host events may be
+declared with `on` and delivered from C# with `Send`; `on empty` handles an interaction with no
+available choices or host events. Use named `state` declarations and `goto` when the interaction
+needs explicit state transitions. Named selects can also be opened from C#.
 
 See [Interactive selects](../Developers/InteractiveSelect.md) for basic host integration and
 [Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md) for factory lifetime,

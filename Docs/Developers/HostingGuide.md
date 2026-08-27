@@ -901,6 +901,8 @@ using var instance = host.CreateInstance(game);
 `FileLookup.Restricted(options)` searches only paths added explicitly with `AddStartupPath`,
 `AddPath`, or `AddPaths`. `FileLookup.Standard(options)` also searches relative to the importing
 file and paths from `SPELLKIT_LIBS`. Spellkit never searches beside its executable implicitly.
+Each configured path is searched exactly as registered; a `lib` child directory is not added
+implicitly. Register it with `AddPath` when it is intended to be importable.
 
 Use the same host configuration but disable file imports explicitly for a restricted console:
 

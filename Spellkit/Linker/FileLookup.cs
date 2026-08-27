@@ -6,7 +6,6 @@ namespace Spellkit.Linker;
 
 public sealed class FileLookup
 {
-    private const string LibDirectory = "lib";
     private const string LogFile = "spellkit_error.log";
 
     private readonly BuilderOptions options;
@@ -60,7 +59,7 @@ public sealed class FileLookup
     {
         ArgumentNullException.ThrowIfNull(options);
         var startupPaths = startupPath is not null
-            ? new string[] { startupPath, Path.Combine(startupPath, LibDirectory) }
+            ? new[] { startupPath }
             : Array.Empty<string>();
 
         return new
@@ -267,7 +266,7 @@ public sealed class FileLookup
 
         public FileLookupBuilder AddStartupPath(string path)
         {
-            AddWithLib(startupPaths, path);
+            Add(startupPaths, path);
             return this;
         }
 
@@ -315,12 +314,6 @@ public sealed class FileLookup
                 standard.ToArray(),
                 additionalPaths.ToArray(),
                 allowCurrentPath);
-        }
-
-        private static void AddWithLib(ICollection<string> target, string path)
-        {
-            Add(target, path);
-            Add(target, Path.Combine(path, LibDirectory));
         }
 
         private static void Add(ICollection<string> target, string path)

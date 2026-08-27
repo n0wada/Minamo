@@ -137,3 +137,13 @@
     str = String(values: Set('a', 'b', 'c'))
     assert("abc", str)
 #endregion
+
+#region "Mutable values use identity"
+    let first = [1]
+    let second = [1]
+    let xs = Set(first, second)
+    first.Add(2)
+    assert(2, xs.Length())
+    assert(true, xs.Contains(first))
+    assert(true, xs.Contains(second))
+#endregion
