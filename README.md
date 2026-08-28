@@ -7,9 +7,6 @@ access to the host.
 Spellkit includes a handwritten parser, bytecode compiler, virtual machine, interactive
 console, standard-library modules, and a C# Hosting API.
 
-> Spellkit is under active development. The current runtime targets .NET 10.0, and its
-> public distribution story is not finalized yet.
-
 ## Why Spellkit?
 
 - **Embeddable by design** — create isolated instances and execute scripts from C#.
