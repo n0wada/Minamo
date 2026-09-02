@@ -118,6 +118,7 @@
     <message id="TraitMixinNotAllowed">Trait "{0}" cannot be mixed with other traits from its own impl block.</message>
     <message id="PublicImplMemberNotInTrait">Public impl member "{0}" is not declared by the target trait.</message>
     <message id="TraitMemberConflict">Trait member "{0}" conflicts with another applied member.</message>
+    <message id="TraitMemberNotImplemented">Type "{0}" does not implement required member "{2}" of trait or mixin "{1}".</message>
     <message id="DllImportNotAllowed">Runtime DLL import is disabled. Register C# modules through the Hosting API instead.</message>
     <message id="DuplicateIndexer">An indexer {0} for type "{1}" is already declared.</message>
   </group>

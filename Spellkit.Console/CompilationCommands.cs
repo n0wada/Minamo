@@ -4,6 +4,21 @@ namespace Spellkit;
 
 internal static class CompilationCommands
 {
+    public static bool Check(ReplSession session, CommandLineOptions options)
+    {
+        var success = true;
+
+        foreach (var file in options.GetFileNames())
+        {
+            if (!session.Compile(file, out _))
+            {
+                success = false;
+            }
+        }
+
+        return success;
+    }
+
     private static bool WriteBytecode(ReplSession session, CommandLineOptions options)
     {
         var success = true;

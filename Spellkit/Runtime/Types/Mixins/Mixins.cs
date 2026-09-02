@@ -43,13 +43,7 @@ internal sealed class SpellkitContainerMixin : SpellkitMixin<SpellkitContainerMi
 
 internal sealed class SpellkitDisposableMixin : SpellkitMixin<SpellkitDisposableMixin>
 {
-    public SpellkitDisposableMixin() : base(SpellkitTypeCodes.Disposable)
-    {
-        Members.Add(Builtins.Dispose, Unary(Builtins.Dispose, Dispose));
-    }
-
-    private static SpellkitObject Dispose(ExecutionContext ctx, SpellkitObject self) =>
-        ctx.NotImplemented(Builtins.Dispose);
+    public SpellkitDisposableMixin() : base(SpellkitTypeCodes.Disposable) { }
 }
 
 internal sealed class SpellkitEquatableMixin : SpellkitMixin<SpellkitEquatableMixin>
@@ -82,11 +76,7 @@ internal sealed class SpellkitEquatableMixin : SpellkitMixin<SpellkitEquatableMi
 
 internal sealed class SpellkitFunctorMixin : SpellkitMixin<SpellkitFunctorMixin>
 {
-    public SpellkitFunctorMixin() : base(SpellkitTypeCodes.Functor) =>
-        Members.Add(Builtins.Call, Unary(Builtins.Call, SelfCall));
-
-    private static SpellkitObject SelfCall(ExecutionContext ctx, SpellkitObject self) =>
-        ctx.NotImplemented(Builtins.Call);
+    public SpellkitFunctorMixin() : base(SpellkitTypeCodes.Functor) { }
 }
 
 internal sealed class SpellkitIdentityMixin : SpellkitMixin<SpellkitIdentityMixin>
@@ -128,38 +118,77 @@ public abstract class SpellkitMixin<T> : SpellkitTypeInfo
 
 internal sealed class SpellkitNumberMixin : SpellkitMixin<SpellkitNumberMixin>
 {
-    public SpellkitNumberMixin() : base(SpellkitTypeCodes.Number)
-    {
-        Members.Add(Builtins.Add, Binary(Builtins.Add, Sum));
-        Members.Add(Builtins.Sub, Binary(Builtins.Sub, Subtract));
-        Members.Add(Builtins.Mul, Binary(Builtins.Mul, Multiply));
-        Members.Add(Builtins.Div, Binary(Builtins.Div, Divide));
-        Members.Add(Builtins.Rem, Binary(Builtins.Rem, Remainder));
-        Members.Add(Builtins.Neg, Unary(Builtins.Neg, Negate));
-        Members.Add(Builtins.Plus, Unary(Builtins.Plus, MakePlus));
+    public SpellkitNumberMixin() : base(SpellkitTypeCodes.Number) =>
         SetSupportedOperations(Ops.Add | Ops.Sub | Ops.Div | Ops.Mul | Ops.Rem | Ops.Neg | Ops.Plus);
-    }
+}
 
-    private static SpellkitObject Sum(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
-        ctx.NotImplemented(Builtins.Add);
+internal static class SpellkitMixinContracts
+{
+    private static readonly IReadOnlyList<string> disposable = [Builtins.Dispose];
+    private static readonly IReadOnlyList<string> functor = [Builtins.Call];
+    private static readonly IReadOnlyList<string> number = [
+        Builtins.Add,
+        Builtins.Sub,
+        Builtins.Mul,
+        Builtins.Div,
+        Builtins.Rem,
+        Builtins.Neg,
+        Builtins.Plus
+    ];
+    private static readonly IReadOnlyList<string> none = [];
 
-    private static SpellkitObject Subtract(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
-        ctx.NotImplemented(Builtins.Sub);
+    private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> defaults =
+        new Dictionary<string, IReadOnlySet<string>>
+        {
+            ["Collection"] = new HashSet<string>
+            {
+                Builtins.Length, Builtins.Get, Builtins.Set
+            },
+            ["Container"] = new HashSet<string>
+            {
+                Builtins.In
+            },
+            ["Equatable"] = new HashSet<string>
+            {
+                Builtins.Eq
+            },
+            ["Identity"] = new HashSet<string>
+            {
+                Builtins.Clone
+            },
+            ["Lookup"] = new HashSet<string>
+            {
+                Builtins.Length, Builtins.Get
+            },
+            ["Order"] = new HashSet<string>
+            {
+                Builtins.Gt, Builtins.Lt, Builtins.Gte, Builtins.Lte
+            },
+            ["Sequence"] = new HashSet<string>
+            {
+                Builtins.Iterate,
+                BuiltinMethodNames.Map,
+                BuiltinMethodNames.Filter,
+                BuiltinMethodNames.Take,
+                BuiltinMethodNames.Skip,
+                BuiltinMethodNames.Reduce,
+                BuiltinMethodNames.Any,
+                BuiltinMethodNames.All,
+                BuiltinMethodNames.ToArray,
+                BuiltinMethodNames.ToSet
+            }
+        };
 
-    private static SpellkitObject Multiply(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
-        ctx.NotImplemented(Builtins.Mul);
+    public static IReadOnlyList<string> GetRequiredMembers(string mixinName) => mixinName switch
+    {
+        "Disposable" => disposable,
+        "Functor" => functor,
+        "Number" => number,
+        _ => none
+    };
 
-    private static SpellkitObject Divide(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
-        ctx.NotImplemented(Builtins.Div);
-
-    private static SpellkitObject Remainder(ExecutionContext ctx, SpellkitObject left, SpellkitObject right) =>
-        ctx.NotImplemented(Builtins.Rem);
-
-    private static SpellkitObject Negate(ExecutionContext ctx, SpellkitObject left) =>
-        ctx.NotImplemented(Builtins.Neg);
-
-    private static SpellkitObject MakePlus(ExecutionContext ctx, SpellkitObject left) =>
-        ctx.NotImplemented(Builtins.Plus);
+    public static bool ProvidesDefaultMember(string mixinName, string memberName) =>
+        defaults.TryGetValue(mixinName, out var members) && members.Contains(memberName);
 }
 
 internal sealed class SpellkitObjectMixin : SpellkitMixin<SpellkitObjectMixin>

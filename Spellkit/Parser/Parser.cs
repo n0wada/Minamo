@@ -119,6 +119,19 @@ internal sealed partial class HandwrittenParser
                 return null;
             }
         }
+        else if (Check(TokenKind.Dot))
+        {
+            node.Kind = ImportKind.Module;
+            if (!TryParseImportPath(node))
+            {
+                return null;
+            }
+
+            if (Match(TokenKind.As))
+            {
+                node.Alias = ParseImportToken();
+            }
+        }
         else
         {
             var firstName = ParseImportToken();
@@ -153,6 +166,11 @@ internal sealed partial class HandwrittenParser
 
     private bool TryParseImportPath(ImportSyntax import)
     {
+        if (Match(TokenKind.Dot) && !Expect(TokenKind.Divide))
+        {
+            return false;
+        }
+
         var firstName = ParseImportToken();
         if (firstName is null)
         {

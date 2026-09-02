@@ -55,6 +55,12 @@ Or execute a source file:
 .\bin\spell.exe .\hello.kit
 ```
 
+Check source syntax, imports, and compilation without executing it:
+
+```powershell
+.\bin\spell.exe .\hello.kit --check
+```
+
 Start an interactive select declared by the file:
 
 ```powershell

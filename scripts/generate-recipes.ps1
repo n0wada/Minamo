@@ -62,6 +62,12 @@ $recipes = @(
         Title = "Traits as interfaces"
         Description = "Uses a trait as a common billable interface, shares a default description, and accepts multiple concrete types through the trait contract."
     }
+    [pscustomobject]@{
+        File = "12-select-composition.kit"
+        Title = "Select composition"
+        Description = "Adds a state-less child select's choices to a parent state and declares host-facing descriptions for both selects."
+        Arguments = "--do setup"
+    }
 )
 
 $lines = [System.Collections.Generic.List[string]]::new()
@@ -94,7 +100,15 @@ foreach ($recipe in $recipes)
     $lines.Add("Run it with:")
     $lines.Add("")
     $lines.Add('```powershell')
-    $lines.Add((".\bin\spell.exe .\Examples\Language\{0} -nologo" -f $recipe.File))
+    $arguments = if ($recipe.PSObject.Properties.Name -contains "Arguments")
+    {
+        " " + $recipe.Arguments
+    }
+    else
+    {
+        ""
+    }
+    $lines.Add((".\bin\spell.exe .\Examples\Language\{0} -nologo{1}" -f $recipe.File, $arguments))
     $lines.Add('```')
     $lines.Add("")
     $lines.Add("Source: [" + $recipe.File + "](../../Examples/Language/" + $recipe.File + ")")

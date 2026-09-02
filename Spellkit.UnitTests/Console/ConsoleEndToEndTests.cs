@@ -44,6 +44,32 @@ public sealed class ConsoleEndToEndTests
         }
     }
 
+    [Fact]
+    public async Task ChecksSourceFilesWithoutExecutingThem()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "spellkit-cli-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var valid = Path.Combine(root, "valid.kit");
+            var invalid = Path.Combine(root, "invalid.kit");
+            await File.WriteAllTextAsync(valid, "print(40 + 2)", Encoding.UTF8);
+            await File.WriteAllTextAsync(invalid, "let =", Encoding.UTF8);
+
+            var success = await RunAsync(valid, "--check", "-nologo");
+            var failure = await RunAsync(invalid, "--check", "-nologo");
+
+            Assert.Equal(0, success.ExitCode);
+            Assert.DoesNotContain("42", success.StandardOutput, StringComparison.Ordinal);
+            Assert.Equal(1, failure.ExitCode);
+            Assert.NotEmpty(failure.StandardError + failure.StandardOutput);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static async Task<ProcessResult> RunAsync(params string[] arguments)
     {
         var assembly = typeof(CommandLine).Assembly.Location;

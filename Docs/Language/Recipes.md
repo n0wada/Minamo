@@ -139,8 +139,8 @@ Source: [05-exceptions.kit](../../Examples/Language/05-exceptions.kit)
 Imports two local modules, uses an alias and a selected import, and keeps a pricing constant private to its module.
 
 ```swift
-import modules/pricing as pricing
-import receiptLine from modules/text
+import ./modules/pricing as pricing
+import receiptLine from ./modules/text
 
 let subtotal = 1200
 let discount = pricing.Discount(subtotal, "member")
@@ -294,6 +294,7 @@ impl Billable {
     func Describe() => fmt("{0}: {1}", this.Name(), this.Price())
 }
 
+// Every trait contract must have an implementation by the end of the file.
 struct Subscription { customer, monthlyFee }
 impl Subscription with Billable {}
 func Subscription.Name() => this.customer
@@ -321,5 +322,39 @@ Run it with:
 ```
 
 Source: [11-traits-as-interfaces.kit](../../Examples/Language/11-traits-as-interfaces.kit)
+
+## Select composition
+
+Adds a state-less child select's choices to a parent state and declares host-facing descriptions for both selects.
+
+```swift
+// The child has no states, so its choices can be expanded into a parent state.
+select quickActions {
+    desc ["scope": "child"]
+
+    choose "show-advanced" => {
+        print("Show the advanced options.")
+    }
+}
+
+select setup {
+    desc ["title": "Quick setup", "kind": "wizard"]
+
+    initial state start {
+        choose "finish" => exit "Setup completed."
+        choose ...quickActions
+    }
+}
+
+print("Run this recipe with --do setup to open the composed select.")
+```
+
+Run it with:
+
+```powershell
+.\bin\spell.exe .\Examples\Language\12-select-composition.kit -nologo --do setup
+```
+
+Source: [12-select-composition.kit](../../Examples/Language/12-select-composition.kit)
 
 The Release smoke test executes every listed recipe. Run `scripts/generate-recipes.ps1 -Check` to verify that this page matches the source files.

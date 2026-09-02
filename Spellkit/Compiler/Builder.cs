@@ -28,6 +28,7 @@ internal sealed partial class Builder : ILoweredEmitterTarget
     private readonly BuilderDiagnostics diagnostics;
 
     private readonly Dictionary<string, TypeInfo> types;
+    private readonly List<TraitRequirement> traitRequirements;
     private readonly LoweringPass lowering;
     private readonly LoweredEmitter loweredEmitter;
 
@@ -37,6 +38,7 @@ internal sealed partial class Builder : ILoweredEmitterTarget
         importedSymbols = new();
         indexerDeclarations = new();
         types = new();
+        traitRequirements = new();
 
         this.options = options;
         this.linker = linker;
@@ -61,6 +63,7 @@ internal sealed partial class Builder : ILoweredEmitterTarget
     {
         linker = builder.linker;
         types = builder.types;
+        traitRequirements = new();
         referencedUnits = builder.referencedUnits;
         importedSymbols = builder.importedSymbols;
         indexerDeclarations = new(builder.indexerDeclarations);
@@ -85,6 +88,7 @@ internal sealed partial class Builder : ILoweredEmitterTarget
     public Unit? Build(SpellkitCodeModel codeModel)
     {
         diagnostics.Clear();
+        traitRequirements.Clear();
         unit.FileName = codeModel.FileName;
 
         if (unit.Layouts.Count == 0)
@@ -121,6 +125,8 @@ internal sealed partial class Builder : ILoweredEmitterTarget
                 includeLangModule: !options.NoLangModule && unit.UnitIds.Count == 0);
 
             EmitLoweredModule(loweredModule, ctx);
+
+            ValidateTraitRequirements();
 
             //Dispose use declarations in global scope
             CallAutos(cls: true);
@@ -248,6 +254,12 @@ internal sealed partial class Builder : ILoweredEmitterTarget
 
     bool ILoweredEmitterTarget.TryGetTypeInfo(string name, out TypeInfo typeInfo) =>
         types.TryGetValue(name, out typeInfo!);
+
+    void ILoweredEmitterTarget.RegisterMixin(string targetName, Qualident mixin, Location loc) =>
+        RegisterMixin(targetName, mixin, loc);
+
+    void ILoweredEmitterTarget.RegisterInstanceMethod(Qualident typeName, string memberName) =>
+        RegisterInstanceMethod(typeName, memberName);
 
     LoweredImportResolution ILoweredEmitterTarget.LinkImport(LoweredImport node)
     {
@@ -381,7 +393,15 @@ internal sealed class TypeInfo
     public UnitInfo Unit { get; }
 
     public LoweredNominalDeclaration Declaration { get; }
+
+    public HashSet<string> InstanceMembers { get; } = new();
+
+    public List<MixinInfo> Mixins { get; } = new();
 }
+
+internal sealed record MixinInfo(string Name, TypeInfo? TypeInfo);
+
+internal sealed record TraitRequirement(string TargetName, string MixinName, string MemberName, Location Location);
 
 internal record UnitInfo(int Handle, Dictionary<HashString, ScopeVar> ExportList);
 

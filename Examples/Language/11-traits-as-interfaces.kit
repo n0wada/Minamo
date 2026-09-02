@@ -9,6 +9,7 @@ impl Billable {
     func Describe() => fmt("{0}: {1}", this.Name(), this.Price())
 }
 
+// Every trait contract must have an implementation by the end of the file.
 struct Subscription { customer, monthlyFee }
 impl Subscription with Billable {}
 func Subscription.Name() => this.customer

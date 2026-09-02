@@ -38,6 +38,11 @@ internal static class ConsoleApp
     {
         using var session = new ReplSession(options);
 
+        if (options.CheckOnly)
+        {
+            return CompilationCommands.Check(session, options);
+        }
+
         if (options.GenerateBytecode)
         {
             return CompilationCommands.PrintBytecode(session, options);

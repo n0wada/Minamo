@@ -55,4 +55,15 @@ public sealed class CommandLineTests
         Assert.Equal("music.player", options.SelectName);
         Assert.Equal(new[] { "Player.kit" }, options.FileNames);
     }
+
+    [Theory]
+    [InlineData("-check")]
+    [InlineData("--check")]
+    public void RecognizesCheckOption(string argument)
+    {
+        var options = CommandLine.Read(new[] { "script.kit", argument });
+
+        Assert.True(options.CheckOnly);
+        Assert.Equal(new[] { "script.kit" }, options.FileNames);
+    }
 }

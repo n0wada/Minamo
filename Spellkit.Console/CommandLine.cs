@@ -292,6 +292,9 @@ internal sealed class CommandLineOptions
     [Binding("il", Help = "Print bytecode or write it to .il files when -out is specified.", Category = Compiler)]
     public bool GenerateBytecode { get; set; }
 
+    [Binding("check", "-check", Help = "Check syntax, imports, and compilation without executing source.", Category = Compiler)]
+    public bool CheckOnly { get; set; }
+
     [Binding("debug", Help = "Compile in debug mode.", Category = Compiler)]
     public bool Debug { get; set; }
 

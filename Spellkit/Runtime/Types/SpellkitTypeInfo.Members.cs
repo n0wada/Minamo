@@ -451,9 +451,6 @@ public abstract partial class SpellkitTypeInfo : SpellkitObject
 
     internal IEnumerable<int> GetMixins() => mixins;
 
-    protected void AddDefaultMixin(string name, string p1) =>
-        Members.Add(name, new SpellkitBinaryFunction(name, (ctx, _, _) => ctx.NotImplemented(name), p1));
-
     internal bool CheckType(SpellkitTypeInfo typeInfo) =>
         ReflectedTypeId == typeInfo.ReflectedTypeId || mixins.Contains(typeInfo.ReflectedTypeId);
     #endregion

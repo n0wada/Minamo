@@ -150,9 +150,9 @@ Use `import` to bring a module into the current file. An import may have an alia
 name, or import every public name. Imports are local and are not re-exported.
 
 ```swift
-import modules/pricing as pricing
-import receiptLine from modules/text
-import * from modules/common
+import ./modules/pricing as pricing
+import receiptLine from ./modules/text
+import * from ./modules/common
 ```
 
 Module declarations are public by default. Prefix a module-level binding, constant, function,

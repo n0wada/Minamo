@@ -28,3 +28,6 @@ factory. Each `await instance.OpenSelectAsync("quest.town")` creates fresh cells
 quest flags, then binds the choice and guard closures to those cells. `Program.cs` drives the
 resulting `SpellkitSelect` by calling `SelectAsync`. This example intentionally shows the
 C#-initiated API rather than `do` and a suspended Script continuation.
+
+For a compact example of select descriptions and expanded child choices, see the
+[select composition recipe](../../Docs/Language/Recipes.md#select-composition).

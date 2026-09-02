@@ -83,20 +83,6 @@
     assert("Disposed!", msg)
 #endregion
 
-#region "Disposable 2"
-    struct Foo {  }
-    impl Foo with Disposable {}
-    try {
-        {
-            use f = Foo()
-        }
-    } catch e {
-        if constructorName(e) == "NotImplemented" {
-            assert(got: true)
-        }
-    }
-#endregion
-
 #region "Equatable: GetType"
     assert("Equatable", typeName(Equatable))
 #endregion

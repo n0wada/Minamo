@@ -226,7 +226,9 @@ public enum CompilerError
 
     DuplicateIndexer = 284,
 
-    TypePatternOnlyInIs = 285
+    TypePatternOnlyInIs = 285,
+
+    TraitMemberNotImplemented = 292
 }
 
 public enum CompilerWarning

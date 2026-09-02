@@ -124,7 +124,7 @@ internal sealed partial class LoweredEmitter
 
         if (lowered.AutoLookup)
         {
-            EmitMixin(typeVar, new Qualident("Lookup"), node.Location, ctx);
+            EmitMixin(node.Name, typeVar, new Qualident("Lookup"), node.Location, ctx);
         }
 
         if (node.Mixins is not null)
@@ -159,7 +159,7 @@ internal sealed partial class LoweredEmitter
                 target.AddError(CompilerError.MixinSameAsType, node.Location, mixin.ToString());
             }
 
-            var code = EmitMixin(typeVar, mixin, node.Location, ctx);
+            var code = EmitMixin(node.Name, typeVar, mixin, node.Location, ctx);
 
             if (set.Contains(code))
             {
@@ -177,8 +177,9 @@ internal sealed partial class LoweredEmitter
         }
     }
 
-    private int EmitMixin(int typeVar, Qualident mixin, Location location, CompilerContext ctx)
+    private int EmitMixin(string targetName, int typeVar, Qualident mixin, Location location, CompilerContext ctx)
     {
+        target.RegisterMixin(targetName, mixin, location);
         cw.LoadVariable(new ScopeVar(typeVar));
         var code = target.PushTypeInfo(ctx, mixin, location);
         cw.ApplyMixin();
@@ -242,6 +243,8 @@ internal sealed partial class LoweredEmitter
                     fieldsAdded = true;
                 }
             }
+
+            target.RegisterMixin(node.TargetName, mixin, node.Location);
 
             target.PushTypeInfo(ctx, implTarget, node.Location);
             var code = target.PushTypeInfo(ctx, mixin, node.Location);
@@ -1259,6 +1262,11 @@ internal sealed partial class LoweredEmitter
         }
 
         target.PushTypeInfo(ctx, node.TypeName!, node.Location);
+
+        if (!node.IsStatic && !node.IsImplInitializer && node.TargetTypeName is null && node.Body is not null)
+        {
+            target.RegisterInstanceMethod(node.TypeName!, realName);
+        }
 
         if (node.IsStatic)
         {

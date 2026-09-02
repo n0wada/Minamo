@@ -54,6 +54,10 @@ internal interface ILoweredEmitterTarget
 
     bool TryGetTypeInfo(string name, out TypeInfo typeInfo);
 
+    void RegisterMixin(string targetName, Qualident mixin, Location loc);
+
+    void RegisterInstanceMethod(Qualident typeName, string memberName);
+
     LoweredImportResolution LinkImport(LoweredImport node);
 
     bool TryResolveModuleMember(string moduleName, string memberName, out ScopeVar symbol);

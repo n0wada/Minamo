@@ -65,6 +65,25 @@ public sealed class ParserTests
         Assert.True(result.Success);
     }
 
+    [Theory]
+    [InlineData("import ./modules/pricing as pricing")]
+    [InlineData("import Discount from ./modules/pricing")]
+    [InlineData("import * from ./modules/pricing")]
+    public void AcceptsExplicitRelativeImportPaths(string source)
+    {
+        var result = SpellkitParser.Parse(source);
+        var bareResult = SpellkitParser.Parse(
+            source.Replace("./", string.Empty, StringComparison.Ordinal));
+
+        Assert.True(result.Success);
+        Assert.True(bareResult.Success);
+        var import = Assert.Single(result.Value!.Imports);
+        var bareImport = Assert.Single(bareResult.Value!.Imports);
+        Assert.Equal("modules", import.LocalPath);
+        Assert.Equal("pricing", import.ModuleName);
+        Assert.Equal(bareImport.ToString(), import.ToString());
+    }
+
     [Fact]
     public void ParsesFileAndPreservesPath()
     {

@@ -559,12 +559,13 @@ import ::=
   | "import" identifier "from" module-path
   | "import" "*" "from" module-path
 
-module-path ::= path-part { "/" path-part }
+module-path ::= [ "./" ] path-part { "/" path-part }
 ```
 
 Imports are local and are not re-exported. Module declarations are public by default. `private`
 may prefix module-level bindings, constants, functions, structs, enums, and traits, but not imports
-or `impl` members.
+or `impl` members. `./` explicitly marks an import as relative; it uses the same lookup order as
+the equivalent path without the prefix.
 
 ## Exceptions
 
