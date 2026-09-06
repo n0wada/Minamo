@@ -1,12 +1,12 @@
 # Syntax
 
-This guide introduces the written form of Spellkit source code: how source is separated into
+This guide introduces the written form of Minamo source code: how source is separated into
 statements, how names and literals are written, and how optional type annotations are expressed.
 For the complete parser grammar, see the [grammar reference](../Reference/Grammar.md).
 
 ## Source text and statements
 
-Spellkit source is Unicode text. Whitespace and comments separate tokens. A statement ends at a
+Minamo source is Unicode text. Whitespace and comments separate tokens. A statement ends at a
 line break, a semicolon, a closing brace, or the end of the source file.
 
 Use braces to form a block when several statements belong together:
@@ -69,9 +69,9 @@ Use double quotes for strings and single quotes for one UTF-16 character. Triple
 preserve text across multiple lines. Adjacent ordinary strings are concatenated.
 
 ```swift
-let greeting = "Hello, " "Spellkit"
+let greeting = "Hello, " "Minamo"
 let initial = 'S'
-let path = "C:\\work\\spellkit"
+let path = "C:\\work\\minamo"
 let text = """
 Line one
 Line two
@@ -83,7 +83,7 @@ escapes such as `\uFFFF`.
 
 ## Literal values and collections
 
-The simple literals are `nil`, `true`, `false`, numbers, strings, and characters. Spellkit also
+The simple literals are `nil`, `true`, `false`, numbers, strings, and characters. Minamo also
 has arrays, tuples, labeled tuples, and dictionaries.
 
 ```swift

@@ -1,6 +1,6 @@
 # Types and traits
 
-This guide covers Spellkit's nominal data types, traits, and implementations. Type annotations are
+This guide covers Minamo's nominal data types, traits, and implementations. Type annotations are
 descriptive metadata rather than a separate static type system; see [Syntax](Syntax.md) for their
 written form and the [grammar reference](../Reference/Grammar.md) for the complete syntax.
 
@@ -84,7 +84,7 @@ if FindUserName() is Some(name) {
 ```
 
 Use a type annotation when it clarifies the values that an enum represents. For example,
-`Result<String, String>` documents a string success value and a string error value. Spellkit
+`Result<String, String>` documents a string success value and a string error value. Minamo
 retains both arguments for tooling and documentation, while runtime execution uses the outer
 `Result` type name.
 

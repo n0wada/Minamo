@@ -1,6 +1,6 @@
 param(
     [string]$Configuration = "Debug",
-    [string]$Project = "Spellkit.sln"
+    [string]$Project = "Minamo.sln"
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,7 +38,7 @@ if ($LASTEXITCODE -ne 0)
 
 if ($Configuration -eq "Release")
 {
-    $consoleProject = Join-Path $repoRoot "Spellkit.Console\Spellkit.Console.csproj"
+    $consoleProject = Join-Path $repoRoot "Minamo.Console\Minamo.Console.csproj"
     $releaseOutput = Join-Path $repoRoot "bin"
 
     dotnet restore $consoleProject `
@@ -65,12 +65,19 @@ if ($Configuration -eq "Release")
         exit $LASTEXITCODE
     }
 
+    $appHost = Join-Path $releaseOutput "Minamo.Console.exe"
+    $launcher = Join-Path $releaseOutput "minamo.exe"
+    if (Test-Path -LiteralPath $appHost)
+    {
+        Move-Item -LiteralPath $appHost -Destination $launcher -Force
+    }
+
     foreach ($fileName in @(
-        "Spellkit.deps.json",
-        "Spellkit.pdb",
-        "Spellkit.Generators.deps.json",
-        "Spellkit.Generators.pdb",
-        "spell.pdb"))
+        "Minamo.deps.json",
+        "Minamo.pdb",
+        "Minamo.Generators.deps.json",
+        "Minamo.Generators.pdb",
+        "Minamo.Console.pdb"))
     {
         $file = Join-Path $releaseOutput $fileName
         if (Test-Path -LiteralPath $file)

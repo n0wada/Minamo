@@ -1,13 +1,13 @@
-# Spellkit
+# Minamo
 
-Spellkit is a lightweight dynamic language and embeddable scripting runtime for .NET.
+Minamo is a lightweight dynamic language and embeddable scripting runtime for .NET.
 It gives applications a real programming language without giving scripts unrestricted
 access to the host.
 
-Spellkit includes a handwritten parser, bytecode compiler, virtual machine, interactive
+Minamo includes a handwritten parser, bytecode compiler, virtual machine, interactive
 console, standard-library modules, and a C# Hosting API.
 
-## Why Spellkit?
+## Why Minamo?
 
 - **Embeddable by design** — create isolated instances and execute scripts from C#.
 - **Explicit host boundaries** — scripts see registered commands and resources, not
@@ -17,12 +17,12 @@ console, standard-library modules, and a C# Hosting API.
 - **An expressive language** — functions, iterators, pattern matching, modules,
   user-defined types, traits, exceptions, and extension methods.
 
-Spellkit began as a fork of [Dyalect](https://github.com/vorov2/dyalect) and is being
+Minamo began as a fork of [Dyalect](https://github.com/vorov2/dyalect) and is being
 reshaped around small, controllable embedded runtimes.
 
 ## Getting started
 
-Spellkit source files use the `.kit` extension.
+Minamo source files use the `.nami` extension.
 
 ```swift
 func fibonacci(n) =>
@@ -46,52 +46,53 @@ You need the .NET 10 SDK. From PowerShell at the repository root:
 Start the interactive console:
 
 ```powershell
-.\bin\spell.exe
+.\bin\minamo.exe
 ```
 
 Or execute a source file:
 
 ```powershell
-.\bin\spell.exe .\hello.kit
+.\bin\minamo.exe .\hello.nami
 ```
 
 Check source syntax, imports, and compilation without executing it:
 
 ```powershell
-.\bin\spell.exe .\hello.kit --check
+.\bin\minamo.exe .\hello.nami --check
 ```
 
 Start an interactive select declared by the file:
 
 ```powershell
-.\bin\spell.exe .\Player.kit --do music.player
+.\bin\minamo.exe .\Player.nami --do music.player
 ```
 
-Inside the REPL, use `do "music.player"`. The console displays the currently available choices;
+Inside the REPL, use the console command `do music.player`. This command and `--do` drive the C#
+hosting API for testing; scripts have no select invocation syntax. The console displays the currently available choices;
 enter their number.
 
 Use `--help` or `--version` for command-line information; enter `#help` in the REPL for
 interactive commands.
 
-The Windows `spell.exe` distribution is framework-dependent and requires the .NET 10
+The Windows `minamo.exe` distribution is framework-dependent and requires the .NET 10
 Runtime to be installed.
 
-## Embed Spellkit in C#
+## Embed Minamo in C#
 
-Embedding requires references to `Spellkit.dll` (the Hosting API and runtime) and
-`Spellkit.Generators.dll` (the source generator). Reference the generator as an analyzer
-at build time; the running application requires `Spellkit.dll`.
+Embedding requires references to `Minamo.dll` (the Hosting API and runtime) and
+`Minamo.Generators.dll` (the source generator). Reference the generator as an analyzer
+at build time; the running application requires `Minamo.dll`.
 
-The application-facing API lives in `Spellkit.Hosting`. Source generation turns attributed
+The application-facing API lives in `Minamo.Hosting`. Source generation turns attributed
 C# methods into commands:
 
 ```csharp
-using Spellkit.Hosting;
+using Minamo.Hosting;
 
-[SpellkitModule("app")]
+[MinamoModule("app")]
 public sealed class AppCommands
 {
-    [SpellkitCommand("greet")]
+    [MinamoCommand("greet")]
     public string Greet(string name) => $"Hello, {name}!";
 }
 ```
@@ -99,21 +100,21 @@ public sealed class AppCommands
 Register the generated bindings and execute a script in an isolated instance:
 
 ```csharp
-var host = new SpellkitHost();
+var host = new MinamoHost();
 host.AddModule(new AppCommands());
 
 using var instance = host.CreateInstance();
-var result = instance.ExecuteFile("hello.kit");
+var result = instance.ExecuteFile("hello.nami");
 
 if (!result.Success)
     Console.Error.WriteLine(result.Failure?.Message);
 ```
 
-`hello.kit` contains the script code:
+`hello.nami` contains the script code:
 
 ```swift
 import app
-app.greet("Spellkit")
+app.greet("Minamo")
 ```
 
 Hosts can expose selected commands and resources, supply capabilities and limits, and keep
@@ -124,7 +125,7 @@ the application, tooling, and runtime-extension surfaces.
 ## Examples
 
 - [Station Console](Examples/StationConsole/README.md) combines a C# space-station
-  simulation with a Spellkit emergency script:
+  simulation with a Minamo emergency script:
 
   ```powershell
   dotnet run --project .\Examples\StationConsole\StationConsole.csproj
@@ -137,7 +138,7 @@ the application, tooling, and runtime-extension surfaces.
   ```
 
 - [Quest Console](Examples/QuestConsole/README.md) is a game-style interactive select where C#
-  owns quest data and Spellkit owns dialogue states and choices:
+  owns quest data and Minamo owns dialogue states and choices:
 
   ```powershell
   dotnet run --project .\Examples\QuestConsole\QuestConsole.csproj
@@ -147,11 +148,11 @@ the application, tooling, and runtime-extension surfaces.
 
 | Path | Purpose |
 | --- | --- |
-| `Spellkit` | Parser, compiler, linker, VM, runtime types, and Hosting API |
-| `Spellkit.Console` | `spell` command-line runner, REPL, and standard modules |
-| `Spellkit.Generators` | Source generators for C# host bindings |
-| `Spellkit.UnitTests` | xUnit tests and the optional `.kit` language report runner |
-| `Examples` | Runnable C# hosts and Spellkit scripts |
+| `Minamo` | Parser, compiler, linker, VM, runtime types, and Hosting API |
+| `Minamo.Console` | `minamo` command-line runner, REPL, and standard modules |
+| `Minamo.Generators` | Source generators for C# host bindings |
+| `Minamo.UnitTests` | xUnit tests and the optional `.nami` language report runner |
+| `Examples` | Runnable C# hosts and Minamo scripts |
 | `Docs` | Language, hosting, compatibility, and test documentation |
 
 ## Validate the checkout
@@ -165,7 +166,7 @@ Run the full local validation suite:
 For focused work, the xUnit project can be run directly:
 
 ```powershell
-dotnet test .\Spellkit.UnitTests\Spellkit.UnitTests.csproj
+dotnet test .\Minamo.UnitTests\Minamo.UnitTests.csproj
 ```
 
 See [Compatibility](Docs/Operations/Compatibility.md) for the supported framework contract and
@@ -221,4 +222,4 @@ surfaces, and record planned language and host integration designs.
 
 ## License
 
-Spellkit is available under the [MIT License](LICENSE).
+Minamo is available under the [MIT License](LICENSE).

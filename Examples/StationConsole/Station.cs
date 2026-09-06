@@ -1,36 +1,36 @@
-using Spellkit.Hosting;
-using Spellkit.Runtime.Types;
+using Minamo.Hosting;
+using Minamo.Runtime.Types;
 
-namespace Spellkit.Examples.StationConsole;
+namespace Minamo.Examples.StationConsole;
 
-[SpellkitModule("station")]
+[MinamoModule("station")]
 public sealed class StationCommands
 {
     private readonly Station station;
 
     internal StationCommands(Station station) => this.station = station;
 
-    [SpellkitCommand(Description = "Returns a compact station status line.",
+    [MinamoCommand(Description = "Returns a compact station status line.",
         Capability = "station.read")]
     public string Status() => station.Status();
 
-    [SpellkitProperty(Description = "Returns the current oxygen percentage.",
+    [MinamoProperty(Description = "Returns the current oxygen percentage.",
         Capability = "station.read")]
     public double OxygenLevel => station.OxygenLevel;
 
-    [SpellkitCommand(Description = "Writes a message to the station console.",
+    [MinamoCommand(Description = "Writes a message to the station console.",
         Capability = "station.control")]
     public void Broadcast(string message) =>
         Console.WriteLine($"[station] {message}");
 
-    [SpellkitCommand(Description = "Returns the instance-scoped reactor handle.",
+    [MinamoCommand(Description = "Returns the instance-scoped reactor handle.",
         Capability = "station.read")]
-    public SpellkitObject Reactor(SpellkitCommandContext context) =>
+    public MinamoObject Reactor(MinamoCommandContext context) =>
         context.Resource(station.ReactorResource);
 
-    [SpellkitCommand(Description = "Returns an instance-scoped handle for a named door.",
+    [MinamoCommand(Description = "Returns an instance-scoped handle for a named door.",
         Capability = "station.read")]
-    public SpellkitObject Door(SpellkitCommandContext context, string zone) =>
+    public MinamoObject Door(MinamoCommandContext context, string zone) =>
         context.Resource(station.GetDoorResource(zone));
 }
 
@@ -105,32 +105,32 @@ internal sealed class StationDoor(string zone)
     public void Unlock() => Locked = false;
 }
 
-[SpellkitResource("Station.Reactor")]
-internal sealed class StationReactorResource(StationReactor reactor) : SpellkitResource
+[MinamoResource("Station.Reactor")]
+internal sealed class StationReactorResource(StationReactor reactor) : MinamoResource
 {
-    [SpellkitCommand]
+    [MinamoCommand]
     public double Output() => reactor.Output;
 
-    [SpellkitCommand(Description = "Changes reactor output.", Capability = "station.control")]
+    [MinamoCommand(Description = "Changes reactor output.", Capability = "station.control")]
     public void SetOutput(double value) => reactor.SetOutput(value);
 
     protected override void OnRelease() =>
         Console.WriteLine("[resource] reactor handle released");
 }
 
-[SpellkitResource("Station.Door")]
-internal sealed class StationDoorResource(StationDoor door) : SpellkitResource
+[MinamoResource("Station.Door")]
+internal sealed class StationDoorResource(StationDoor door) : MinamoResource
 {
-    [SpellkitCommand]
+    [MinamoCommand]
     public string Zone() => door.Zone;
 
-    [SpellkitCommand]
+    [MinamoCommand]
     public bool Locked() => door.Locked;
 
-    [SpellkitCommand(Description = "Locks this door.", Capability = "station.control")]
+    [MinamoCommand(Description = "Locks this door.", Capability = "station.control")]
     public void Lock() => door.Lock();
 
-    [SpellkitCommand(Description = "Unlocks this door.", Capability = "station.control")]
+    [MinamoCommand(Description = "Unlocks this door.", Capability = "station.control")]
     public void Unlock() => door.Unlock();
 
     protected override void OnRelease() =>

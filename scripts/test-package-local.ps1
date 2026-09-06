@@ -5,9 +5,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$project = Join-Path $repoRoot "Spellkit\Spellkit.csproj"
+$project = Join-Path $repoRoot "Minamo\Minamo.csproj"
 $props = [xml](Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "Directory.Build.props"))
-$version = $props.SelectSingleNode("//SpellkitVersion").InnerText
+$version = $props.SelectSingleNode("//MinamoVersion").InnerText
 $runRoot = Join-Path $repoRoot ("artifacts\package-smoke\" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 $packageDirectory = Join-Path $runRoot "packages"
 $consumerDirectory = Join-Path $runRoot "consumer"
@@ -15,7 +15,7 @@ $consumerPackages = Join-Path $runRoot "nuget"
 $dotnetHome = Join-Path $runRoot "dotnet-home"
 $appData = Join-Path $runRoot "appdata"
 $localAppData = Join-Path $runRoot "localappdata"
-$package = Join-Path $packageDirectory "Spellkit.$version.nupkg"
+$package = Join-Path $packageDirectory "Minamo.$version.nupkg"
 $nugetConfig = Join-Path $consumerDirectory "NuGet.Config"
 
 New-Item -ItemType Directory -Force -Path $packageDirectory | Out-Null
@@ -45,9 +45,9 @@ try
 {
     $entries = @($archive.Entries.FullName)
     foreach ($required in @(
-        "lib/net10.0/Spellkit.dll",
-        "analyzers/dotnet/cs/Spellkit.Generators.dll",
-        "spellkit.png",
+        "lib/net10.0/Minamo.dll",
+        "analyzers/dotnet/cs/Minamo.Generators.dll",
+        "minamo.png",
         "README.md"))
     {
         if ($required -notin $entries)
@@ -69,24 +69,24 @@ finally
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Spellkit" Version="$version" />
+    <PackageReference Include="Minamo" Version="$version" />
   </ItemGroup>
 </Project>
 "@ | Set-Content -Encoding UTF8 (Join-Path $consumerDirectory "Consumer.csproj")
 
 @'
-using Spellkit.Hosting;
+using Minamo.Hosting;
 
 var commands = new SampleCommands();
-var host = new SpellkitHost().AddModule(commands);
+var host = new MinamoHost().AddModule(commands);
 using var instance = host.CreateInstance(commands);
 var result = instance.Execute("import sample\nsample.Add(20, 22)");
 return result.Success && result.GetValue<long>() == 42 ? 0 : 1;
 
-[SpellkitModule("sample")]
+[MinamoModule("sample")]
 public sealed class SampleCommands
 {
-    [SpellkitCommand]
+    [MinamoCommand]
     public long Add(long left, long right) => left + right;
 }
 '@ | Set-Content -Encoding UTF8 (Join-Path $consumerDirectory "Program.cs")

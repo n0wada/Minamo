@@ -90,7 +90,7 @@ let text = value as String
 
 ## Assignment and rebinding
 
-Use `=` to assign or rebind a mutable location. Spellkit also supports nil-coalescing and
+Use `=` to assign or rebind a mutable location. Minamo also supports nil-coalescing and
 arithmetic assignment.
 
 ```swift

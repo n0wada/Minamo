@@ -2,21 +2,21 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>$(SpellkitRuntimeTargetFramework)</TargetFramework>
+    <TargetFramework>$(MinamoRuntimeTargetFramework)</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>Spellkit.Examples.StationConsole</AssemblyName>
+    <AssemblyName>Minamo.Examples.StationConsole</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Spellkit.Generators\Spellkit.Generators.csproj"
+    <ProjectReference Include="..\..\Minamo.Generators\Minamo.Generators.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\..\Spellkit\Spellkit.csproj" />
+    <ProjectReference Include="..\..\Minamo\Minamo.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="Scripts\**\*.kit" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Scripts\**\*.nami" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

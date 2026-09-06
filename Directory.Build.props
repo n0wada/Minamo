@@ -1,32 +1,32 @@
 <Project>
   <PropertyGroup>
     <!-- Product identity lives here so a future rename does not require editing every project. -->
-    <SpellkitProductName>Spellkit</SpellkitProductName>
-    <SpellkitVersion>0.9.4</SpellkitVersion>
-    <SpellkitCompany>Spellkit Contributors</SpellkitCompany>
-    <SpellkitCopyright>Copyright (c) Spellkit Contributors</SpellkitCopyright>
+    <MinamoProductName>Minamo</MinamoProductName>
+    <MinamoVersion>0.9.4</MinamoVersion>
+    <MinamoCompany>Minamo Contributors</MinamoCompany>
+    <MinamoCopyright>Copyright (c) Minamo Contributors</MinamoCopyright>
     <MicrosoftCodeAnalysisVersion>4.1.0</MicrosoftCodeAnalysisVersion>
     <MicrosoftCodeAnalysisAnalyzersVersion>3.3.3</MicrosoftCodeAnalysisAnalyzersVersion>
     <MicrosoftNetTestSdkVersion>18.7.0</MicrosoftNetTestSdkVersion>
     <CoverletCollectorVersion>10.0.1</CoverletCollectorVersion>
     <XunitVersion>3.2.2</XunitVersion>
     <XunitRunnerVisualStudioVersion>3.1.5</XunitRunnerVisualStudioVersion>
-    <SpellkitRuntimeTargetFramework>net10.0</SpellkitRuntimeTargetFramework>
+    <MinamoRuntimeTargetFramework>net10.0</MinamoRuntimeTargetFramework>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <SpellkitOutputRoot>$(MSBuildThisFileDirectory)bin\</SpellkitOutputRoot>
-    <SpellkitGeneratorOutputPath Condition="'$(Configuration)' == 'Release'">$(SpellkitOutputRoot)Spellkit.Generators.dll</SpellkitGeneratorOutputPath>
-    <SpellkitGeneratorOutputPath Condition="'$(Configuration)' != 'Release'">$(SpellkitOutputRoot)tools\generators\$(Configuration)\Spellkit.Generators.dll</SpellkitGeneratorOutputPath>
-    <SpellkitProductProject Condition="'$(MSBuildProjectName)' == 'Spellkit'
-      Or '$(MSBuildProjectName)' == 'Spellkit.Console'">true</SpellkitProductProject>
-    <OutputPath>$(SpellkitOutputRoot)projects\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
+    <MinamoOutputRoot>$(MSBuildThisFileDirectory)bin\</MinamoOutputRoot>
+    <MinamoGeneratorOutputPath Condition="'$(Configuration)' == 'Release'">$(MinamoOutputRoot)Minamo.Generators.dll</MinamoGeneratorOutputPath>
+    <MinamoGeneratorOutputPath Condition="'$(Configuration)' != 'Release'">$(MinamoOutputRoot)tools\generators\$(Configuration)\Minamo.Generators.dll</MinamoGeneratorOutputPath>
+    <MinamoProductProject Condition="'$(MSBuildProjectName)' == 'Minamo'
+      Or '$(MSBuildProjectName)' == 'Minamo.Console'">true</MinamoProductProject>
+    <OutputPath>$(MinamoOutputRoot)projects\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
 
-    <Version Condition="'$(Version)' == ''">$(SpellkitVersion)</Version>
-    <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(SpellkitVersion)</AssemblyVersion>
-    <FileVersion Condition="'$(FileVersion)' == ''">$(SpellkitVersion)</FileVersion>
-    <Company Condition="'$(Company)' == ''">$(SpellkitCompany)</Company>
-    <Product Condition="'$(Product)' == ''">$(SpellkitProductName)</Product>
-    <Copyright Condition="'$(Copyright)' == ''">$(SpellkitCopyright)</Copyright>
-    <Trademark Condition="'$(Trademark)' == ''">$(SpellkitCompany)</Trademark>
+    <Version Condition="'$(Version)' == ''">$(MinamoVersion)</Version>
+    <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(MinamoVersion)</AssemblyVersion>
+    <FileVersion Condition="'$(FileVersion)' == ''">$(MinamoVersion)</FileVersion>
+    <Company Condition="'$(Company)' == ''">$(MinamoCompany)</Company>
+    <Product Condition="'$(Product)' == ''">$(MinamoProductName)</Product>
+    <Copyright Condition="'$(Copyright)' == ''">$(MinamoCopyright)</Copyright>
+    <Trademark Condition="'$(Trademark)' == ''">$(MinamoCompany)</Trademark>
     <PackageLicenseExpression Condition="'$(PackageLicenseExpression)' == ''">MIT</PackageLicenseExpression>
     <PackageProjectUrl Condition="'$(PackageProjectUrl)' == ''" />
     <RepositoryUrl Condition="'$(RepositoryUrl)' == ''" />
@@ -41,39 +41,39 @@
   </PropertyGroup>
 
   <!-- Keep distributable Release files at bin root and isolate development-only outputs. -->
-  <PropertyGroup Condition="'$(SpellkitProductProject)' == 'true' And '$(Configuration)' == 'Release'">
-    <OutputPath>$(SpellkitOutputRoot)</OutputPath>
+  <PropertyGroup Condition="'$(MinamoProductProject)' == 'true' And '$(Configuration)' == 'Release'">
+    <OutputPath>$(MinamoOutputRoot)</OutputPath>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(SpellkitProductProject)' == 'true' And '$(Configuration)' == 'Debug'">
-    <OutputPath>$(SpellkitOutputRoot)debug\</OutputPath>
+  <PropertyGroup Condition="'$(MinamoProductProject)' == 'true' And '$(Configuration)' == 'Debug'">
+    <OutputPath>$(MinamoOutputRoot)debug\</OutputPath>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(SpellkitProductProject)' == 'true' And '$(Configuration)' == 'DebugGenerators'">
-    <OutputPath>$(SpellkitOutputRoot)debug-generators\</OutputPath>
+  <PropertyGroup Condition="'$(MinamoProductProject)' == 'true' And '$(Configuration)' == 'DebugGenerators'">
+    <OutputPath>$(MinamoOutputRoot)debug-generators\</OutputPath>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Spellkit.UnitTests'
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Minamo.UnitTests'
     And '$(LanguageRunner)' != 'true'">
-    <OutputPath>$(SpellkitOutputRoot)tests\unit\$(Configuration)\</OutputPath>
+    <OutputPath>$(MinamoOutputRoot)tests\unit\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Spellkit.UnitTests'
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Minamo.UnitTests'
     And '$(LanguageRunner)' == 'true'">
     <BaseIntermediateOutputPath>obj\language-runner\</BaseIntermediateOutputPath>
-    <OutputPath>$(SpellkitOutputRoot)tests\language\$(Configuration)\</OutputPath>
+    <OutputPath>$(MinamoOutputRoot)tests\language\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Spellkit.Generators' And '$(Configuration)' == 'Release'">
-    <OutputPath>$(SpellkitOutputRoot)</OutputPath>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Minamo.Generators' And '$(Configuration)' == 'Release'">
+    <OutputPath>$(MinamoOutputRoot)</OutputPath>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Spellkit.Generators' And '$(Configuration)' != 'Release'">
-    <OutputPath>$(SpellkitOutputRoot)tools\generators\$(Configuration)\</OutputPath>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Minamo.Generators' And '$(Configuration)' != 'Release'">
+    <OutputPath>$(MinamoOutputRoot)tools\generators\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'StationConsole'">
-    <OutputPath>$(SpellkitOutputRoot)examples\StationConsole\$(Configuration)\</OutputPath>
+    <OutputPath>$(MinamoOutputRoot)examples\StationConsole\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'DebugGenerators'">

@@ -6,9 +6,9 @@ loop.
 
 ## Published UI state and revisions
 
-`OpenSelectAsync` returns one live `SpellkitSelect` object. Its `State`, `Description`, `Choices`,
+`OpenSelectAsync` returns one live `MinamoSelect` object. Its `State`, `Description`, `Choices`,
 and `IsCompleted` properties are the most recently published UI state. Reading them does not
-execute Spellkit code; opening the select, completing an action, refreshing, and invalidating
+execute Minamo code; opening the select, completing an action, refreshing, and invalidating
 publish a new state asynchronously. A failed publication leaves the preceding published state
 unchanged.
 
@@ -26,7 +26,7 @@ try
     await town.SelectAtRevisionAsync(request.ChoiceId, request.Revision);
     ui.Render(town.State, town.Choices);
 }
-catch (SpellkitSelectRevisionMismatchException stale)
+catch (MinamoSelectRevisionMismatchException stale)
 {
     ui.Render(town.State, town.Choices);
 }
@@ -61,7 +61,7 @@ already executing one of the session's actions; queue that notification instead.
 uses no `=>`, and must be a dictionary literal with string keys. It is evaluated once when the
 interaction opens.
 
-```kit
+```nami
 select courierQuest {
     desc ["template": "quest", "title": "Courier needed"]
 
@@ -82,16 +82,16 @@ select courierQuest {
 }
 ```
 
-`SpellkitSelectDescription.GetValue<T>()` and `TryGetValue<T>()` use standard host conversion. For
+`MinamoSelectDescription.GetValue<T>()` and `TryGetValue<T>()` use standard host conversion. For
 example, a dictionary description can be read as `Dictionary<string, object?>`.
 
 ## Stateful select declarations
 
-A select expression is a reusable factory. Each `OpenSelectAsync` or `do`
+A select expression is a reusable factory. Each `OpenSelectAsync`
 creates a new interaction instance, including its state and select-local values. Captured outer
 variables belong to the factory and are shared by its instances.
 
-```kit
+```nami
 func createShop(items) {
     mut visits = 0
 
@@ -113,7 +113,7 @@ select instance. Select-local declarations must precede the state declarations.
 Use select-local values when state actions need to share per-session data. `enter` and `leave`
 run when a state is entered or left.
 
-```kit
+```nami
 select counter {
     mut total = 0
 
@@ -141,15 +141,14 @@ select counter {
 ```
 
 `enter` runs after the initial state is created and after `goto`; `leave` runs before a `goto` or
-`exit` leaves a state. Both are side-effect hooks: they cannot themselves `goto`, `exit`, or start
-a nested select.
+`exit` leaves a state. Both are side-effect hooks: they cannot themselves `goto` or `exit`.
 
 ### Empty-choice actions
 
 `on empty` runs once after entering a state when no choice is available and the state has no host
 event. It can use `goto` or `exit` to recover from an empty state.
 
-```kit
+```nami
 initial state gate {
     choose "continue" when account.ready => goto next
     on empty => exit "Account is not ready"
@@ -161,9 +160,9 @@ stays active with an empty choice list.
 
 ### Dynamic choices
 
-Put `for` on a `choose` declaration to generate one choice for each item in a Spellkit collection.
+Put `for` on a `choose` declaration to generate one choice for each item in a Minamo collection.
 
-```kit
+```nami
 initial state browse {
     choose "leave" => exit
 
@@ -178,36 +177,28 @@ initial state browse {
 }
 ```
 
-The source is reevaluated when Spellkit publishes the UI state: on opening, after an action, and
+The source is reevaluated when Minamo publishes the UI state: on opening, after an action, and
 after `RefreshAsync` or `InvalidateAsync`. Generated IDs must be nonempty and unique among all
 choices in the state. Dynamic choices currently have no host-supplied parameters: the loop item is
 their action input.
 
-## Script-initiated and nested selects
+## Exposing factory expressions to the host
 
-`do expression` starts a select factory and suspends the Spellkit VM until it exits. The expression
-evaluates to the value supplied by `exit`.
+The host opens a select by its global variable name or an alias. To expose a factory produced by a
+function or stored in an object, bind it to a global variable or register it with `alias`:
 
-```kit
-func visitTown() {
-    let result = do town
-    print("Town closed: ", result)
-}
+```nami
+let shop = createShop(items)
+alias(shop, "town.shop")
 ```
 
-A choice can start another select. While it is active, the host sees only the inner select's current
-state and choices. When it exits, the parent choice resumes after `do`.
-
-```kit
-choose "shop" => {
-    let purchase = do "town.shop"
-    recordPurchase(purchase)
-    goto square
-}
+```csharp
+using var shop = await instance.OpenSelectAsync("town.shop");
+var result = await shop.SelectAsync("leave");
 ```
 
-`do "dotted.name"` resolves a Script alias registered with `alias(factory, "dotted.name")`.
-Disposing or cancelling an outer session also cancels its active nested select.
+Scripts declare factories and actions; the host controls when to open each interaction. Within
+one interaction, use `state` and `goto` for explicit stages.
 
 ## Expanded child choices
 
@@ -215,7 +206,7 @@ Use `choose ...child` inside a named parent state to add the choices of a state-
 The child keeps its own select-local values, but is directly composed into the parent interaction.
 State-less parent selects cannot use choice spreads.
 
-```kit
+```nami
 select filters {
     mut showArchived = false
 
@@ -246,22 +237,8 @@ using var select = await instance.OpenSelectAsync("dialog");
 var result = await select.SelectAsync("confirm");
 ```
 
-When a script itself executes `do`, start it with `StartAsync`. The resulting
-`SpellkitRunSession` exposes the active `State`, `Description`, `Choices`, and nullable `Revision`.
-It also supports the same choice, revision, refresh, and invalidation operations while the VM is
-waiting for a select.
-
-```csharp
-using var run = await instance.StartAsync(source);
-while (!run.IsCompleted)
-{
-    var choice = await ui.PickAsync(run.Choices);
-    await run.SelectAsync(choice);
-}
-```
-
-`SpellkitEnvironment.UseSelectAsync` installs a host-wide select runner for scripts that execute
-`do`. The `spell` console supplies its own runner.
+Automated tests can use this same API. The console also drives `OpenSelectAsync` and `SelectAsync`
+for manual tests through `--do name` or the REPL command `do name`; neither is a script expression.
 
 ## Host boundary and limits
 
@@ -271,8 +248,7 @@ it was displayed; selection is checked again before its action runs.
 
 Current limits are deliberate:
 
-- one active suspended run per `SpellkitInstance`;
 - serialized select actions rather than concurrent actions;
-- no public serialization of suspended VM continuations or select instances.
+- no public serialization of select instances.
 
 For exact syntax and all validation rules, see the [grammar reference](../Reference/Grammar.md).

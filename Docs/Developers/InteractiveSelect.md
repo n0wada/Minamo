@@ -1,11 +1,11 @@
 # Interactive selects
 
-`select` lets a Spellkit script describe a menu, dialogue, shop, or similar interaction. The
+`select` lets a Minamo script describe a menu, dialogue, shop, or similar interaction. The
 script decides which actions are available and where they lead; the C# host displays those actions
 and sends the selected ID back to the script.
 
 This page covers the normal host integration. It uses `OpenSelectAsync` and its small
-`SpellkitSelect` API. For web UIs, dynamic choices, nested selects, and revision-aware input,
+`MinamoSelect` API. For web UIs, dynamic choices, expanded child choices, and revision-aware input,
 see [Advanced interactive selects](InteractiveSelectAdvanced.md).
 
 ## Quick start
@@ -13,7 +13,7 @@ see [Advanced interactive selects](InteractiveSelectAdvanced.md).
 Declare a named select at module scope. For a single-screen interaction, choices can appear directly
 in the select body.
 
-```kit
+```nami
 select town {
     choose "leave" => exit "goodbye"
 }
@@ -41,7 +41,7 @@ while (!town.IsCompleted)
 }
 ```
 
-`SpellkitSelect` exposes only the operations needed for this loop:
+`MinamoSelect` exposes only the operations needed for this loop:
 
 | Member | Purpose |
 | --- | --- |
@@ -59,6 +59,23 @@ Each call to `OpenSelectAsync` creates a new interaction with its own current st
 select-local values. A state-less select remains active and republishes its choices after an action
 unless that action exits.
 
+## Testing selects
+
+Automated tests use the same C# API as the application: execute the declarations, call
+`OpenSelectAsync`, inspect `Choices`, and drive `SelectAsync` or `SendAsync`. Assert the new choices,
+state, or the returned `MinamoSelectResult.GetValue<T>()` after each action. No script invocation
+syntax or suspended script run is needed.
+
+For a manual test, let the console act as the host:
+
+```powershell
+minamo.exe town.nami --do town
+```
+
+The console loads the file and calls `OpenSelectAsync("town")`. In the REPL, `do town` is a
+console command with the same behavior. These are testing commands, not language syntax;
+`do expression` is not accepted in scripts. The ordinary `do { ... } while ...` loop is supported.
+
 ## States and choices
 
 A select that declares states is a state machine. Exactly one state is `initial`; `goto` moves
@@ -68,7 +85,7 @@ A state contains the choices available at that point. `choose` IDs are the stabl
 the host. `label` is display text; when omitted, it defaults to the ID.
 `goto` enters another state and `exit` completes the interaction, optionally with a value.
 
-```kit
+```nami
 select player {
     initial state stopped {
         choose "play" label "Play" => goto playing
@@ -97,7 +114,7 @@ current state.
 
 Choice parameters determine the C# payload shape:
 
-```kit
+```nami
 choose "play" => { }
 choose "select-track" (trackId) => { }
 choose "set-volume" (trackId, value) => { }
@@ -116,7 +133,7 @@ more parameters receive one C# tuple with the same number of elements.
 
 Use `when` to hide a choice until it is available.
 
-```kit
+```nami
 choose "accept"
     label "Accept the courier quest"
     when game.CanAcceptCourierQuest() => {
@@ -125,7 +142,7 @@ choose "accept"
 }
 ```
 
-A false guard removes the choice from `Choices`. Guards run when Spellkit publishes a select screen:
+A false guard removes the choice from `Choices`. Guards run when Minamo publishes a select screen:
 on opening, after an action, and after `RefreshAsync` or `InvalidateAsync`. They should be free of
 side effects.
 
@@ -134,7 +151,7 @@ side effects.
 `on` declares an event that is not displayed in `Choices`. Use it for host-owned domain events
 such as a timer, a completed download, or an inventory update.
 
-```kit
+```nami
 select download {
     initial state waiting {
         on "completed" (fileName) => exit fileName
@@ -158,5 +175,5 @@ when an old screen or client request must be rejected, host data can change inde
 select, or select actions perform asynchronous work.
 
 For the complete grammar, see the [grammar reference](../Reference/Grammar.md). The advanced guide
-also covers select-local values, state parameters, lifecycle hooks, fallback actions, dynamic
-choices, state display views, script-initiated selects, and nested selects.
+also covers select-local values, lifecycle hooks, fallback actions, dynamic choices, and expanded
+child choices.

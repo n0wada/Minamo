@@ -12,7 +12,7 @@ $appData = Join-Path $repoRoot ".appdata"
 $localAppData = Join-Path $repoRoot ".localappdata"
 $userNuGetDir = Join-Path $appData "NuGet"
 $userNuGetConfig = Join-Path $userNuGetDir "NuGet.Config"
-$testProject = Join-Path $repoRoot "Spellkit.UnitTests\Spellkit.UnitTests.csproj"
+$testProject = Join-Path $repoRoot "Minamo.UnitTests\Minamo.UnitTests.csproj"
 $settings = Join-Path $repoRoot "coverage.runsettings"
 $runDirectory = Join-Path $repoRoot ("artifacts\coverage\" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 

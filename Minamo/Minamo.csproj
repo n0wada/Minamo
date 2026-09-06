@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>$(MinamoRuntimeTargetFramework)</TargetFramework>
+    <Title>$(MinamoProductName)</Title>
+    <Description>Minamo, a dynamic language for .NET</Description>
+    <PackageIcon>minamo.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <AssemblyName>Minamo</AssemblyName>
+    <UseWindowsForms>false</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Minamo.Generators\Minamo.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Misc\messages.xml" LogicalName="Minamo.Resources.messages.xml" />
+    <None Update="Misc\minamo.png" Pack="true" PackagePath="minamo.png" />
+    <None Include="..\README.md" Pack="true" PackagePath="README.md" />
+    <None Include="$(MinamoGeneratorOutputPath)"
+          Pack="true"
+          PackagePath="analyzers\dotnet\cs"
+          Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Minamo.Console</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>spk-tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>spk-language-tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.ComVisibleAttribute">
+      <_Parameter1>false</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.GuidAttribute">
+      <_Parameter1>e74aba7b-5a82-46ee-9eba-6eb0db5792aa</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

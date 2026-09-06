@@ -1,16 +1,16 @@
 # Order Workflow example
 
-This sample keeps most business behavior in Spellkit source files. C# provides a small order
+This sample keeps most business behavior in Minamo source files. C# provides a small order
 ledger, registers three lifecycle signals, and explicitly chooses when queued events are delivered.
 
 The script entry point imports four modules:
 
-- `workflow/model.kit` converts host payloads into a script value type;
-- `workflow/validation.kit` accepts or rejects submitted orders;
-- `workflow/shipping.kit` chooses a delivery plan;
-- `workflow/notifications.kit` formats business-facing messages.
+- `workflow/model.nami` converts host payloads into a script value type;
+- `workflow/validation.nami` accepts or rejects submitted orders;
+- `workflow/shipping.nami` chooses a delivery plan;
+- `workflow/notifications.nami` formats business-facing messages.
 
-`main.kit` installs handlers for `order.submitted`, `order.payment.confirmed`, and
+`main.nami` installs handlers for `order.submitted`, `order.payment.confirmed`, and
 `order.shipment.requested`. The payment handler emits the shipment signal. Because signal delivery
 is explicit, the host calls `DispatchSignalsAsync()` a second time to deliver that newly queued request.
 

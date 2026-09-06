@@ -5,12 +5,12 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$console = Join-Path $repoRoot "bin\spell.exe"
-$station = Join-Path $repoRoot "bin\examples\StationConsole\$Configuration\Spellkit.Examples.StationConsole.dll"
-$workflow = Join-Path $repoRoot "bin\projects\OrderWorkflow\$Configuration\Spellkit.Examples.OrderWorkflow.dll"
+$console = Join-Path $repoRoot "bin\minamo.exe"
+$station = Join-Path $repoRoot "bin\examples\StationConsole\$Configuration\Minamo.Examples.StationConsole.dll"
+$workflow = Join-Path $repoRoot "bin\projects\OrderWorkflow\$Configuration\Minamo.Examples.OrderWorkflow.dll"
 $smokeDirectory = Join-Path $repoRoot "artifacts\release-smoke"
 $languageExamples = Join-Path $repoRoot "Examples\Language"
-$source = Join-Path $smokeDirectory "smoke test.kit"
+$source = Join-Path $smokeDirectory "smoke test.nami"
 
 & (Join-Path $PSScriptRoot "build-local.ps1") -Configuration $Configuration
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -22,29 +22,29 @@ New-Item -ItemType Directory -Force -Path $smokeDirectory | Out-Null
 "print(40 + 2)" | Set-Content -Encoding UTF8 $source
 
 $help = & $console --help 2>&1
-if ($LASTEXITCODE -ne 0 -or ($help -join "`n") -notmatch "Usage: spell")
+if ($LASTEXITCODE -ne 0 -or ($help -join "`n") -notmatch "Usage: minamo")
 {
-    throw "Spellkit console help smoke test failed."
+    throw "Minamo console help smoke test failed."
 }
 
 $version = & $console --version 2>&1
-if ($LASTEXITCODE -ne 0 -or ($version -join "`n") -notmatch '^spell ')
+if ($LASTEXITCODE -ne 0 -or ($version -join "`n") -notmatch '^minamo ')
 {
-    throw "Spellkit console version smoke test failed."
+    throw "Minamo console version smoke test failed."
 }
 
 $execution = & $console $source -nologo 2>&1
 if ($LASTEXITCODE -ne 0 -or ($execution -join "`n") -notmatch '42')
 {
-    throw "Spellkit source execution smoke test failed."
+    throw "Minamo source execution smoke test failed."
 }
 
-foreach ($example in Get-ChildItem $languageExamples -Filter "*.kit" -File | Sort-Object Name)
+foreach ($example in Get-ChildItem $languageExamples -Filter "*.nami" -File | Sort-Object Name)
 {
     & $console $example.FullName -nologo | Out-Null
     if ($LASTEXITCODE -ne 0)
     {
-        throw "Spellkit language recipe '$($example.Name)' failed."
+        throw "Minamo language recipe '$($example.Name)' failed."
     }
 }
 

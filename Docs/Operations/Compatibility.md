@@ -1,6 +1,6 @@
 # Compatibility
 
-This document defines the runtime compatibility contract for embedding Spellkit. It describes what
+This document defines the runtime compatibility contract for embedding Minamo. It describes what
 the repository currently builds and tests; it does not infer compatibility from a host product's
 marketing name or approximate .NET support.
 
@@ -8,13 +8,13 @@ marketing name or approximate .NET support.
 
 | Component | Target framework | Contract |
 | --- | --- | --- |
-| `Spellkit` | `net10.0` | Compiler, runtime, and Hosting API |
-| `Spellkit.Console` | `net10.0` | Command-line host and standard modules |
-| `Spellkit.UnitTests` | `net10.0` | Standard xUnit contract tests |
-| `Spellkit.UnitTests` with `LanguageRunner=true` | `net10.0` | `.kit` language corpus report runner |
-| `Spellkit.Generators` | `netstandard2.0` | Compiler-loaded source generators |
+| `Minamo` | `net10.0` | Compiler, runtime, and Hosting API |
+| `Minamo.Console` | `net10.0` | Command-line host and standard modules |
+| `Minamo.UnitTests` | `net10.0` | Standard xUnit contract tests |
+| `Minamo.UnitTests` with `LanguageRunner=true` | `net10.0` | `.nami` language corpus report runner |
+| `Minamo.Generators` | `netstandard2.0` | Compiler-loaded source generators |
 
-An application embedding the current `Spellkit.dll` must provide a runtime compatible with its
+An application embedding the current `Minamo.dll` must provide a runtime compatible with its
 `net10.0` target. The Generator target does not lower the runtime requirement of generated bindings;
 it only allows the compiler component to be loaded independently.
 
@@ -33,7 +33,7 @@ it only allows the compiler component to be loaded independently.
 
 Add a target framework only for a concrete embedding host. Before calling it supported, verify:
 
-1. `Spellkit.dll` and generated bindings load in the host.
+1. `Minamo.dll` and generated bindings load in the host.
 2. Parsing, compilation, execution, cancellation, limits, and disposal pass there.
 3. Host commands, state, resources, signals, and telemetry cross the boundary correctly.
 4. The optional library remains separate so a restricted host can omit it.
@@ -56,7 +56,7 @@ The local test script exposes independent validation layers:
 ```
 
 `Pipeline` checks parser diagnostics, lowering/compiler output, and direct VM execution. `Language`
-exposes each `.kit` file as an xUnit test case and also runs the standalone corpus runner to update
+exposes each `.nami` file as an xUnit test case and also runs the standalone corpus runner to update
 the Markdown report. `All` runs every contract layer and the language corpus. All suites support
 standard `dotnet test` discovery and filtering; Debug and Release use the same exception-handling
 path in the language test runner.

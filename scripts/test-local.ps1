@@ -1,6 +1,6 @@
 param(
     [string]$Configuration = "Debug",
-    [string]$TestPath = "Spellkit.UnitTests\Tests",
+    [string]$TestPath = "Minamo.UnitTests\Tests",
     [string]$Region,
     [ValidateRange(0.001, 86400)]
     [double]$TimeoutSeconds = 10,
@@ -18,7 +18,7 @@ $appData = Join-Path $repoRoot ".appdata"
 $localAppData = Join-Path $repoRoot ".localappdata"
 $userNuGetDir = Join-Path $appData "NuGet"
 $userNuGetConfig = Join-Path $userNuGetDir "NuGet.Config"
-$testProject = Join-Path $repoRoot "Spellkit.UnitTests\Spellkit.UnitTests.csproj"
+$testProject = Join-Path $repoRoot "Minamo.UnitTests\Minamo.UnitTests.csproj"
 $resolvedTestPath = Join-Path $repoRoot $TestPath
 $languageTestOutput = Join-Path $repoRoot "bin\tests\language\$Configuration"
 $languageTestEntry = Join-Path $languageTestOutput "spk-language-tests.dll"

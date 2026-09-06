@@ -1,6 +1,6 @@
 # Program structure
 
-This guide describes how a Spellkit program is organized: bindings, control flow, modules, and
+This guide describes how a Minamo program is organized: bindings, control flow, modules, and
 error handling. For the exact grammar, see the [grammar reference](../Reference/Grammar.md).
 
 ## Bindings and constants
@@ -159,14 +159,14 @@ Module declarations are public by default. Prefix a module-level binding, consta
 struct, enum, or trait with `private` to keep it within its module.
 
 ```swift
-private const InternalName = "spellkit"
+private const InternalName = "minamo"
 private func normalize(value) => value.Trim()
 ```
 
 ## Exceptions
 
 Use `try`, `catch`, and `finally` to handle a thrown value. `Exception<Tag>(...)` creates a tagged
-Spellkit exception.
+Minamo exception.
 
 ```swift
 try {
@@ -180,7 +180,7 @@ try {
 
 ## Regions
 
-`#region` and `#endregion` name a region of source. They are primarily used by the `.kit` test
+`#region` and `#endregion` name a region of source. They are primarily used by the `.nami` test
 corpus to identify independent test cases.
 
 ```swift

@@ -1,6 +1,6 @@
-using Spellkit.Hosting;
+using Minamo.Hosting;
 
-namespace Spellkit.Examples.StationConsole;
+namespace Minamo.Examples.StationConsole;
 
 internal static class Program
 {
@@ -18,7 +18,7 @@ internal static class Program
 
         Console.WriteLine();
 
-        var scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "emergency.kit");
+        var scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "emergency.nami");
         var startup = await instance.ExecuteFileAsync(scriptPath);
         if (!PrintResult("Startup automation", startup))
         {
@@ -40,9 +40,9 @@ internal static class Program
         return 0;
     }
 
-    private static SpellkitHost CreateHost(Station station)
+    private static MinamoHost CreateHost(Station station)
     {
-        var host = new SpellkitHost(new()
+        var host = new MinamoHost(new()
         {
             Limits = new()
             {
@@ -56,7 +56,7 @@ internal static class Program
                 Console.WriteLine($"[{entry.Level}] {entry.Message}"),
             Trace = trace =>
             {
-                if (trace.Kind is SpellkitTraceKind.HostCommand)
+                if (trace.Kind is MinamoTraceKind.HostCommand)
                 {
                     Console.WriteLine($"[trace] command {trace.Name}");
                 }
@@ -82,11 +82,11 @@ internal static class Program
         return host;
     }
 
-    private static bool PrintResult(string operation, ISpellkitOperationResult result)
+    private static bool PrintResult(string operation, IMinamoOperationResult result)
     {
         if (result.Success)
         {
-            var delivered = result is SpellkitSignalDispatchResult signals
+            var delivered = result is MinamoSignalDispatchResult signals
                 ? $", {signals.Delivered} signals"
                 : string.Empty;
             Console.WriteLine(
@@ -104,7 +104,7 @@ internal static class Program
                 $"{operation}: {failure.Kind}: {failure.Message}");
         }
 
-        if (result is SpellkitExecutionResult execution)
+        if (result is MinamoExecutionResult execution)
         {
             foreach (var diagnostic in execution.Diagnostics)
             {

@@ -1,24 +1,24 @@
-using Spellkit.Hosting;
+using Minamo.Hosting;
 
-namespace Spellkit.Examples.OrderWorkflow;
+namespace Minamo.Examples.OrderWorkflow;
 
-[SpellkitModule("orders")]
+[MinamoModule("orders")]
 public sealed class OrderCommands
 {
     private readonly OrderLedger ledger;
 
     internal OrderCommands(OrderLedger ledger) => this.ledger = ledger;
 
-    [SpellkitCommand(Description = "Records that an accepted order needs payment.",
+    [MinamoCommand(Description = "Records that an accepted order needs payment.",
         Capability = "orders.write")]
     public void RequestPayment(string id) => ledger.RequestPayment(id);
 
-    [SpellkitCommand(Description = "Creates a shipment with a script-selected delivery plan.",
+    [MinamoCommand(Description = "Creates a shipment with a script-selected delivery plan.",
         Capability = "orders.write")]
     public void CreateShipment(string id, string carrier, string priority) =>
         ledger.CreateShipment(id, carrier, priority);
 
-    [SpellkitCommand(Description = "Returns the current lifecycle state for an order.",
+    [MinamoCommand(Description = "Returns the current lifecycle state for an order.",
         Capability = "orders.read")]
     public string Status(string id) => ledger.Status(id);
 }

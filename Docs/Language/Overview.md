@@ -1,8 +1,8 @@
-# Spellkit language overview
+# Minamo language overview
 
-Spellkit is a compact dynamic language for embedded .NET scripting. This page is a map of the
+Minamo is a compact dynamic language for embedded .NET scripting. This page is a map of the
 language rather than a complete specification. See the [recipes](Recipes.md) and the
-[language tests](../../Spellkit.UnitTests/Tests) for more examples.
+[language tests](../../Minamo.UnitTests/Tests) for more examples.
 
 ## Comments
 
@@ -27,7 +27,7 @@ false
 3.14159
 1.2E+10
 'A'
-"Spellkit"
+"Minamo"
 [1, 2, 3]
 (1, "two", true)
 (name: "Ada", age: 33)
@@ -42,7 +42,7 @@ Strings use double quotes. Characters use single quotes. Triple-quoted strings s
 lines. Formatting is explicit through `fmt`.
 
 ```swift
-let name = "Spellkit"
+let name = "Minamo"
 let greeting = fmt("Hello, {0}", name)
 let text = """
 Line one
@@ -78,7 +78,7 @@ tooling and documentation, while execution currently uses only the outer type na
 
 ## Operators
 
-Spellkit provides arithmetic, comparison, logical, assignment, range, conditional, and
+Minamo provides arithmetic, comparison, logical, assignment, range, conditional, and
 nil-coalescing operators.
 
 ```swift
@@ -116,7 +116,7 @@ let transform = (value, operation) => operation(value)
 
 ## Conditional flow
 
-`if` can be used as a statement or expression. Spellkit also provides `guard` and the conditional
+`if` can be used as a statement or expression. Minamo also provides `guard` and the conditional
 operator.
 
 ```swift
@@ -167,10 +167,10 @@ let shop = select {
 }
 ```
 
-Save the script as `shop.kit`, then start its named select from the console:
+Save the script as `shop.nami`, then start its named select from the console:
 
 ```powershell
-spell.exe shop.kit --do shop
+minamo.exe shop.nami --do shop
 ```
 
 The console presents the choices after it executes the file. Selecting `"browse"` runs its choice
@@ -181,7 +181,7 @@ needs explicit state transitions. Named selects can also be opened from C#.
 
 See [Interactive selects](../Developers/InteractiveSelect.md) for basic host integration and
 [Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md) for factory lifetime,
-nesting, aliases, and the C# session API.
+expanded child choices, aliases, and the C# session API.
 
 ## Collections
 
@@ -332,39 +332,39 @@ added when cleanup must run after either success or failure.
 
 ## Embedding in .NET
 
-The application-facing API lives in `Spellkit.Hosting`. Reference `Spellkit.dll` for the Hosting
-API and runtime, and reference `Spellkit.Generators.dll` as an analyzer to expose attributed C#
+The application-facing API lives in `Minamo.Hosting`. Reference `Minamo.dll` for the Hosting
+API and runtime, and reference `Minamo.Generators.dll` as an analyzer to expose attributed C#
 methods as commands.
 
 ```csharp
-using Spellkit.Hosting;
+using Minamo.Hosting;
 
-[SpellkitModule("app")]
+[MinamoModule("app")]
 public sealed class AppCommands
 {
-    [SpellkitCommand("greet")]
+    [MinamoCommand("greet")]
     public string Greet(string name) => $"Hello, {name}!";
 }
 
-var host = new SpellkitHost();
+var host = new MinamoHost();
 host.AddModule(new AppCommands());
 
 using var instance = host.CreateInstance();
-var result = await instance.ExecuteFileAsync("hello.kit");
+var result = await instance.ExecuteFileAsync("hello.nami");
 
 if (!result.Success)
     Console.Error.WriteLine(result.Failure?.Message);
 ```
 
-The `hello.kit` file imports the generated module and calls its command:
+The `hello.nami` file imports the generated module and calls its command:
 
 ```swift
 import app
-app.greet("Spellkit")
+app.greet("Minamo")
 ```
 
 Instances are incremental, so definitions from successful executions remain available to later
-calls. `ExecuteAsync` and `ExecuteFileAsync` provide asynchronous host-call surfaces. Spellkit has
+calls. `ExecuteAsync` and `ExecuteFileAsync` provide asynchronous host-call surfaces. Minamo has
 no language-level `async` or `await` syntax: an ordinary call to an asynchronous host command
 suspends the VM, and the C# hosting surface resumes it when the returned `Task` or `ValueTask`
 completes. The selected entry file can always be executed, while additional file imports remain
@@ -376,7 +376,7 @@ instances:
 ```csharp
 var source = """
     import app
-    app.greet("Spellkit")
+    app.greet("Minamo")
     """;
 
 var program = host.Compile(source).GetValueOrThrow();
@@ -388,11 +388,11 @@ await first.ExecuteAsync();
 await second.ExecuteAsync();
 ```
 
-The `SpellkitProgram` holds the compiled code; each `SpellkitInstance` keeps its own environment
+The `MinamoProgram` holds the compiled code; each `MinamoInstance` keeps its own environment
 and mutable state. C# can expose instance-specific names through that environment:
 
 ```csharp
-var env = new SpellkitEnvironment(game)
+var env = new MinamoEnvironment(game)
     .Expose("self", player)
     .Expose("world", world);
 
@@ -404,7 +404,7 @@ program can run with different host-provided views.
 
 For actor-style scripts, the host object itself can be hidden with `ExposeHostObject = false`.
 Then `host` is not declared in the script, and only names explicitly exposed through the
-`SpellkitEnvironment` are visible.
+`MinamoEnvironment` are visible.
 
 ## Host integration
 

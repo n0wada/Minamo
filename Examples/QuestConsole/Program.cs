@@ -1,17 +1,17 @@
-using Spellkit.Hosting;
+using Minamo.Hosting;
 
-namespace Spellkit.Examples.QuestConsole;
+namespace Minamo.Examples.QuestConsole;
 
 internal static class Program
 {
     private static async Task<int> Main()
     {
-        var host = new SpellkitHost();
-        var environment = new SpellkitEnvironment()
+        var host = new MinamoHost();
+        var environment = new MinamoEnvironment()
             .UseOutput(Console.Write);
 
         using var instance = host.CreateInstance(environment);
-        var scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "town.kit");
+        var scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "town.nami");
 
         Console.WriteLine("Quest Console");
         Console.WriteLine("A Script-owned quest state driven by a C# interactive-select host.");
@@ -35,7 +35,7 @@ internal static class Program
         return 0;
     }
 
-    private static async Task RunSelect(SpellkitSelect select)
+    private static async Task RunSelect(MinamoSelect select)
     {
         while (!select.IsCompleted)
         {

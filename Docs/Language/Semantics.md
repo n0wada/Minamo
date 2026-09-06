@@ -1,6 +1,6 @@
 # Semantics
 
-This guide collects behavior that affects how Spellkit code evaluates. It complements the syntax
+This guide collects behavior that affects how Minamo code evaluates. It complements the syntax
 guides; the [grammar reference](../Reference/Grammar.md) remains the source for accepted syntax.
 
 ## Expressions and values

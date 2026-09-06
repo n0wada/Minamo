@@ -1,7 +1,7 @@
-# Spellkit grammar reference
+# Minamo grammar reference
 
 This document describes the grammar accepted by the current handwritten parser. The parser and
-the passing files under [`Spellkit.UnitTests/Tests`](../../Spellkit.UnitTests/Tests) remain
+the passing files under [`Minamo.UnitTests/Tests`](../../Minamo.UnitTests/Tests) remain
 authoritative. See the [overview](../Language/Overview.md) for an introduction and the
 [recipes](../Language/Recipes.md) for runnable examples.
 
@@ -116,7 +116,7 @@ Comprehensions are:
 
 ## Type annotations
 
-Annotations are descriptive metadata, not a separate static type system. Spellkit does not
+Annotations are descriptive metadata, not a separate static type system. Minamo does not
 enforce them consistently at compile time or runtime.
 
 ```text
@@ -182,8 +182,8 @@ The final expression of a block is its value.
 
 ## Interactive selects
 
-An interactive select defines a host-driven state machine. A host opens it through
-`SpellkitInstance.OpenSelectAsync`. Script may also invoke a factory with `do expression`. The host
+An interactive select presents choices to the host and executes the selected actions. A host opens it
+through `MinamoInstance.OpenSelectAsync`. Named states optionally organize the interaction. The host
 renders current choices and sends a selected choice back to the select. See
 [Interactive selects](../Developers/InteractiveSelect.md) for the basic C# protocol and
 [Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md) for revision-aware,
@@ -249,8 +249,6 @@ exit-statement
 select-alias
     ::= "alias" "(" expression "," string ")"
 
-select-invocation
-    ::= "do" expression
 ```
 
 Named select declarations are permitted only at global (module) scope. A select either declares
@@ -270,8 +268,9 @@ display text; `when` controls whether a choice is currently available.
 no host events; its body may `goto` or `exit`. `enter` runs when a state is entered, including the
 initial state, and `leave` runs before a `goto` or `exit` leaves it. Lifecycle hooks are blocks and
 cannot themselves change state, exit, or suspend. In a named select, `goto` targets must name a
-state declared by that select. Select-local values are available to all states in an interaction. `do expression`
-invokes a factory and evaluates to its exit value. A `choose` declaration with a `for` clause
+state declared by that select. Select-local values are available to all states in an interaction.
+Selects are opened and driven by the host; scripts cannot invoke them with `do expression`.
+A `choose` declaration with a `for` clause
 generates one choice for each item in its source. Its ID, label, guard, and action receive
 the loop item; dynamic choices do not accept host-supplied parameters.
 A `choose ...` declaration directly expands a state-less child select into the current parent
@@ -433,7 +432,6 @@ expressions.
 ```text
 while-loop    ::= "while" expression block
 do-while-loop ::= "do" block "while" expression
-select-invocation ::= "do" expression
 for-loop      ::= "for" pattern "in" expression
                   [ "when" expression ] block [ "else" block ]
 ```
@@ -575,7 +573,7 @@ try-form ::= "try" block
              [ "finally" block ]
 ```
 
-`throw` raises a value. `Exception<Tag>(...)` creates a tagged Spellkit exception.
+`throw` raises a value. `Exception<Tag>(...)` creates a tagged Minamo exception.
 
 ## Regions
 
@@ -583,7 +581,7 @@ try-form ::= "try" block
 region ::= '#region' string { statement } '#endregion'
 ```
 
-Regions are primarily used by the `.kit` test corpus to name independent test cases.
+Regions are primarily used by the `.nami` test corpus to name independent test cases.
 
 ## Current omissions
 

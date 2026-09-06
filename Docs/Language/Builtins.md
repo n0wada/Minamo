@@ -1,6 +1,6 @@
 # Built-in types and functions
 
-Spellkit provides a small set of core values, types, and functions to every script. The `spell`
+Minamo provides a small set of core values, types, and functions to every script. The `minamo`
 console also registers the standard-library modules shipped with the executable. An embedding host
 can choose which modules and commands to expose, so a script must not assume that console modules
 are available in every hosted environment.
@@ -159,7 +159,7 @@ for host-controlled input and output.
 
 ## Standard library modules
 
-The `spell` console registers its standard library modules. Import a module before using its public
+The `minamo` console registers its standard library modules. Import a module before using its public
 names. `ByteArray` and `Json` are core types and are available without an import.
 
 ```swift
@@ -220,20 +220,20 @@ print(recent.ToArray())         // [2, 3, 4]
 
 The `readline` and `io` modules can access host resources. An embedding host chooses which
 modules to register and can instead expose narrower host commands and capabilities. The `http`
-module is not part of the default `spell` distribution; add its external extension through
-[`spellkit.json`](../Developers/HostingGuide.md#external-extension-libraries) when it is needed.
+module is not part of the default `minamo` distribution; add its external extension through
+[`minamo.json`](../Developers/HostingGuide.md#external-extension-libraries) when it is needed.
 
 Core types provide explicit conversions for common data formats:
 
 ```swift
-let bytes = ByteArray.FromString("Spellkit")
+let bytes = ByteArray.FromString("Minamo")
 print(bytes.ToHex())
 
 let value = Json.Parse("""{"ready":true,"ports":[8080,8081]}""")
 print(Json.Stringify(value, indented: true))
 ```
 
-Seeded random generators are independent and reproducible within the running Spellkit version:
+Seeded random generators are independent and reproducible within the running Minamo version:
 
 ```swift
 import * from random

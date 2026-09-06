@@ -1,13 +1,13 @@
 # Hosting API guide
 
-The Hosting API exposes application commands to Spellkit through ordinary C# APIs and attributes.
-It is part of `Spellkit.dll` and uses the `Spellkit.Hosting` namespace.
+The Hosting API exposes application commands to Minamo through ordinary C# APIs and attributes.
+It is part of `Minamo.dll` and uses the `Minamo.Hosting` namespace.
 
 ## API boundary
 
-`Spellkit.Hosting` is the primary application-facing API. The runtime object and foreign-type APIs
-under `Spellkit.Runtime` and `Spellkit.Linker.ForeignUnit` form the advanced extension API used by
-custom Spellkit types. Parser, compiler, linker, debugger, bytecode, and VM implementation details
+`Minamo.Hosting` is the primary application-facing API. The runtime object and foreign-type APIs
+under `Minamo.Runtime` and `Minamo.Linker.ForeignUnit` form the advanced extension API used by
+custom Minamo types. Parser, compiler, linker, debugger, bytecode, and VM implementation details
 are not part of the stable Hosting contract even where a low-level type remains public for legacy
 integration.
 
@@ -15,9 +15,9 @@ integration.
 
 The common path is:
 
-1. Create a `SpellkitHost`.
+1. Create a `MinamoHost`.
 2. Configure runtime policy and register modules, resources, signals, and capabilities.
-3. Create a `SpellkitInstance`.
+3. Create a `MinamoInstance`.
 4. Execute scripts with `ExecuteAsync(...)`.
 5. Deliver queued signals at safe points with `DispatchSignalsAsync(...)`.
 6. Dispose the instance when the console or host scope ends.
@@ -27,19 +27,19 @@ tracing, security defaults, and generated bindings.
 
 ## Concept map
 
-The Hosting API uses a small set of names consistently on the C# side and the Spellkit side:
+The Hosting API uses a small set of names consistently on the C# side and the Minamo side:
 
-| Concept | C# setup or access | Spellkit access | Purpose |
+| Concept | C# setup or access | Minamo access | Purpose |
 | --- | --- | --- | --- |
 | Module commands | `host.Module(...)` | `import module` | Named command groups exposed by the host |
 | Resources | `host.AddResourceType<T>()`, `context.Resource(...)` | Returned handles | Instance-scoped opaque CLR objects |
 | State | `Environment.State.Set/SetScript` | `host.State` | Instance memory with host-owned and script-owned keys |
 | Signals | `host.AddSignal(...)`, `Environment.Signals` | `host.Signals` | Queued events delivered by `DispatchSignalsAsync()` |
-| Input and output | `SpellkitEnvironment.UseInput/UseOutput` | `readLine` (`readline` library), `print` | Instance-local text I/O selected by the host |
+| Input and output | `MinamoEnvironment.UseInput/UseOutput` | `readLine` (`readline` library), `print` | Instance-local text I/O selected by the host |
 | Capabilities | `host.AddCapabilities(...)`, `Environment.Capabilities` | None | Host-owned allow-list for protected features |
-| Logging | `SpellkitHostOptions.Log` | `host.Log` | User-facing structured log events |
-| Tracing | `SpellkitHostOptions.Trace` | None | Observational diagnostics for the embedding host |
-| Limits | `SpellkitHostOptions.Limits` | None | Per-operation execution guards |
+| Logging | `MinamoHostOptions.Log` | `host.Log` | User-facing structured log events |
+| Tracing | `MinamoHostOptions.Trace` | None | Observational diagnostics for the embedding host |
+| Limits | `MinamoHostOptions.Limits` | None | Per-operation execution guards |
 
 Use module commands for live host operations, resources for objects with identity and lifetime,
 and `State` for instance facts or script working memory.
@@ -51,17 +51,17 @@ retain their normal process Console behavior for compatibility.
 ## Host Setup
 
 ```csharp
-using Spellkit.Hosting;
+using Minamo.Hosting;
 
-var host = new SpellkitHost(new SpellkitHostOptions
+var host = new MinamoHost(new MinamoHostOptions
 {
     Limits = new() { MaxInstructions = 100_000 },
     Log = entry => Console.WriteLine(entry.Message)
 });
 ```
 
-`SpellkitHostOptions` contains execution policy and observability settings. Create one
-`SpellkitHost`, add the modules and host features needed by the application, and then create
+`MinamoHostOptions` contains execution policy and observability settings. Create one
+`MinamoHost`, add the modules and host features needed by the application, and then create
 instances from that configured host. The examples below continue configuring this same `host`
 variable rather than constructing a new host for every feature. They demonstrate alternative
 features and are not intended to be concatenated verbatim; apply the relevant registrations before
@@ -82,7 +82,7 @@ host.Module("game", module => module.Command(
     "Creates an entity from a prefab.",
     context => context.Host<Game>().Spawn(
         context.Argument<string>("prefab")),
-    SpellkitCommandParameter.Required<string>("prefab")));
+    MinamoCommandParameter.Required<string>("prefab")));
 ```
 
 The instance host object is supplied separately. This allows the same command definitions to be
@@ -98,20 +98,20 @@ if (!result.Success)
 ```
 
 `CreateInstance` snapshots the current host configuration. Registrations added afterward are
-available only to instances created after those registrations. Configure a `SpellkitHost` before sharing
+available only to instances created after those registrations. Configure a `MinamoHost` before sharing
 it between threads; concurrent configuration and instance creation are not supported.
 
-`SpellkitHost` borrows the instance host context and telemetry
+`MinamoHost` borrows the instance host context and telemetry
 handlers. Disposing an instance does not dispose those host-owned objects. The instance
-owns its `SpellkitHostEnvironment`, state, signal subscriptions, and resource handles. Releasing a handle
+owns its `MinamoHostEnvironment`, state, signal subscriptions, and resource handles. Releasing a handle
 or disposing an instance invalidates the handle but does not dispose the CLR object behind it.
 
-Always dispose `SpellkitInstance`. `Reset` keeps the snapshotted host registrations but clears script
+Always dispose `MinamoInstance`. `Reset` keeps the snapshotted host registrations but clears script
 state, script signal subscriptions, incremental compilation state, and non-service handles.
 
 ## Results and failures
 
-`ExecuteAsync` and `ExecuteFileAsync` return a `SpellkitExecutionResult` instead of throwing for script
+`ExecuteAsync` and `ExecuteFileAsync` return a `MinamoExecutionResult` instead of throwing for script
 compilation errors, runtime errors, input failures, cancellation, and execution limits. Inspect
 `Failure.Kind` to distinguish `Compilation`, `Runtime`, `Input`, `Cancelled`, and `Limit`;
 `Failure.Limit` identifies the exceeded limit. `Diagnostics`
@@ -121,13 +121,13 @@ Exceptions thrown by registered host commands are deliberately sanitized before 
 script. Their CLR type and original message are written to host telemetry at `Error` level, while the
 script receives only a generic host-command failure.
 
-`SpellkitExecutionResult` and `SpellkitSignalDispatchResult` both implement
-`ISpellkitOperationResult`. Generic host reporting can use its `Success`, `Failures`,
+`MinamoExecutionResult` and `MinamoSignalDispatchResult` both implement
+`IMinamoOperationResult`. Generic host reporting can use its `Success`, `Failures`,
 `ExecutionId`, and `Metrics` members while operation-specific code can still inspect diagnostics,
 the returned value, or the delivered signal count.
 
 Use `GetValue<T>()` to convert a successful execution value to a CLR type, or
-`TryGetValue<T>()` when conversion may not be available. A Spellkit `nil` converts to
+`TryGetValue<T>()` when conversion may not be available. A Minamo `nil` converts to
 `default(T)`. `TryGetValue<T>()` returns `false` when an operation has no value or the value cannot
 be converted; `GetValue<T>()` throws in those cases. The raw `Value` remains available for advanced
 runtime integrations.
@@ -135,10 +135,10 @@ runtime integrations.
 Invalid Hosting API usage, such as a duplicate registration or an invalid argument, still throws
 a normal C# exception immediately.
 
-Commands can return either CLR values supported by `TypeConverter` or an existing `SpellkitObject`.
+Commands can return either CLR values supported by `TypeConverter` or an existing `MinamoObject`.
 Parameters are converted to their declared CLR types before the handler uses them.
 
-Commands can also accept Spellkit functions as callbacks through the command context:
+Commands can also accept Minamo functions as callbacks through the command context:
 
 ```csharp
 module.Command("Apply", context =>
@@ -146,8 +146,8 @@ module.Command("Apply", context =>
     var callback = context.Callback<long, long>("callback");
     return callback(context.Argument<long>("value"));
 },
-SpellkitCommandParameter.Required<long>("value"),
-SpellkitCommandParameter.Required<object>("callback"));
+MinamoCommandParameter.Required<long>("value"),
+MinamoCommandParameter.Required<object>("callback"));
 ```
 
 ```swift
@@ -158,7 +158,7 @@ callbacks.Apply(5, value => value + 2)
 
 Use `context.Callback("name").Invoke<T>(...)` when the arity is dynamic, or
 `CallbackAction<T>(...)` for callbacks whose return value is ignored. For three or more typed
-arguments, use a `ValueTuple` and let `CallbackTuple<TArgs, TResult>(...)` expand it into Spellkit
+arguments, use a `ValueTuple` and let `CallbackTuple<TArgs, TResult>(...)` expand it into Minamo
 function arguments:
 
 ```csharp
@@ -175,7 +175,7 @@ Callbacks are valid only while the host command that received them is running. F
 command, that lifetime extends until its returned task completes. Do not retain a callback for later
 use or invoke it from detached background work after the command has completed.
 
-For other CLR objects, Spellkit exposes members from the command's declared return type. Use a
+For other CLR objects, Minamo exposes members from the command's declared return type. Use a
 typed command when the implementation object has additional public members that must remain hidden:
 
 ```csharp
@@ -188,13 +188,13 @@ or a resource wrapper when more operations are required.
 
 Generated module and resource commands may return `Task`, `Task<T>`, `ValueTask`, or
 `ValueTask<T>`. Manual module registration provides `AsyncCommand(...)` for the same purpose.
-Spellkit does not add language-level `async` or `await` syntax. Calling one of these commands
+Minamo does not add language-level `async` or `await` syntax. Calling one of these commands
 suspends the VM at the ordinary call expression; the hosting API waits for the CLR awaitable and
 then resumes the same VM continuation.
 
-Host module, service, signal, and resource type names use dotted Spellkit identifier segments
+Host module, service, signal, and resource type names use dotted Minamo identifier segments
 such as `scene`, `scene.player`, or `audio.volume`. Command, static host type, and command
-parameter names use a single Spellkit identifier. Capabilities use the same dotted form, plus
+parameter names use a single Minamo identifier. Capabilities use the same dotted form, plus
 hierarchical wildcards such as `scene.*` and the global `*`. Invalid names are rejected when the
 host is configured, before an instance is created.
 
@@ -204,14 +204,14 @@ Commands that belong to a static host type can be grouped with `Type`:
 host.Module("math", module => module.Type("Math", type => type.Command(
     "Abs",
     context => Math.Abs(context.Argument<long>("value")),
-    SpellkitCommandParameter.Required<long>("value"))));
+    MinamoCommandParameter.Required<long>("value"))));
 ```
 
-Spellkit can then use `Math.Abs(...)` after `import * from math`.
+Minamo can then use `Math.Abs(...)` after `import * from math`.
 
 ## Instances
 
-`SpellkitInstance` is incremental. Definitions created by one successful submission remain available to
+`MinamoInstance` is incremental. Definitions created by one successful submission remain available to
 later submissions. Failed builds and runtime failures are rolled back.
 
 ```csharp
@@ -222,7 +222,7 @@ await instance.ExecuteAsync("game.teleport(boss, 100, 20)");
 Call `Reset()` to discard compiled definitions and runtime state.
 
 For repeated execution of the same code across multiple actors or players, compile once into a
-`SpellkitProgram` and create separate instances from it:
+`MinamoProgram` and create separate instances from it:
 
 ```csharp
 var compiled = host.Compile("""
@@ -240,16 +240,16 @@ var firstRun = await first.ExecuteAsync();
 var secondRun = await second.ExecuteAsync();
 ```
 
-`SpellkitProgram` contains compiled code and diagnostics and can be shared. Each
-`SpellkitInstance` combines a program, a `SpellkitEnvironment`, and mutable execution state such as
+`MinamoProgram` contains compiled code and diagnostics and can be shared. Each
+`MinamoInstance` combines a program, a `MinamoEnvironment`, and mutable execution state such as
 runtime variables, state, signals, and resource handles. Each `ExecuteAsync` or `DispatchSignalsAsync` call
-creates a `SpellkitExecution` with its own correlation ID and metrics.
+creates a `MinamoExecution` with its own correlation ID and metrics.
 
-A program is bound to the `SpellkitHost` that compiled it because its compiled module references
+A program is bound to the `MinamoHost` that compiled it because its compiled module references
 and host policy come from that host. It can be shared by instances created from the same host, but
 passing it to a different host is rejected.
 
-`SpellkitEnvironment.Expose(...)` makes C# values visible as bare names for that instance. This is
+`MinamoEnvironment.Expose(...)` makes C# values visible as bare names for that instance. This is
 useful for actor-style scripts where the host chooses what `self`, `world`, or `target` means:
 
 ```csharp
@@ -257,7 +257,7 @@ var program = host.Compile("self + world").GetValueOrThrow();
 
 using var instance = host.CreateInstance(
     program,
-    new SpellkitEnvironment(game)
+    new MinamoEnvironment(game)
         .Expose("self", 2)
         .Expose("world", 3));
 ```
@@ -268,15 +268,15 @@ self + world
 
 Name resolution checks script locals, outer scopes, imports, and built-in types before consulting
 the environment. A missing exposed name is a runtime error. Assignment to the same bare name creates
-or updates a script binding; it does not write back into the `SpellkitEnvironment`.
+or updates a script binding; it does not write back into the `MinamoEnvironment`.
 
 ### Instance input and output
 
-Configure text I/O on the `SpellkitEnvironment` when an instance needs isolated input or output:
+Configure text I/O on the `MinamoEnvironment` when an instance needs isolated input or output:
 
 ```csharp
 var output = new StringBuilder();
-var environment = new SpellkitEnvironment(game)
+var environment = new MinamoEnvironment(game)
     .UseInputAsync(async cancellationToken => await commandQueue.ReadAsync(cancellationToken))
     .UseOutput(text => output.Append(text));
 
@@ -285,7 +285,7 @@ var result = await instance.ExecuteAsync("print(\"ready\", terminator: nil)");
 ```
 
 The input delegate receives the current operation's cancellation token and returns a
-`ValueTask<string?>`. Returning `null` represents end of input and produces an empty Spellkit
+`ValueTask<string?>`. Returning `null` represents end of input and produces an empty Minamo
 string. The optional `readline` library exposes that input as `readLine` after `import * from
 readline`; it suspends while input is pending without blocking the caller of `ExecuteAsync`. The
 output delegate receives the text chunks that `print` writes: values, separators, and terminators.
@@ -294,7 +294,7 @@ Without delegates, the `readline` library and `print` retain their process Conso
 Use `ExecuteFileAsync` when the host has explicitly selected an entry script:
 
 ```csharp
-var result = await instance.ExecuteFileAsync("Scripts/startup.kit");
+var result = await instance.ExecuteFileAsync("Scripts/startup.nami");
 ```
 
 The full file path is preserved in compiler diagnostics. This loads only the selected entry file;
@@ -302,7 +302,7 @@ its imports remain governed by the instance's `FileLookup` or `DisableFileImport
 Missing or unreadable entry files produce an `Input` failure with the original I/O exception in
 `Failure.Exception`.
 
-`SpellkitInstance` implements `IDisposable`. Disposing an instance invalidates its resource handles and
+`MinamoInstance` implements `IDisposable`. Disposing an instance invalidates its resource handles and
 prevents further execution.
 
 `ExecuteAsync`, `ExecuteFileAsync`, and `DispatchSignalsAsync` provide non-blocking host-call
@@ -314,19 +314,13 @@ Program-backed instances also provide `ExecuteAsync(CancellationToken)`. Interac
 matching asynchronous surfaces:
 
 ```csharp
-using var run = await instance.StartAsync(source);
-var step = await run.SelectAsync("continue");
-var eventResult = await run.SendAsync("loaded", payload);
-
+await instance.ExecuteAsync(source);
 using var select = await instance.OpenSelectAsync("dialog");
 await select.SelectAsync("confirm");
 ```
 
-`SelectAsync` and `SendAsync` await work in `choose` and `on` actions, including work performed
-after a nested `do`.
-
-For a script that executes `do`, configure a select runner with
-`SpellkitEnvironment.UseSelectAsync(...)`.
+`SelectAsync` and `SendAsync` await work in `choose` and `on` actions. The host opens and drives
+selects directly; scripts do not invoke selects or wait for their completion.
 
 ## Host environment
 
@@ -338,20 +332,20 @@ host.Commands.List()
 ```
 
 Outside a hosted instance, accessing members of `host` produces a runtime error. Hosted execution
-always goes through `SpellkitInstance`; parser and compiler-only tooling may still use
+always goes through `MinamoInstance`; parser and compiler-only tooling may still use
 `BuilderOptions` directly.
 
-Set `SpellkitHostOptions.ExposeHostObject` to `false` when scripts should see only names supplied
-through `SpellkitEnvironment.Expose(...)`:
+Set `MinamoHostOptions.ExposeHostObject` to `false` when scripts should see only names supplied
+through `MinamoEnvironment.Expose(...)`:
 
 ```csharp
-var host = new SpellkitHost(new()
+var host = new MinamoHost(new()
 {
     ExposeHostObject = false
 });
 
 var program = host.Compile("self.MoveTo(10, 20)").GetValueOrThrow();
-var env = new SpellkitEnvironment(game).Expose("self", player);
+var env = new MinamoEnvironment(game).Expose("self", player);
 using var instance = host.CreateInstance(program, env);
 ```
 
@@ -362,7 +356,7 @@ therefore produces the normal undeclared-variable diagnostic for `host`.
 
 Calling `AddCapabilities` creates an allow-list in the default `Automatic` mode. Exact names and
 hierarchical wildcards are supported. If `AddCapabilities` is not called, all explicitly registered
-host features are available. Use `CapabilityMode = SpellkitCapabilityMode.Restricted` to start with
+host features are available. Use `CapabilityMode = MinamoCapabilityMode.Restricted` to start with
 an empty, deny-all allow-list.
 
 ```csharp
@@ -372,7 +366,7 @@ host.AddCapabilities("scene.read", "audio.*")
         "Deletes an entity.",
         "scene.write",
         context => context.Host<Game>().Delete(context.Argument<long>("id")),
-        SpellkitCommandParameter.Required<long>("id")));
+        MinamoCommandParameter.Required<long>("id")));
 ```
 
 Commands whose capability is unavailable cannot be invoked and are omitted from the catalog.
@@ -387,7 +381,7 @@ host.Commands.Describe("scene.Delete")
 Generated commands accept the same metadata:
 
 ```csharp
-[SpellkitCommand(Description = "Deletes an entity.", Capability = "scene.write")]
+[MinamoCommand(Description = "Deletes an entity.", Capability = "scene.write")]
 public void Delete(long id) { /* ... */ }
 ```
 
@@ -395,7 +389,7 @@ public void Delete(long id) { /* ... */ }
 
 Capability names are not declared in a central registry. `AddCapabilities` builds the allow-list,
 and each protected operation demands the name documented below when it runs. The following names
-are reserved by Spellkit's built-in host APIs:
+are reserved by Minamo's built-in host APIs:
 
 | Capability | Protected script operations |
 | --- | --- |
@@ -419,22 +413,22 @@ error and a `CapabilityDenied` trace event when tracing is enabled.
 ## Resource handles
 
 Resources use explicit wrapper classes. The wrapped domain object remains private, and only methods
-marked with `[SpellkitCommand]` are exposed to scripts.
+marked with `[MinamoCommand]` are exposed to scripts.
 
-Derive a wrapper from `SpellkitResource` and give it a script-visible name:
+Derive a wrapper from `MinamoResource` and give it a script-visible name:
 
 ```csharp
-[SpellkitResource("Player")]
-public sealed class PlayerResource : SpellkitResource
+[MinamoResource("Player")]
+public sealed class PlayerResource : MinamoResource
 {
     private readonly Player player;
 
     public PlayerResource(Player player) => this.player = player;
 
-    [SpellkitCommand]
+    [MinamoCommand]
     public string Name() => player.Name;
 
-    [SpellkitCommand(Capability = "scene.write")]
+    [MinamoCommand(Capability = "scene.write")]
     public void MoveTo(double x, double y) => player.MoveTo(x, y);
 
     protected override void OnRelease() => player.CloseSessionView();
@@ -456,7 +450,7 @@ return context.Resource(new PlayerResource(player));
 Registered operations appear in the command catalog under names such as
 `resource.Player.Name` and `resource.Player.MoveTo`. Catalog visibility respects each operation's
 capability. A wrapper type can have one registered resource definition per host. Public methods
-without `[SpellkitCommand]` are not exposed.
+without `[MinamoCommand]` are not exposed.
 
 Registered resource wrappers are shared by default. Repeatedly exposing the same wrapper instance
 returns the same instance handle. Shared handles do not expose `Release`, survive `Reset()`, and are
@@ -465,14 +459,14 @@ invalidated when the instance is disposed. `OnRelease` runs once at instance dis
 Mark wrapper types that the script should explicitly own and release as transient:
 
 ```csharp
-[SpellkitResource("TemporaryFile", Lifetime = SpellkitResourceLifetime.Transient)]
-public sealed class TemporaryFileResource : SpellkitResource
+[MinamoResource("TemporaryFile", Lifetime = MinamoResourceLifetime.Transient)]
+public sealed class TemporaryFileResource : MinamoResource
 {
     private readonly TemporaryFile file;
 
     public TemporaryFileResource(TemporaryFile file) => this.file = file;
 
-    [SpellkitCommand]
+    [MinamoCommand]
     public string Read() => file.Read();
 
     protected override void OnRelease() => file.Dispose();
@@ -500,7 +494,7 @@ be transferred between instances.
 
 ## Shared state
 
-`State` is an instance-scoped string-keyed store shared by C# and Spellkit. Each key is owned either
+`State` is an instance-scoped string-keyed store shared by C# and Minamo. Each key is owned either
 by the host or by the script. Missing keys return `nil`.
 
 ```swift
@@ -521,16 +515,16 @@ if (instance.Environment.State.TryGet<string>("selectedPlayer", out var current)
 ```
 
 `TryGet<T>()` returns `false` when the key is absent or its value cannot be converted. A stored
-Spellkit `nil` is present and returns `true` with `default(T)`. Values are converted with the same
+Minamo `nil` is present and returns `true` with `default(T)`. Values are converted with the same
 CLR conversion rules used by host command arguments.
 
-`Set` creates or updates host-owned state. Spellkit can read host-owned keys but cannot overwrite or
-remove them. `SetScript` creates or updates script-owned state; Spellkit and C# can both edit those
-keys. Spellkit assignment creates script-owned state for new keys. `Remove` returns `false` and does
-nothing for host-owned keys, and `Clear` removes only script-owned keys from Spellkit. C# `Remove`
+`Set` creates or updates host-owned state. Minamo can read host-owned keys but cannot overwrite or
+remove them. `SetScript` creates or updates script-owned state; Minamo and C# can both edit those
+keys. Minamo assignment creates script-owned state for new keys. `Remove` returns `false` and does
+nothing for host-owned keys, and `Clear` removes only script-owned keys from Minamo. C# `Remove`
 and `Clear` still manage the whole store.
 
-Spellkit reads require `state.read`; writes, removals, and script clearing require `state.write`.
+Minamo reads require `state.read`; writes, removals, and script clearing require `state.write`.
 These checks are inactive when the host has no explicit allow-list. `Reset()` clears instance state.
 
 ## Signals
@@ -545,7 +539,7 @@ host.AddCapabilities("player.*")
         emitCapability: "player.emit");
 ```
 
-Spellkit subscriptions return an ID used by `Off`. `Once` removes its subscription before the first
+Minamo subscriptions return an ID used by `Off`. `Once` removes its subscription before the first
 callback is invoked.
 
 ```swift
@@ -559,7 +553,7 @@ host.Signals.Off(subscription)
 host.Signals.Emit("player.hit", 10)
 ```
 
-Both C# and Spellkit emission enqueue a signal. Delivery is explicit and never re-enters a running
+Both C# and Minamo emission enqueue a signal. Delivery is explicit and never re-enters a running
 VM execution:
 
 ```csharp
@@ -585,7 +579,7 @@ Pending queues are unbounded by default for compatibility. Set `Signals.MaxPendi
 options when producers can outpace dispatch:
 
 ```csharp
-var host = new SpellkitHost(new()
+var host = new MinamoHost(new()
 {
     Signals = new() { MaxPending = 1024 }
 });
@@ -601,7 +595,7 @@ if (!instance.Environment.Signals.TryEmit("player.hit", 10))
     droppedSignals.Increment();
 ```
 
-Spellkit can select the same non-throwing behavior:
+Minamo can select the same non-throwing behavior:
 
 ```swift
 if !host.Signals.TryEmit("player.hit", 10) {
@@ -613,7 +607,7 @@ Use `GetPayload<T>()` or `TryGetPayload<T>()` to consume signal payloads without
 runtime object types. The raw `Payload` remains available for advanced integrations.
 
 `DispatchSignalsAsync()` processes only signals that were queued when dispatch began. Signals emitted
-by a callback remain queued until the next call. `Reset()` removes Spellkit subscriptions and queued
+by a callback remain queued until the next call. `Reset()` removes Minamo subscriptions and queued
 signals while preserving C# subscriptions. Instance disposal removes all subscriptions.
 
 ## Structured logs
@@ -622,7 +616,7 @@ Logging is synchronous and uses a host-provided delegate. No task or scheduler i
 API.
 
 ```csharp
-var host = new SpellkitHost(new()
+var host = new MinamoHost(new()
 {
     Log = entry =>
         Console.WriteLine($"[{entry.Level}] {entry.Message}")
@@ -633,7 +627,7 @@ host.AddCapabilities("log.write");
 Stateful handlers can assign an instance method such as `recorder.Handle`. Combine multiple
 handlers with a multicast delegate before constructing the host.
 
-Spellkit exposes four log levels and optional structured properties. A tuple or dictionary is
+Minamo exposes four log levels and optional structured properties. A tuple or dictionary is
 converted to a case-insensitive property map.
 
 ```swift
@@ -645,13 +639,13 @@ host.Log.Error("command failed")
 
 Logs require `log.write`.
 
-Host commands use the same sink through `SpellkitCommandContext`:
+Host commands use the same sink through `MinamoCommandContext`:
 
 ```csharp
 module.Command("Load", context =>
 {
     context.Log(
-        SpellkitLogLevel.Info,
+        MinamoLogLevel.Info,
         "loading scene",
         new Dictionary<string, object?> { ["scene"] = "town" });
     return null;
@@ -659,17 +653,17 @@ module.Command("Load", context =>
 ```
 
 Every `ExecuteAsync` and `DispatchSignalsAsync` call receives a new correlation ID. It is available through
-`SpellkitExecutionResult.ExecutionId`, `SpellkitSignalDispatchResult.ExecutionId`, `SpellkitCommandContext.ExecutionId`,
-and `SpellkitLogEntry.ExecutionId`. Entries produced by a host command also contain its unqualified
+`MinamoExecutionResult.ExecutionId`, `MinamoSignalDispatchResult.ExecutionId`, `MinamoCommandContext.ExecutionId`,
+and `MinamoLogEntry.ExecutionId`. Entries produced by a host command also contain its unqualified
 command name in `Command`; script and signal-level entries leave it empty.
 
 ### Log payload
 
-The `Log` delegate in `SpellkitHostOptions` receives an immutable record object:
+The `Log` delegate in `MinamoHostOptions` receives an immutable record object:
 
-| `SpellkitLogEntry` member | Meaning |
+| `MinamoLogEntry` member | Meaning |
 | --- | --- |
-| `Timestamp` | UTC time at which `SpellkitTelemetry.Write` created the entry |
+| `Timestamp` | UTC time at which `MinamoTelemetry.Write` created the entry |
 | `Level` | `Debug`, `Info`, `Warning`, or `Error` |
 | `Message` | Log message supplied by the script or host command |
 | `Properties` | Case-insensitive, read-only structured property map; empty when omitted |
@@ -684,7 +678,7 @@ asynchronous continuations started by an operation, but it is not shared with un
 that write telemetry while that operation is running.
 
 ```csharp
-var host = new SpellkitHost(new()
+var host = new MinamoHost(new()
 {
     Log = entry => logger.Write(
         entry.Timestamp,
@@ -696,16 +690,16 @@ var host = new SpellkitHost(new()
 });
 ```
 
-Handler exceptions are synchronous failures. A Spellkit log call reports them as a runtime error,
+Handler exceptions are synchronous failures. A Minamo log call reports them as a runtime error,
 and a failure raised by a Handler inside a host command is reported as a host command failure.
 
 ## Execution limits
 
-Limits are configured once on `SpellkitHost` and applied independently to every `ExecuteAsync` and
+Limits are configured once on `MinamoHost` and applied independently to every `ExecuteAsync` and
 `DispatchSignalsAsync` operation.
 
 ```csharp
-var host = new SpellkitHost(new()
+var host = new MinamoHost(new()
 {
     Limits = new()
     {
@@ -722,7 +716,7 @@ Every limit is optional. Leave a property as `null` to make that dimension unlim
 omit `MaxExecutionTime` to allow a long-running operation, or omit `MaxHostCommands` to allow any
 number of host command calls while still limiting instructions or call depth.
 
-An exceeded limit returns a `SpellkitFailure` whose `Kind` is `Limit`. Its `Limit` identifies
+An exceeded limit returns a `MinamoFailure` whose `Kind` is `Limit`. Its `Limit` identifies
 `Instructions`, `Time`, `HostCommands`, `Signals`, or `CallDepth`. Instruction,
 command, and Signal counters contain completed work; an operation rejected by a limit is not added
 to the corresponding counter.
@@ -734,13 +728,13 @@ var result = await instance.ExecuteAsync(source, cancellationToken);
 var dispatch = await instance.DispatchSignalsAsync(cancellationToken);
 ```
 
-Host commands receive a combined token through `SpellkitCommandContext.CancellationToken`. It is
+Host commands receive a combined token through `MinamoCommandContext.CancellationToken`. It is
 cancelled by either the operation token or `MaxExecutionTime`, so a command that performs long-running
 C# work should observe it itself. The VM checks cancellation and time periodically while executing
 bytecode and again when a host command returns. .NET does not provide a safe way to forcibly stop a
 synchronous handler that ignores cancellation.
 
-`SpellkitExecutionResult.Metrics` and `SpellkitSignalDispatchResult.Metrics` contain total, compilation, and VM
+`MinamoExecutionResult.Metrics` and `MinamoSignalDispatchResult.Metrics` contain total, compilation, and VM
 durations plus instruction, host-command, and Signal counts. Instruction counting is enabled when
 limits, tracing, or a cancellable token are active; otherwise it remains zero to avoid adding work
 to unrestricted instances.
@@ -751,11 +745,11 @@ Tracing is opt-in and independent from user-facing logs. It records execution ph
 boundaries without changing script behavior.
 
 ```csharp
-var traces = new List<SpellkitTraceEvent>();
-var host = new SpellkitHost(new() { Trace = traces.Add });
+var traces = new List<MinamoTraceEvent>();
+var host = new MinamoHost(new() { Trace = traces.Add });
 ```
 
-`SpellkitTraceKind` includes:
+`MinamoTraceKind` includes:
 
 - `ExecutionStarted` and `ExecutionCompleted`
 - `Compilation` and `VmExecution`
@@ -764,12 +758,12 @@ var host = new SpellkitHost(new() { Trace = traces.Add });
 - `SignalEmitted` and `SignalDelivered`
 - `ResourceCreated` and `ResourceReleased`
 
-`SpellkitTraceEvent` contains:
+`MinamoTraceEvent` contains:
 
 | Member | Meaning |
 | --- | --- |
 | `Timestamp` | UTC time at which the event was created |
-| `Kind` | Event category from `SpellkitTraceKind` |
+| `Kind` | Event category from `MinamoTraceKind` |
 | `ExecutionId` | Correlation ID of the current operation |
 | `Name` | Operation, command, capability, signal, or resource type associated with the event |
 | `Duration` | Elapsed time for completed execution phases and host commands; otherwise `null` |
@@ -791,13 +785,13 @@ The contents of the optional fields depend on `Kind`:
 | `ResourceReleased` | Resource type name | — | `id`: resource handle ID |
 
 Events emitted by C# outside `ExecuteAsync` or `DispatchSignalsAsync` use `Guid.Empty` for `ExecutionId`.
-`Trace` accepts an `Action<SpellkitTraceEvent>`. Unlike log handlers, trace handler exceptions are
+`Trace` accepts an `Action<MinamoTraceEvent>`. Unlike log handlers, trace handler exceptions are
 ignored because tracing is observational and must not alter script results.
 
 ```csharp
 Trace = trace =>
 {
-    if (trace.Kind == SpellkitTraceKind.CapabilityDenied)
+    if (trace.Kind == MinamoTraceKind.CapabilityDenied)
         securityLog.Write(trace.ExecutionId, trace.Name);
     else if (trace.Duration is { } elapsed)
         timings.Record(trace.Kind, trace.Name, elapsed);
@@ -807,10 +801,10 @@ Trace = trace =>
 ## Game console example
 
 The following setup exposes a deliberately small surface to an in-game console. The engine remains
-responsible for scene work; Spellkit only combines registered operations.
+responsible for scene work; Minamo only combines registered operations.
 
 ```csharp
-var host = new SpellkitHost(new()
+var host = new MinamoHost(new()
 {
     Limits = new()
     {
@@ -840,7 +834,7 @@ host.Module("scene", module => module.Command(
     "scene.read",
     command => command.Resource(
         new EntityResource(scene.Find(command.Argument<string>("name")))),
-    SpellkitCommandParameter.Required<string>("name")));
+    MinamoCommandParameter.Required<string>("name")));
 
 using var instance = host.CreateInstance(game);
 ```
@@ -866,7 +860,7 @@ func selected(name) {
 host.Signals.On("player.selected", selected)
 ```
 
-The game loop does not run Spellkit asynchronously. It explicitly delivers queued engine events at
+The game loop does not run Minamo asynchronously. It explicitly delivers queued engine events at
 a safe point:
 
 ```csharp
@@ -883,9 +877,9 @@ lookup was configured earlier. Supply an explicit `FileLookup` when script file 
 intended.
 
 ```csharp
-using Spellkit.Compiler;
-using Spellkit.Hosting;
-using Spellkit.Linker;
+using Minamo.Compiler;
+using Minamo.Hosting;
+using Minamo.Linker;
 
 var options = BuilderOptions.Default();
 var lookup = FileLookup.Restricted(options)
@@ -893,21 +887,21 @@ var lookup = FileLookup.Restricted(options)
     .AddPath(Path.Combine(AppContext.BaseDirectory, "mods"))
     .Build();
 
-var host = new SpellkitHost(new() { BuilderOptions = options })
+var host = new MinamoHost(new() { BuilderOptions = options })
     .UseFileLookup(lookup);
 using var instance = host.CreateInstance(game);
 ```
 
 `FileLookup.Restricted(options)` searches only paths added explicitly with `AddStartupPath`,
 `AddPath`, or `AddPaths`. `FileLookup.Standard(options)` also searches relative to the importing
-file and paths from `SPELLKIT_LIBS`. Spellkit never searches beside its executable implicitly.
+file and paths from `MINAMO_LIBS`. Minamo never searches beside its executable implicitly.
 Each configured path is searched exactly as registered; a `lib` child directory is not added
 implicitly. Register it with `AddPath` when it is intended to be importable.
 
 Use the same host configuration but disable file imports explicitly for a restricted console:
 
 ```csharp
-var restrictedHost = new SpellkitHost(new() { BuilderOptions = options })
+var restrictedHost = new MinamoHost(new() { BuilderOptions = options })
     .UseFileLookup(lookup)
     .DisableFileImports();
 ```
@@ -916,28 +910,28 @@ The command-line host registers its standard modules, including `io`, through th
 
 ## Generated command bindings
 
-`Spellkit.Generators` can generate the `SpellkitHost` registration code from ordinary C# methods.
+`Minamo.Generators` can generate the `MinamoHost` registration code from ordinary C# methods.
 
 ```csharp
-using Spellkit.Hosting;
+using Minamo.Hosting;
 
-[SpellkitModule("game")]
+[MinamoModule("game")]
 public sealed class GameCommands
 {
-    [SpellkitProperty(Description = "Current scene name.", Capability = "scene.read")]
+    [MinamoProperty(Description = "Current scene name.", Capability = "scene.read")]
     public string SceneName => game.SceneName;
 
-    [SpellkitProperty(Capability = "audio.write")]
+    [MinamoProperty(Capability = "audio.write")]
     public double Volume
     {
         get => game.Volume;
         set => game.Volume = value;
     }
 
-    [SpellkitCommand("spawn", Description = "Creates an entity from a prefab.")]
+    [MinamoCommand("spawn", Description = "Creates an entity from a prefab.")]
     public GameObject Spawn(string prefab, bool active = true) { /* ... */ }
 
-    [SpellkitCommand]
+    [MinamoCommand]
     public static string Version() => "1.0";
 }
 ```
@@ -955,25 +949,25 @@ general-purpose host context. This is the preferred form for cohesive applicatio
 dependencies. Static modules generate a parameterless registration method such as
 `AddGameModule()`.
 
-A `SpellkitCommandContext` parameter is injected rather than exposed to Spellkit. C# optional
+A `MinamoCommandContext` parameter is injected rather than exposed to Minamo. C# optional
 parameter values and the `Description` property are copied into command metadata.
 
-`SpellkitProperty` exposes an ordinary C# property as a module property:
+`MinamoProperty` exposes an ordinary C# property as a module property:
 
 ```swift
 print(game.SceneName)
 game.Volume = 0.5
 ```
 
-A getter is required. Omitting the C# setter makes the Spellkit property read-only. The declared
+A getter is required. Omitting the C# setter makes the Minamo property read-only. The declared
 capability protects both reads and writes, and the property appears once in the command catalog;
 its generated setter is an internal implementation detail. Use properties for live values and
-lightweight settings. Keep operations with substantial side effects as `SpellkitCommand` methods.
+lightweight settings. Keep operations with substantial side effects as `MinamoCommand` methods.
 
 When using project references, add the generator as an analyzer:
 
 ```xml
-<ProjectReference Include="..\Spellkit.Generators\Spellkit.Generators.csproj"
+<ProjectReference Include="..\Minamo.Generators\Minamo.Generators.csproj"
                   OutputItemType="Analyzer"
                   ReferenceOutputAssembly="false" />
 ```
@@ -984,30 +978,30 @@ duplicate command names are reported as compiler diagnostics.
 Set `Type` when commands should appear under a static host type rather than directly on the module:
 
 ```csharp
-[SpellkitModule("math")]
+[MinamoModule("math")]
 public static class MathCommands
 {
-    [SpellkitCommand(Type = "Math")]
+    [MinamoCommand(Type = "Math")]
     public static long Abs(long value) => Math.Abs(value);
 }
 ```
 
-Custom Spellkit foreign types can be registered by the generated module initializer:
+Custom Minamo foreign types can be registered by the generated module initializer:
 
 ```csharp
-[SpellkitModule("game")]
-[SpellkitForeignType(typeof(EntityTypeInfo))]
+[MinamoModule("game")]
+[MinamoForeignType(typeof(EntityTypeInfo))]
 public static class GameTypes { }
 ```
 
-The generator validates that foreign types derive from `SpellkitForeignTypeInfo` and have an accessible
-parameterless constructor. Generator diagnostics currently use `SpellkitH001` through `SpellkitH007`.
+The generator validates that foreign types derive from `MinamoForeignTypeInfo` and have an accessible
+parameterless constructor. Generator diagnostics currently use `MinamoH001` through `MinamoH007`.
 
-A specialized module can derive from `ForeignUnit` directly. Applying `SpellkitModule` makes the
+A specialized module can derive from `ForeignUnit` directly. Applying `MinamoModule` makes the
 generator register that unit through `module.Unit(...)`:
 
 ```csharp
-[SpellkitModule("types")]
+[MinamoModule("types")]
 public sealed class TypesModule : ForeignUnit
 {
     public TypesModule() { /* register related foreign types */ }
@@ -1015,73 +1009,73 @@ public sealed class TypesModule : ForeignUnit
 ```
 
 This form is useful when several foreign types share a strongly typed declaring unit. It cannot be
-combined with generated `SpellkitCommand` or `SpellkitForeignType` declarations on the same module class.
+combined with generated `MinamoCommand` or `MinamoForeignType` declarations on the same module class.
 The imperative API follows the same rule: a module configured with `Unit(...)` cannot also add
 generated command, static type, or foreign type registrations.
 
 Foreign type members use the related type-binding attributes:
 
 ```csharp
-[SpellkitType]
-public sealed partial class EntityTypeInfo : SpellkitForeignTypeInfo
+[MinamoType]
+public sealed partial class EntityTypeInfo : MinamoForeignTypeInfo
 {
-    [SpellkitMethod]
+    [MinamoMethod]
     internal static string Name(ExecutionContext context, Entity self) => self.Name;
 
-    [SpellkitProperty]
+    [MinamoProperty]
     internal static long Id(ExecutionContext context, Entity self) => self.Id;
 
-    [SpellkitStaticMethod]
+    [MinamoStaticMethod]
     internal static Entity Find(ExecutionContext context, long id) { /* ... */ }
 
-    [SpellkitStaticProperty]
+    [MinamoStaticProperty]
     internal static Entity None(ExecutionContext context) { /* ... */ }
 }
 ```
 
-`SpellkitCommand` exposes ordinary host commands on a module or static host type. `SpellkitType` and its member
-attributes bind instance and static members on a `SpellkitForeignTypeInfo`. Operators and conversions stay
-as explicit `SpellkitForeignTypeInfo` overrides because they participate in the runtime type protocol.
+`MinamoCommand` exposes ordinary host commands on a module or static host type. `MinamoType` and its member
+attributes bind instance and static members on a `MinamoForeignTypeInfo`. Operators and conversions stay
+as explicit `MinamoForeignTypeInfo` overrides because they participate in the runtime type protocol.
 
 ## External extension libraries
 
-The `spell` executable can load optional extension assemblies listed in its
-`spellkit.json` file. This is a command-line distribution feature; embedding
+The `minamo` executable can load optional extension assemblies listed in its
+`minamo.json` file. This is a command-line distribution feature; embedding
 applications choose their own module registrations and do not inherit those
 extensions automatically.
 
-An extension assembly exposes one or more public `[SpellkitModule]` types. The
-Spellkit source generator produces the registration code used by `spell`:
+An extension assembly exposes one or more public `[MinamoModule]` types. The
+Minamo source generator produces the registration code used by `minamo`:
 
 ```csharp
-using Spellkit.Hosting;
+using Minamo.Hosting;
 
-namespace Spellkit.Extra;
+namespace MyExtension;
 
-[SpellkitModule("example")]
+[MinamoModule("example")]
 public static class ExampleModule
 {
-    [SpellkitCommand("hello")]
+    [MinamoCommand("hello")]
     public static string Hello() => "Hello from an extension."
 }
 ```
 
-`spellkit.json` contains an `extensions` array of assembly paths. Each path may
+`minamo.json` contains an `extensions` array of assembly paths. Each path may
 be absolute or relative to the directory containing the configuration file:
 
 ```json
 {
   "extensions": [
-    "Spellkit.Extra.Http.dll"
+    "MyExtension.dll"
   ]
 }
 ```
 
-The default `spellkit.json` has an empty `extensions` array. For example, add
-`Spellkit.Extra.Http.dll` only to a `spell` distribution that includes the HTTP extension.
+The default `minamo.json` has an empty `extensions` array. Add paths to extension
+assemblies to this array as needed.
 
-`spell` loads each assembly and registers its generated modules automatically.
+`minamo` loads each assembly and registers its generated modules automatically.
 Extension module types must be public and either static, derive from
 `ForeignUnit`, or have a public parameterless constructor. An extension should
-reference `Spellkit.dll`, not `spell.exe`; no executable-specific interface is
+reference `Minamo.dll`, not `minamo.exe`; no executable-specific interface is
 required.

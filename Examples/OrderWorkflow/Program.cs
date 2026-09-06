@@ -1,8 +1,8 @@
-using Spellkit.Compiler;
-using Spellkit.Hosting;
-using Spellkit.Linker;
+using Minamo.Compiler;
+using Minamo.Hosting;
+using Minamo.Linker;
 
-namespace Spellkit.Examples.OrderWorkflow;
+namespace Minamo.Examples.OrderWorkflow;
 
 internal static class Program
 {
@@ -13,8 +13,8 @@ internal static class Program
         var host = CreateHost(scripts, ledger);
 
         using var instance = host.CreateInstance(
-            new SpellkitEnvironment().UseOutput(Console.Write));
-        if (!Succeeded("Load workflow", await instance.ExecuteFileAsync(Path.Combine(scripts, "main.kit"))))
+            new MinamoEnvironment().UseOutput(Console.Write));
+        if (!Succeeded("Load workflow", await instance.ExecuteFileAsync(Path.Combine(scripts, "main.nami"))))
         {
             return 1;
         }
@@ -55,13 +55,13 @@ internal static class Program
             : 1;
     }
 
-    private static SpellkitHost CreateHost(string scripts, OrderLedger ledger)
+    private static MinamoHost CreateHost(string scripts, OrderLedger ledger)
     {
         var options = BuilderOptions.Default();
         var lookup = FileLookup.Restricted(options)
             .AddStartupPath(scripts)
             .Build();
-        var host = new SpellkitHost(new()
+        var host = new MinamoHost(new()
         {
             BuilderOptions = options,
             Limits = new()
@@ -87,11 +87,11 @@ internal static class Program
         return host;
     }
 
-    private static bool Succeeded(string name, ISpellkitOperationResult result)
+    private static bool Succeeded(string name, IMinamoOperationResult result)
     {
         if (result.Success)
         {
-            var delivered = result is SpellkitSignalDispatchResult signals
+            var delivered = result is MinamoSignalDispatchResult signals
                 ? $", delivered={signals.Delivered}"
                 : string.Empty;
             Console.WriteLine($"{name}: OK{delivered}");
