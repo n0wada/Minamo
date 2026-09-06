@@ -1,5 +1,9 @@
 # Minamo
 
+<p align="center">
+  <img src="Minamo/Misc/minamo.png" alt="Minamo logo">
+</p>
+
 Minamo is a lightweight dynamic language and embeddable scripting runtime for .NET.
 It gives applications a real programming language without giving scripts unrestricted
 access to the host.
