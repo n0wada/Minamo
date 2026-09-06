@@ -1,7 +1,7 @@
 # Minamo
 
 <p align="center">
-  <img src="Minamo/Misc/minamo.png" alt="Minamo logo">
+  <img src="minamo_logo.png" alt="Minamo logo">
 </p>
 
 Minamo is a lightweight dynamic language and embeddable scripting runtime for .NET.
