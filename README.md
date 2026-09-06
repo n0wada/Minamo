@@ -53,18 +53,6 @@ Start the interactive console:
 .\bin\minamo.exe
 ```
 
-Or execute a source file:
-
-```powershell
-.\bin\minamo.exe .\hello.nami
-```
-
-Check source syntax, imports, and compilation without executing it:
-
-```powershell
-.\bin\minamo.exe .\hello.nami --check
-```
-
 Start an interactive select declared by the file:
 
 ```powershell
@@ -77,9 +65,6 @@ enter their number.
 
 Use `--help` or `--version` for command-line information; enter `#help` in the REPL for
 interactive commands.
-
-The Windows `minamo.exe` distribution is framework-dependent and requires the .NET 10
-Runtime to be installed.
 
 ## Embed Minamo in C#
 
