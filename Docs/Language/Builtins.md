@@ -219,9 +219,7 @@ print(recent.ToArray())         // [2, 3, 4]
 ```
 
 The `readline` and `io` modules can access host resources. An embedding host chooses which
-modules to register and can instead expose narrower host commands and capabilities. The `http`
-module is not part of the default `minamo` distribution; add its external extension through
-[`minamo.json`](../Developers/HostingGuide.md#external-extension-libraries) when it is needed.
+modules to register and can instead expose narrower host commands and capabilities.
 
 Core types provide explicit conversions for common data formats:
 

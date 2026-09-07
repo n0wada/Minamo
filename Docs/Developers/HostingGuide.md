@@ -5,25 +5,18 @@ It is part of `Minamo.dll` and uses the `Minamo.Hosting` namespace.
 
 ## API boundary
 
-`Minamo.Hosting` is the primary application-facing API. The runtime object and foreign-type APIs
-under `Minamo.Runtime` and `Minamo.Linker.ForeignUnit` form the advanced extension API used by
-custom Minamo types. Parser, compiler, linker, debugger, bytecode, and VM implementation details
-are not part of the stable Hosting contract even where a low-level type remains public for legacy
-integration.
+`Minamo.Hosting` is the application-facing API. Parser, compiler, linker, and runtime APIs are
+separate tooling and extension surfaces; see [Public API layers](PublicApiLayers.md).
 
 ## Reading guide
 
-The common path is:
+The common hosting flow is:
 
 1. Create a `MinamoHost`.
 2. Configure runtime policy and register modules, resources, signals, and capabilities.
 3. Create a `MinamoInstance`.
-4. Execute scripts with `ExecuteAsync(...)`.
-5. Deliver queued signals at safe points with `DispatchSignalsAsync(...)`.
-6. Dispose the instance when the console or host scope ends.
-
-The later sections follow that order: setup and instances first, then host features, then limits,
-tracing, security defaults, and generated bindings.
+4. Execute scripts and dispatch queued signals at host-chosen safe points.
+5. Dispose the instance when its host scope ends.
 
 ## Concept map
 
@@ -41,12 +34,8 @@ The Hosting API uses a small set of names consistently on the C# side and the Mi
 | Tracing | `MinamoHostOptions.Trace` | None | Observational diagnostics for the embedding host |
 | Limits | `MinamoHostOptions.Limits` | None | Per-operation execution guards |
 
-Use module commands for live host operations, resources for objects with identity and lifetime,
-and `State` for instance facts or script working memory.
-`Signals` are queued and explicit: `DispatchSignalsAsync()` dispatches the pending
-queue at a host-chosen safe point rather than immediately re-entering a running VM.
-Input and output can be selected per hosted instance. When a delegate is not supplied, the builtins
-retain their normal process Console behavior for compatibility.
+Module commands expose operations, resources preserve object identity and lifetime, state stores
+instance data, and signals defer events until `DispatchSignalsAsync()`.
 
 ## Host Setup
 
@@ -60,21 +49,8 @@ var host = new MinamoHost(new MinamoHostOptions
 });
 ```
 
-`MinamoHostOptions` contains execution policy and observability settings. Create one
-`MinamoHost`, add the modules and host features needed by the application, and then create
-instances from that configured host. The examples below continue configuring this same `host`
-variable rather than constructing a new host for every feature. They demonstrate alternative
-features and are not intended to be concatenated verbatim; apply the relevant registrations before
-creating an instance.
-
-`CapabilityMode` controls how the capability allow-list is activated:
-
-- `Automatic` is the compatibility default: no registered capabilities means unrestricted, while
-  registering one or more names with `AddCapabilities(...)` activates the allow-list.
-- `Restricted` always activates the allow-list, including an empty list that denies every protected
-  operation.
-- `Unrestricted` explicitly allows every protected operation. Any registered capability names
-  remain visible through the host environment but do not restrict access.
+Configure the host before creating instances. The examples below add individual features to this
+same `host`; they are not intended to be concatenated verbatim.
 
 ```csharp
 host.Module("game", module => module.Command(
@@ -100,14 +76,6 @@ if (!result.Success)
 `CreateInstance` snapshots the current host configuration. Registrations added afterward are
 available only to instances created after those registrations. Configure a `MinamoHost` before sharing
 it between threads; concurrent configuration and instance creation are not supported.
-
-`MinamoHost` borrows the instance host context and telemetry
-handlers. Disposing an instance does not dispose those host-owned objects. The instance
-owns its `MinamoHostEnvironment`, state, signal subscriptions, and resource handles. Releasing a handle
-or disposing an instance invalidates the handle but does not dispose the CLR object behind it.
-
-Always dispose `MinamoInstance`. `Reset` keeps the snapshotted host registrations but clears script
-state, script signal subscriptions, incremental compilation state, and non-service handles.
 
 ## Results and failures
 
@@ -138,76 +106,20 @@ a normal C# exception immediately.
 Commands can return either CLR values supported by `TypeConverter` or an existing `MinamoObject`.
 Parameters are converted to their declared CLR types before the handler uses them.
 
-Commands can also accept Minamo functions as callbacks through the command context:
+Commands may accept Minamo callbacks through `MinamoCommandContext.Callback(...)`,
+`CallbackAction(...)`, or `CallbackTuple(...)`. Arguments and results use the normal CLR conversion
+rules. A callback is valid only for the lifetime of the host command, including the awaited lifetime
+of an asynchronous command, and must not be retained for detached work.
 
-```csharp
-module.Command("Apply", context =>
-{
-    var callback = context.Callback<long, long>("callback");
-    return callback(context.Argument<long>("value"));
-},
-MinamoCommandParameter.Required<long>("value"),
-MinamoCommandParameter.Required<object>("callback"));
-```
+For returned CLR objects, the declared C# return type is the exposure boundary; runtime types do not
+reveal additional members. Use a resource wrapper when the script needs a deliberately broader API.
+Generated commands support `Task`, `Task<T>`, `ValueTask`, and `ValueTask<T>`; manual registration
+provides `AsyncCommand(...)`. Minamo suspends the VM while the CLR awaitable completes without adding
+language-level `async` or `await` syntax.
 
-```swift
-import callbacks
-
-callbacks.Apply(5, value => value + 2)
-```
-
-Use `context.Callback("name").Invoke<T>(...)` when the arity is dynamic, or
-`CallbackAction<T>(...)` for callbacks whose return value is ignored. For three or more typed
-arguments, use a `ValueTuple` and let `CallbackTuple<TArgs, TResult>(...)` expand it into Minamo
-function arguments:
-
-```csharp
-var sum = context.CallbackTuple<(long A, long B, long C, long D), long>("callback");
-return sum((1, 2, 3, 4));
-```
-
-```swift
-callbacks.Sum((a, b, c, d) => a + b + c + d)
-```
-
-Callback arguments and return values use the same CLR conversion rules as host command arguments.
-Callbacks are valid only while the host command that received them is running. For an asynchronous
-command, that lifetime extends until its returned task completes. Do not retain a callback for later
-use or invoke it from detached background work after the command has completed.
-
-For other CLR objects, Minamo exposes members from the command's declared return type. Use a
-typed command when the implementation object has additional public members that must remain hidden:
-
-```csharp
-module.Command<IPlayerView>("Player", context => context.Host<Game>().Player);
-```
-
-The returned object's runtime type is not used to discover additional members. Generated bindings
-follow the same rule: their declared C# return type is the boundary. Expose a concrete declared type
-or a resource wrapper when more operations are required.
-
-Generated module and resource commands may return `Task`, `Task<T>`, `ValueTask`, or
-`ValueTask<T>`. Manual module registration provides `AsyncCommand(...)` for the same purpose.
-Minamo does not add language-level `async` or `await` syntax. Calling one of these commands
-suspends the VM at the ordinary call expression; the hosting API waits for the CLR awaitable and
-then resumes the same VM continuation.
-
-Host module, service, signal, and resource type names use dotted Minamo identifier segments
-such as `scene`, `scene.player`, or `audio.volume`. Command, static host type, and command
-parameter names use a single Minamo identifier. Capabilities use the same dotted form, plus
-hierarchical wildcards such as `scene.*` and the global `*`. Invalid names are rejected when the
-host is configured, before an instance is created.
-
-Commands that belong to a static host type can be grouped with `Type`:
-
-```csharp
-host.Module("math", module => module.Type("Math", type => type.Command(
-    "Abs",
-    context => Math.Abs(context.Argument<long>("value")),
-    MinamoCommandParameter.Required<long>("value"))));
-```
-
-Minamo can then use `Math.Abs(...)` after `import * from math`.
+Module, service, signal, resource, and capability names use dotted identifier segments. Commands,
+static host types, and parameters use single identifiers. Invalid names are rejected during host
+configuration. Group static host commands with `module.Type(...)`.
 
 ## Instances
 
@@ -219,7 +131,9 @@ await instance.ExecuteAsync("let boss = game.spawn(\"boss\")");
 await instance.ExecuteAsync("game.teleport(boss, 100, 20)");
 ```
 
-Call `Reset()` to discard compiled definitions and runtime state.
+`Reset()` discards compiled definitions, script state and subscriptions, and non-service handles
+while preserving snapshotted host registrations. Dispose every instance when its host scope ends;
+disposal invalidates its handles but does not dispose borrowed host objects.
 
 For repeated execution of the same code across multiple actors or players, compile once into a
 `MinamoProgram` and create separate instances from it:
@@ -262,10 +176,6 @@ using var instance = host.CreateInstance(
         .Expose("world", 3));
 ```
 
-```swift
-self + world
-```
-
 Name resolution checks script locals, outer scopes, imports, and built-in types before consulting
 the environment. A missing exposed name is a runtime error. Assignment to the same bare name creates
 or updates a script binding; it does not write back into the `MinamoEnvironment`.
@@ -284,43 +194,16 @@ using var instance = host.CreateInstance(environment);
 var result = await instance.ExecuteAsync("print(\"ready\", terminator: nil)");
 ```
 
-The input delegate receives the current operation's cancellation token and returns a
-`ValueTask<string?>`. Returning `null` represents end of input and produces an empty Minamo
-string. The optional `readline` library exposes that input as `readLine` after `import * from
-readline`; it suspends while input is pending without blocking the caller of `ExecuteAsync`. The
-output delegate receives the text chunks that `print` writes: values, separators, and terminators.
-Without delegates, the `readline` library and `print` retain their process Console behavior.
+The input delegate receives the operation cancellation token and returns `ValueTask<string?>`;
+`null` represents end of input. The output delegate receives the chunks written by `print`.
+Without delegates, `readline` and `print` use the process console.
 
-Use `ExecuteFileAsync` when the host has explicitly selected an entry script:
+Use `ExecuteFileAsync("Scripts/startup.nami")` for a host-selected entry script. Imports still obey
+the configured `FileLookup`; file I/O failures return an `Input` failure.
 
-```csharp
-var result = await instance.ExecuteFileAsync("Scripts/startup.nami");
-```
-
-The full file path is preserved in compiler diagnostics. This loads only the selected entry file;
-its imports remain governed by the instance's `FileLookup` or `DisableFileImports()` configuration.
-Missing or unreadable entry files produce an `Input` failure with the original I/O exception in
-`Failure.Exception`.
-
-`MinamoInstance` implements `IDisposable`. Disposing an instance invalidates its resource handles and
-prevents further execution.
-
-`ExecuteAsync`, `ExecuteFileAsync`, and `DispatchSignalsAsync` provide non-blocking host-call
-surfaces. A pending host `Task` or `ValueTask` does not occupy a worker thread while the VM is
-suspended. Instance operations remain serialized; concurrent calls wait for the active operation.
-Hosting exposes asynchronous execution methods only.
-
-Program-backed instances also provide `ExecuteAsync(CancellationToken)`. Interactive execution has
-matching asynchronous surfaces:
-
-```csharp
-await instance.ExecuteAsync(source);
-using var select = await instance.OpenSelectAsync("dialog");
-await select.SelectAsync("confirm");
-```
-
-`SelectAsync` and `SendAsync` await work in `choose` and `on` actions. The host opens and drives
-selects directly; scripts do not invoke selects or wait for their completion.
+Instance operations are asynchronous and serialized. Pending host awaitables suspend the VM without
+occupying a worker thread, and concurrent calls wait for the active operation. Interactive selects
+follow the same model; see [Interactive selects](InteractiveSelect.md).
 
 ## Host environment
 
@@ -354,10 +237,13 @@ therefore produces the normal undeclared-variable diagnostic for `host`.
 
 ## Capabilities and command catalog
 
-Calling `AddCapabilities` creates an allow-list in the default `Automatic` mode. Exact names and
-hierarchical wildcards are supported. If `AddCapabilities` is not called, all explicitly registered
-host features are available. Use `CapabilityMode = MinamoCapabilityMode.Restricted` to start with
-an empty, deny-all allow-list.
+`CapabilityMode` determines when the allow-list is active:
+
+- `Automatic` activates it when `AddCapabilities(...)` registers at least one name.
+- `Restricted` activates it even when empty, producing a deny-all starting point.
+- `Unrestricted` bypasses it.
+
+Entries may be exact names, `*`, or hierarchical wildcards such as `scene.*`.
 
 ```csharp
 host.AddCapabilities("scene.read", "audio.*")
@@ -378,18 +264,9 @@ host.Commands.Find("scene")
 host.Commands.Describe("scene.Delete")
 ```
 
-Generated commands accept the same metadata:
-
-```csharp
-[MinamoCommand(Description = "Deletes an entity.", Capability = "scene.write")]
-public void Delete(long id) { /* ... */ }
-```
-
 ### Built-in capabilities
 
-Capability names are not declared in a central registry. `AddCapabilities` builds the allow-list,
-and each protected operation demands the name documented below when it runs. The following names
-are reserved by Minamo's built-in host APIs:
+The following names are reserved by Minamo's built-in host APIs:
 
 | Capability | Protected script operations |
 | --- | --- |
@@ -397,18 +274,9 @@ are reserved by Minamo's built-in host APIs:
 | `state.write` | Assignment to `host.State[key]`, `Remove()`, and `Clear()` |
 | `log.write` | `host.Log.Debug()`, `Info()`, `Warning()`, and `Error()` |
 
-Signal capabilities are chosen when calling `AddSignal` through `listenCapability` and
-`emitCapability`. Module commands, generated commands and properties, and resource commands use
-the capability supplied by their registration or attribute. Those application-defined names are
-not built-in and may follow the host application's own namespace, such as `station.read` or
-`station.control`.
-
-In `Automatic` mode, registering at least one capability switches the host to an explicit
-allow-list. In `Restricted` mode the allow-list is always active, even when empty. Every protected
-built-in operation and application-defined operation must then match an exact entry, `*`, or a
-hierarchical wildcard such as `state.*`. `Unrestricted` mode bypasses the allow-list. An unavailable
-command is hidden from `host.Commands`; attempting another protected operation produces a runtime
-error and a `CapabilityDenied` trace event when tracing is enabled.
+Signal, module, generated, and resource capabilities use names supplied by the host application.
+An unavailable command is hidden from `host.Commands`; other denied operations produce a runtime
+error and, when tracing is enabled, a `CapabilityDenied` event.
 
 ## Resource handles
 
@@ -456,37 +324,13 @@ Registered resource wrappers are shared by default. Repeatedly exposing the same
 returns the same instance handle. Shared handles do not expose `Release`, survive `Reset()`, and are
 invalidated when the instance is disposed. `OnRelease` runs once at instance disposal.
 
-Mark wrapper types that the script should explicitly own and release as transient:
-
-```csharp
-[MinamoResource("TemporaryFile", Lifetime = MinamoResourceLifetime.Transient)]
-public sealed class TemporaryFileResource : MinamoResource
-{
-    private readonly TemporaryFile file;
-
-    public TemporaryFileResource(TemporaryFile file) => this.file = file;
-
-    [MinamoCommand]
-    public string Read() => file.Read();
-
-    protected override void OnRelease() => file.Dispose();
-}
-```
-
-Transient resources receive a new handle on every exposure. `OnRelease` runs once when the handle
-is released explicitly, cleared by `Reset()`, or invalidated by instance disposal.
+Use `[MinamoResource("TemporaryFile", Lifetime = MinamoResourceLifetime.Transient)]` when the
+script should own and explicitly release a resource. Transient resources receive a new handle on
+every exposure; `OnRelease` runs once when the handle is released, reset, or disposed.
 
 In every lifetime, the handle is invalidated before `OnRelease` runs. Failures from bulk cleanup
 are collected so every callback is attempted, then reported as an `AggregateException`. Service
 instances remain borrowed host objects and do not participate in resource release.
-
-```swift
-let player = scene.Find("player")
-player.Type
-player.IsValid()
-player.MoveTo(10, 20)
-player.Release()
-```
 
 Transient handles are invalidated by `Release()`, `Reset()`, or instance disposal. Shared and
 service handles remain valid through `Reset()` and cannot be released by the script. No handle can
@@ -565,46 +409,12 @@ if (!dispatch.Success)
         Console.Error.WriteLine(failure.Message);
 ```
 
-C# can observe dispatched signals as well:
+C# observers use `Subscribe` and `Unsubscribe`; payloads can be read with `GetPayload<T>()` or
+`TryGetPayload<T>()`.
 
-```csharp
-var subscription = instance.Environment.Signals.Subscribe(
-    "player.hit",
-    signal => Console.WriteLine(signal.GetPayload<int>()));
-
-instance.Environment.Signals.Unsubscribe(subscription);
-```
-
-Pending queues are unbounded by default for compatibility. Set `Signals.MaxPending` on the host
-options when producers can outpace dispatch:
-
-```csharp
-var host = new MinamoHost(new()
-{
-    Signals = new() { MaxPending = 1024 }
-});
-```
-
-The limit is copied into every instance created by that host. `TryEmit` returns `false` when the
-queue is full; `Emit` throws `InvalidOperationException` on the C# side and produces a runtime
-failure when called by a script. Invalid signal names and disposed dispatchers still throw from
-both methods. `PendingCount` reports the current queue length.
-
-```csharp
-if (!instance.Environment.Signals.TryEmit("player.hit", 10))
-    droppedSignals.Increment();
-```
-
-Minamo can select the same non-throwing behavior:
-
-```swift
-if !host.Signals.TryEmit("player.hit", 10) {
-    host.Log.Warning("signal queue is full")
-}
-```
-
-Use `GetPayload<T>()` or `TryGetPayload<T>()` to consume signal payloads without depending on
-runtime object types. The raw `Payload` remains available for advanced integrations.
+Pending queues are unbounded by default. Configure `Signals.MaxPending` when producers can outpace
+dispatch. `TryEmit` returns `false` when the queue is full, while `Emit` throws on the C# side and
+produces a runtime failure in Minamo. `PendingCount` reports the current queue length.
 
 `DispatchSignalsAsync()` processes only signals that were queued when dispatch began. Signals emitted
 by a callback remain queued until the next call. `Reset()` removes Minamo subscriptions and queued
@@ -624,9 +434,6 @@ var host = new MinamoHost(new()
 host.AddCapabilities("log.write");
 ```
 
-Stateful handlers can assign an instance method such as `recorder.Handle`. Combine multiple
-handlers with a multicast delegate before constructing the host.
-
 Minamo exposes four log levels and optional structured properties. A tuple or dictionary is
 converted to a case-insensitive property map.
 
@@ -639,23 +446,7 @@ host.Log.Error("command failed")
 
 Logs require `log.write`.
 
-Host commands use the same sink through `MinamoCommandContext`:
-
-```csharp
-module.Command("Load", context =>
-{
-    context.Log(
-        MinamoLogLevel.Info,
-        "loading scene",
-        new Dictionary<string, object?> { ["scene"] = "town" });
-    return null;
-});
-```
-
-Every `ExecuteAsync` and `DispatchSignalsAsync` call receives a new correlation ID. It is available through
-`MinamoExecutionResult.ExecutionId`, `MinamoSignalDispatchResult.ExecutionId`, `MinamoCommandContext.ExecutionId`,
-and `MinamoLogEntry.ExecutionId`. Entries produced by a host command also contain its unqualified
-command name in `Command`; script and signal-level entries leave it empty.
+Host commands write to the same sink through `MinamoCommandContext.Log(...)`.
 
 ### Log payload
 
@@ -670,28 +461,9 @@ The `Log` delegate in `MinamoHostOptions` receives an immutable record object:
 | `ExecutionId` | Correlation ID of the current `ExecuteAsync` or `DispatchSignalsAsync` operation |
 | `Command` | Unqualified host-command name while that command is executing; otherwise `null` |
 
-`ExecutionId` can be used to group interleaved diagnostic output by operation. `Command` identifies
-which host boundary produced an entry, but it is intentionally `null` for direct script calls such
-as `host.Log.Info(...)`. C# code may also call `instance.Environment.Telemetry.Write()`; outside an
-active execution context its execution ID is `Guid.Empty`. Correlation state flows through
-asynchronous continuations started by an operation, but it is not shared with unrelated threads
-that write telemetry while that operation is running.
-
-```csharp
-var host = new MinamoHost(new()
-{
-    Log = entry => logger.Write(
-        entry.Timestamp,
-        entry.Level,
-        entry.ExecutionId,
-        entry.Command,
-        entry.Message,
-        entry.Properties)
-});
-```
-
-Handler exceptions are synchronous failures. A Minamo log call reports them as a runtime error,
-and a failure raised by a Handler inside a host command is reported as a host command failure.
+Each execution or signal dispatch receives a correlation ID. Outside an active operation,
+`instance.Environment.Telemetry.Write(...)` uses `Guid.Empty`. Log-handler exceptions become
+runtime or host-command failures.
 
 ## Execution limits
 
@@ -749,15 +521,6 @@ var traces = new List<MinamoTraceEvent>();
 var host = new MinamoHost(new() { Trace = traces.Add });
 ```
 
-`MinamoTraceKind` includes:
-
-- `ExecutionStarted` and `ExecutionCompleted`
-- `Compilation` and `VmExecution`
-- `HostCommand`
-- `CapabilityDenied`
-- `SignalEmitted` and `SignalDelivered`
-- `ResourceCreated` and `ResourceReleased`
-
 `MinamoTraceEvent` contains:
 
 | Member | Meaning |
@@ -788,85 +551,11 @@ Events emitted by C# outside `ExecuteAsync` or `DispatchSignalsAsync` use `Guid.
 `Trace` accepts an `Action<MinamoTraceEvent>`. Unlike log handlers, trace handler exceptions are
 ignored because tracing is observational and must not alter script results.
 
-```csharp
-Trace = trace =>
-{
-    if (trace.Kind == MinamoTraceKind.CapabilityDenied)
-        securityLog.Write(trace.ExecutionId, trace.Name);
-    else if (trace.Duration is { } elapsed)
-        timings.Record(trace.Kind, trace.Name, elapsed);
-}
-```
+## Complete example
 
-## Game console example
-
-The following setup exposes a deliberately small surface to an in-game console. The engine remains
-responsible for scene work; Minamo only combines registered operations.
-
-```csharp
-var host = new MinamoHost(new()
-{
-    Limits = new()
-    {
-        MaxInstructions = 50_000,
-        MaxExecutionTime = TimeSpan.FromMilliseconds(25),
-        MaxHostCommands = 50,
-        MaxSignals = 16,
-        MaxCallDepth = 32
-    },
-    Log = entry => console.AddLine(entry.Level, entry.Message),
-    Trace = trace => diagnostics.Record(trace)
-});
-
-host.AddResourceType<EntityResource>();
-
-host.AddCapabilities(
-        "scene.read", "scene.write",
-        "state.*", "log.write",
-        "player.listen")
-    .AddSignal(
-        "player.selected",
-        listenCapability: "player.listen");
-
-host.Module("scene", module => module.Command(
-    "Find",
-    "Finds an entity by name.",
-    "scene.read",
-    command => command.Resource(
-        new EntityResource(scene.Find(command.Argument<string>("name")))),
-    MinamoCommandParameter.Required<string>("name")));
-
-using var instance = host.CreateInstance(game);
-```
-
-`EntityResource` follows the wrapper pattern from the resource section and exposes only its
-attributed commands.
-
-The console can then execute a small orchestration script:
-
-```swift
-import scene
-let player = scene.Find("player")
-
-host.Log.Info("moving player", (name: player.Name()))
-player.MoveTo(10, 20)
-host.State["lastCommand"] = "move player"
-
-func selected(name) {
-    let entity = scene.Find(name)
-    host.Log.Info("selected", (entity: entity.Name()))
-}
-
-host.Signals.On("player.selected", selected)
-```
-
-The game loop does not run Minamo asynchronously. It explicitly delivers queued engine events at
-a safe point:
-
-```csharp
-instance.Environment.Signals.Emit("player.selected", selectedEntity.Name);
-var dispatch = await instance.DispatchSignalsAsync(frameCancellationToken);
-```
+The [Station Console example](../../Examples/StationConsole/README.md) combines generated commands,
+resources, capabilities, state, signals, limits, and logging in a runnable host. Signal delivery is
+explicitly driven by that host at a safe point through `DispatchSignalsAsync(...)`.
 
 ## Security default
 
@@ -898,13 +587,8 @@ file and paths from `MINAMO_LIBS`. Minamo never searches beside its executable i
 Each configured path is searched exactly as registered; a `lib` child directory is not added
 implicitly. Register it with `AddPath` when it is intended to be importable.
 
-Use the same host configuration but disable file imports explicitly for a restricted console:
-
-```csharp
-var restrictedHost = new MinamoHost(new() { BuilderOptions = options })
-    .UseFileLookup(lookup)
-    .DisableFileImports();
-```
+Call `DisableFileImports()` after `UseFileLookup(...)` when a restricted console must explicitly
+disable file imports.
 
 The command-line host registers its standard modules, including `io`, through this same C# API.
 
@@ -975,67 +659,13 @@ When using project references, add the generator as an analyzer:
 Unsupported generic methods, `ref`/`out` parameters, `params` arrays, inaccessible methods, and
 duplicate command names are reported as compiler diagnostics.
 
-Set `Type` when commands should appear under a static host type rather than directly on the module:
-
-```csharp
-[MinamoModule("math")]
-public static class MathCommands
-{
-    [MinamoCommand(Type = "Math")]
-    public static long Abs(long value) => Math.Abs(value);
-}
-```
-
-Custom Minamo foreign types can be registered by the generated module initializer:
-
-```csharp
-[MinamoModule("game")]
-[MinamoForeignType(typeof(EntityTypeInfo))]
-public static class GameTypes { }
-```
-
-The generator validates that foreign types derive from `MinamoForeignTypeInfo` and have an accessible
-parameterless constructor. Generator diagnostics currently use `MinamoH001` through `MinamoH007`.
-
-A specialized module can derive from `ForeignUnit` directly. Applying `MinamoModule` makes the
-generator register that unit through `module.Unit(...)`:
-
-```csharp
-[MinamoModule("types")]
-public sealed class TypesModule : ForeignUnit
-{
-    public TypesModule() { /* register related foreign types */ }
-}
-```
-
-This form is useful when several foreign types share a strongly typed declaring unit. It cannot be
-combined with generated `MinamoCommand` or `MinamoForeignType` declarations on the same module class.
-The imperative API follows the same rule: a module configured with `Unit(...)` cannot also add
-generated command, static type, or foreign type registrations.
-
-Foreign type members use the related type-binding attributes:
-
-```csharp
-[MinamoType]
-public sealed partial class EntityTypeInfo : MinamoForeignTypeInfo
-{
-    [MinamoMethod]
-    internal static string Name(ExecutionContext context, Entity self) => self.Name;
-
-    [MinamoProperty]
-    internal static long Id(ExecutionContext context, Entity self) => self.Id;
-
-    [MinamoStaticMethod]
-    internal static Entity Find(ExecutionContext context, long id) { /* ... */ }
-
-    [MinamoStaticProperty]
-    internal static Entity None(ExecutionContext context) { /* ... */ }
-}
-```
-
-`MinamoCommand` exposes ordinary host commands on a module or static host type. `MinamoType` and its member
-attributes bind instance and static members on a `MinamoForeignTypeInfo`. Operators and conversions stay
-as explicit `MinamoForeignTypeInfo` overrides because they participate in the runtime type protocol.
+Set `MinamoCommand.Type` to group commands under a static host type. Advanced extensions can register
+`MinamoForeignTypeInfo` implementations with `MinamoForeignType`, or register a specialized
+`ForeignUnit` by applying `MinamoModule` to it. A module backed by `ForeignUnit` cannot also contain
+generated commands or foreign-type declarations. Foreign-type members use `MinamoType`,
+`MinamoMethod`, `MinamoProperty`, `MinamoStaticMethod`, and `MinamoStaticProperty`; operators and
+conversions remain explicit runtime overrides. See [Public API layers](PublicApiLayers.md) for the
+boundary between hosting and advanced extension APIs.
 
 ## External extension libraries
 
