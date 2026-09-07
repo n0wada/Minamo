@@ -65,13 +65,6 @@ if ($Configuration -eq "Release")
         exit $LASTEXITCODE
     }
 
-    $appHost = Join-Path $releaseOutput "Minamo.Console.exe"
-    $launcher = Join-Path $releaseOutput "minamo.exe"
-    if (Test-Path -LiteralPath $appHost)
-    {
-        Move-Item -LiteralPath $appHost -Destination $launcher -Force
-    }
-
     foreach ($fileName in @(
         "Minamo.deps.json",
         "Minamo.pdb",

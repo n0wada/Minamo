@@ -5,6 +5,8 @@
     <ApplicationIcon>minamo.ico</ApplicationIcon>
     <OutputType>Exe</OutputType>
     <AssemblyName>Minamo.Console</AssemblyName>
+    <MinamoLauncherExtension Condition="$([MSBuild]::IsOSPlatform('Windows'))">.exe</MinamoLauncherExtension>
+    <RunCommand>$(OutputPath)$(MinamoLauncherName)$(MinamoLauncherExtension)</RunCommand>
     <RootNamespace>Minamo</RootNamespace>
     <Title>$(MinamoProductName).Console</Title>
     <Description>Minamo, a dynamic language for .NET</Description>

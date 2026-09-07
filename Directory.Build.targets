@@ -1,0 +1,21 @@
+<Project>
+  <!-- Keep the managed assembly name while giving every copied app host the public CLI name. -->
+  <Target Name="RenameMinamoConsoleBuildAppHost"
+          AfterTargets="CopyFilesToOutputDirectory">
+    <Move SourceFiles="$(TargetDir)Minamo.Console$(_NativeExecutableExtension)"
+          DestinationFiles="$(TargetDir)$(MinamoLauncherName)$(_NativeExecutableExtension)"
+          OverwriteReadOnlyFiles="true"
+          Condition="Exists('$(TargetDir)Minamo.Console$(_NativeExecutableExtension)')" />
+    <ItemGroup Condition="Exists('$(TargetDir)$(MinamoLauncherName)$(_NativeExecutableExtension)')">
+      <FileWrites Include="$(TargetDir)$(MinamoLauncherName)$(_NativeExecutableExtension)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="RenameMinamoConsolePublishedAppHost"
+          AfterTargets="Publish">
+    <Move SourceFiles="$(PublishDir)Minamo.Console$(_NativeExecutableExtension)"
+          DestinationFiles="$(PublishDir)$(MinamoLauncherName)$(_NativeExecutableExtension)"
+          OverwriteReadOnlyFiles="true"
+          Condition="Exists('$(PublishDir)Minamo.Console$(_NativeExecutableExtension)')" />
+  </Target>
+</Project>

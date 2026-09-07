@@ -2,6 +2,7 @@
   <PropertyGroup>
     <!-- Product identity lives here so a future rename does not require editing every project. -->
     <MinamoProductName>Minamo</MinamoProductName>
+    <MinamoLauncherName>minamo</MinamoLauncherName>
     <MinamoVersion>0.9.5</MinamoVersion>
     <MinamoCompany>Minamo Contributors</MinamoCompany>
     <MinamoCopyright>Copyright (c) Minamo Contributors</MinamoCopyright>
