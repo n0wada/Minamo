@@ -196,9 +196,8 @@ An action can use `goto select-expression` to create and enter another select wh
 current instance on a navigation stack. `return` restores the preceding instance, and `exit`
 finishes the whole interaction from any depth. No `back` keyword is defined.
 
-See [Interactive selects](../Developers/InteractiveSelect.md) for basic host integration and
-[Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md) for navigation, factory
-lifetime, aliases, and the C# session API.
+See [Interactive selects](../Developers/InteractiveSelect.md) for the complete language and host
+integration model, including publication, navigation, factory lifetime, aliases, and requests.
 
 ## Collections
 
@@ -443,7 +442,6 @@ telemetry, and C# integration.
 - [Detailed grammar reference](../Reference/Grammar.md)
 - [Language recipes](Recipes.md)
 - [Interactive selects](../Developers/InteractiveSelect.md)
-- [Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md)
 - [Hosting API](../Developers/HostingGuide.md)
 - [Compatibility](../Operations/Compatibility.md)
 - [Runnable Station Console example](../../Examples/StationConsole/README.md)

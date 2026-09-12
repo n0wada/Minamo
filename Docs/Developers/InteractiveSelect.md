@@ -1,17 +1,15 @@
 # Interactive selects
 
-`select` lets a Minamo script describe a menu, dialogue, shop, or similar interaction. The script
-publishes cases and properties; the C# host renders them and sends a selected case back as a
-`MinamoChoice` object.
+`select` describes a host-driven interaction such as a menu, dialogue, shop, game screen, or GUI
+view model. The script publishes data and available operations; the host decides how to render them
+and sends user or application input back through the C# API.
 
-This page covers the normal host integration. It uses `OpenSelectAsync` and its small
-`MinamoSelect` API. For choice identity and reusable factories, see
-[Advanced interactive selects](InteractiveSelectAdvanced.md).
+Language-level `case` declarations appear as `MinamoChoice` objects in C#. This guide uses *case*
+for the language construct and *choice* for its published host representation.
 
 ## Quick start
 
-Declare a named select at module scope. For a single-screen interaction, cases can appear directly
-in the select body.
+Declare a named select at module scope:
 
 ```nami
 select town {
@@ -19,7 +17,8 @@ select town {
 }
 ```
 
-Execute the script, then open a new interaction and drive it with the currently available choices.
+Execute the declarations, open a new interaction, and pass a currently published choice back to
+the select:
 
 ```csharp
 var initialization = await instance.ExecuteAsync("""
@@ -40,33 +39,161 @@ while (!town.IsCompleted)
 Console.WriteLine(town.GetValue<string>());
 ```
 
-This minimal loop assumes its actions do not call `request`. When an action requests additional
-input, respond as shown below before asking the user to pick another choice.
+This minimal loop assumes every published screen has a visible choice and no action calls
+`request`. The later sections cover requests and event-only screens.
 
-`MinamoSelect` exposes only the operations needed for this loop:
+`MinamoSelect` is a live handle whose properties describe the latest published state:
 
 | Member | Purpose |
 | --- | --- |
 | `Name` | Declared name of the select currently at the top of the navigation stack. |
-| `Description` | Free-form dictionary description declared for the select. |
+| `Description` | Free-form dictionary description declared with `desc`. |
 | `Properties` | Read-only values published by `prop` declarations. |
-| `Choices` | The currently visible language-level cases, represented as `MinamoChoice` objects. |
-| `IsCompleted` | Whether the select has exited. |
-| `Request` | Input currently requested by a running action, or `null`. |
-| `SelectAsync(choice, argument?)` | Runs a visible choice from the published UI state. |
+| `Choices` | Currently visible cases, represented as `MinamoChoice` objects. |
+| `Request` | Input currently requested by a running case action, or `null`. |
+| `IsCompleted` | Whether the whole interaction has completed. |
+| `SelectAsync(choice, argument?)` | Runs a choice from the current publication. |
 | `SendAsync(id, argument?)` | Delivers a hidden host event declared with `on`. |
 | `RespondAsync(request, response?)` | Resumes the action that yielded the request. |
-| `GetValue<T>()` / `TryGetValue<T>()` | Reads the exit value after completion. |
+| `GetValue<T>()` / `TryGetValue<T>()` | Reads the completion value. |
 | `Dispose()` | Abandons the interaction and releases it. |
 
-Each call to `OpenSelectAsync` creates a new interaction with its own select-local values. A select
-remains active and republishes its properties and choices after an ordinary action. Navigation
-changes the same live `MinamoSelect` object, so the host loop does not need special routing code.
+Each call to `OpenSelectAsync` creates a fresh root select instance and fresh select-local values.
+After an ordinary action, Minamo republishes the same interaction through the same `MinamoSelect`
+object.
 
-## Requests from actions
+## Declaration model
 
-Call `request(kind, payload?)` when an action needs host input before it can finish. The action
-yields to the host, and the current publication contains no choices until the host responds.
+A select can contain one description, private local values, published properties, visible cases,
+and hidden host events:
+
+```nami
+select player {
+    desc ["prompt": "Present a compact music player"]
+
+    mut playing = false
+
+    prop playing ["control": "status"] => playing
+
+    case "play" when !playing [
+        "text": "Play",
+        "control": "button"
+    ] => {
+        playing = true
+    }
+
+    case "stop" when playing ["text": "Stop"] => {
+        playing = false
+    }
+
+    on "close" => exit
+}
+```
+
+`desc`, when present, comes first. All `let` and `mut` select locals follow it and must precede
+`prop`, `case`, and `on` declarations. Properties, cases, and events may then be interleaved.
+
+Case syntax follows this order:
+
+```text
+case "id" [ select-parameters ] [ "when" guard ] [ select-metadata ] "=>" action
+```
+
+The guard therefore precedes case metadata. A case action must be a block or a direct `goto`,
+`return`, or `exit` control statement.
+
+### Description, properties, and metadata
+
+`desc` is a free-form string-key dictionary evaluated once for each select instance, including an
+instance created as a `goto` target. Its main role is explanatory text or an AI-generation prompt,
+although a host may also use broad layout hints from it.
+
+`prop` exposes a read-only value without exposing the select-local storage behind it. Property
+names may be identifiers or strings:
+
+```nami
+prop count ["format": "number"] => count
+prop "status-text" => fmt("Count: {0}", count)
+```
+
+```csharp
+var count = select.Properties
+    .Single(property => property.Name == "count")
+    .GetValue<long>();
+```
+
+The optional dictionary after a property or after a case's optional `when` guard is free-form UI
+metadata. Keys must be strings, but Minamo assigns no meaning to values such as `text`, `control`,
+`icon`, `shape`, `format`, or `bind`. A CLI may ignore them, a conventional GUI may recognize a
+subset, and an AI UI generator may use all of them as hints.
+
+`MinamoSelectDescription`, `MinamoSelectProperty`, and `MinamoSelectMetadata` provide typed
+`GetValue<T>()` and `TryGetValue<T>()` conversion. For example, a metadata dictionary can be read as
+`Dictionary<string, object?>`. The bundled console treats a string-valued `text` entry as display
+text and falls back to the case ID; this is a host convention, not language semantics.
+
+### Publication and evaluation timing
+
+Opening a select publishes its first screen. Minamo publishes again after a case or host event
+finishes normally, after a request response lets its action finish, after entering a `goto` target,
+and after `return` restores the previous instance.
+
+| Declaration | Evaluation time |
+| --- | --- |
+| `desc` | Once when its select instance is created. |
+| `prop` value and metadata | On every screen publication. |
+| `case when` guard | On every screen publication. |
+| Available case metadata | On every screen publication, after its guard succeeds. |
+| Case or `on` action | Only when invoked by the host. |
+
+Published properties and metadata are snapshots. Objects retained from an earlier publication keep
+their old values. Guards, properties, and metadata should be free of side effects because the host
+controls when interactions are driven and republished.
+
+When an ordinary republication fails while evaluating a guard, property, or metadata dictionary,
+the operation throws and does not replace the last successfully published state with partially
+evaluated data.
+
+## Selecting cases and passing arguments
+
+Always select a `MinamoChoice` from the current `Choices` collection. There is intentionally no
+string overload of `SelectAsync`; resolving an ID is a normal collection lookup:
+
+```csharp
+MinamoChoice Choice(string id) =>
+    player.Choices.Single(choice => choice.Id == id);
+
+await player.SelectAsync(Choice("play"));
+```
+
+Each successful screen publication creates fresh choice objects. An object retained from an older
+publication is rejected, even if a case with the same ID is still visible. This prevents a local UI
+from accidentally applying an input to a screen that has already changed.
+
+A remote UI cannot preserve .NET object identity. Associate an opaque render token with the
+published choices and validate that token on the same serialized dispatcher that resolves the
+current ID and calls `SelectAsync`.
+
+Case parameters determine the host payload shape:
+
+```nami
+case "play" => { }
+case "select-track" (trackId) => { }
+case "set-volume" (trackId, value) => { }
+```
+
+```csharp
+await player.SelectAsync(Choice("play"));
+await player.SelectAsync(Choice("select-track"), trackId);
+await player.SelectAsync(Choice("set-volume"), (trackId, 80));
+```
+
+No parameter accepts no payload. One parameter receives the supplied value. Two or more parameters
+receive one C# tuple with the same number of elements.
+
+## Requests from case actions
+
+Call `request(kind, payload?)` when a case action needs additional host input before it can finish:
 
 ```nami
 select profile {
@@ -77,9 +204,13 @@ select profile {
 }
 ```
 
+The action yields without blocking a thread. The publication retains its properties but exposes no
+choices until the host responds:
+
 ```csharp
 var rename = profile.Choices.Single(choice => choice.Id == "rename");
 await profile.SelectAsync(rename);
+
 while (profile.Request is { } request)
 {
     var response = await ui.GetResponseAsync(
@@ -89,161 +220,152 @@ while (profile.Request is { } request)
 }
 ```
 
-An action may yield more than one request. Each request accepts exactly one response. While a
-request is pending, choice selection and event delivery are rejected; `Dispose` abandons the
-interaction. `request` is not available to host events, guards, or descriptions.
-
-## Testing selects
-
-Automated tests use the same C# API as the application: execute the declarations, call
-`OpenSelectAsync`, inspect `Choices`, and drive `SelectAsync` or `SendAsync`. Assert the live
-`Choices` after each action, or call `MinamoSelect.GetValue<T>()` after completion. No script
-invocation syntax or suspended script run is needed.
-
-For a manual test, let the console act as the host:
-
-```powershell
-minamo.exe town.nami --do town
-```
-
-The console loads the file and calls `OpenSelectAsync("town")`. In the REPL, `do town` is a
-console command with the same behavior. These are testing commands, not language syntax;
-`do expression` is not accepted in scripts. The ordinary `do { ... } while ...` loop is supported.
-
-## Properties, cases, and local values
-
-`prop` publishes read-only values for the current UI state. Property values are reevaluated after a
-case, host event, response, or navigation return. Select-local values remain private to the script.
-Case IDs are the stable values sent by the host. After an action finishes, properties, metadata,
-guards, and available choices are published again. `exit` completes the interaction, optionally
-with a value.
-
-```nami
-select player {
-    mut playing = false
-
-    prop playing => playing
-
-    case "play" when !playing [
-        "text": "Play",
-        "control": "button"
-    ] => {
-        playing = true
-    }
-
-    case "stop" when playing => {
-        playing = false
-    }
-
-    case "exit" ["text": "Close player"] => exit
-}
-```
-
-Property names may be identifiers or strings. Resolve a property by name and convert its value:
-
-```csharp
-var playing = player.Properties
-    .Single(property => property.Name == "playing")
-    .GetValue<bool>();
-```
-
-The optional string-key dictionary following a property or case is free-form UI metadata. Minamo
-does not interpret keys such as `text`, `control`, `icon`, or `shape`; each host may use or ignore
-them. `MinamoSelectProperty.Metadata` and `MinamoChoice.Metadata` expose the dictionary through
-`GetValue<T>()` and `TryGetValue<T>()`. A simple CLI can display the case ID when it does not use a
-`text` hint.
-
-## Passing values to cases
-
-Case parameters determine the C# payload shape:
-
-```nami
-case "play" => { }
-case "select-track" (trackId) => { }
-case "set-volume" (trackId, value) => { }
-```
-
-```csharp
-MinamoChoice Choice(string id) =>
-    player.Choices.Single(choice => choice.Id == id);
-
-await player.SelectAsync(Choice("play"));
-await player.SelectAsync(Choice("select-track"), trackId);
-await player.SelectAsync(Choice("set-volume"), (trackId, 80));
-```
-
-No parameter means that no payload is accepted. One parameter receives the supplied value. Two or
-more parameters receive one C# tuple with the same number of elements.
-
-## Navigation between selects
-
-Use `goto select-expression` to open another select inside the same host interaction. Minamo creates
-a fresh instance of the target factory and keeps the current instance on a navigation stack. A
-value-less `return` completes the current instance and restores the previous one; its local values
-are preserved. `exit value` completes the entire interaction from any depth and makes `value`
-available through `GetValue<T>()`.
-
-```nami
-select details {
-    desc ["title": "Details"]
-    case "close" => return
-}
-
-select menu {
-    desc ["title": "Menu"]
-    case "details" => goto details
-    case "quit" => exit "closed"
-}
-```
-
-The host continues to read `Name`, `Description`, and `Choices` from the same `MinamoSelect`.
-`return` at the root completes with `nil`. A select with no available choices and no host events
-also returns implicitly; at the root that completes with `nil`. There is currently no `back`
-keyword, and `return` in a select action does not accept a value. An explicitly declared function
-inside an action still uses ordinary function-return semantics.
-
-## Conditional cases
-
-Use `when` to hide a case until it is available.
-
-```nami
-case "accept"
-    when game.CanAcceptCourierQuest()
-    ["text": "Accept the courier quest", "control": "button"]
-    => {
-    game.AcceptCourierQuest()
-}
-```
-
-A false guard removes the case from `Choices`. Guards run when Minamo publishes a select screen:
-on opening and after a case, host event, or response finishes. They should be free of side
-effects.
+An action may yield more than one request. Each published request accepts exactly one response and
+must be passed back to `RespondAsync`; an older request object is rejected. While a request is
+pending, choice selection and event delivery are rejected. `request` is not available in host
+events, guards, properties, metadata, or descriptions. Disposing the select abandons a pending
+request.
 
 ## Host events
 
-`on` declares an event that is not displayed in `Choices`. Use it for host-owned domain events
-such as a timer, a completed download, or an inventory update.
+`on` declares input that is not displayed in `Choices`. Use it for host-owned domain events such as
+a timer, completed download, or inventory update:
 
 ```nami
 select download {
+    prop progress => downloads.Progress()
+    on "progress-changed" => { }
     on "completed" (fileName) => exit fileName
     case "cancel" => exit nil
 }
 ```
 
 ```csharp
+await download.SendAsync("progress-changed");
 await download.SendAsync("completed", fileName);
 var completedFile = download.GetValue<string>();
 ```
 
-`SendAsync` uses the same argument rules as `SelectAsync`. An event is accepted only when the
-select declares it.
+`SendAsync` uses the same argument-shape rules as `SelectAsync`. Sending an event republishes the
+screen after its action finishes, making it the explicit mechanism for reflecting changed
+host-owned data. An undeclared event ID is rejected.
 
-## When to use the advanced API
+## Navigation and factories
 
-Use this basic API for a CLI, a single-threaded desktop UI, or any host that renders choices and
-handles the next input immediately. Move to [Advanced interactive selects](InteractiveSelectAdvanced.md)
-when choice identity matters or selects are created and composed as reusable factories.
+A select expression produces a reusable factory. Select-local values belong to an instance created
+from that factory, while captured outer variables belong to the factory closure and are shared by
+its instances:
 
-For the complete grammar, see the [grammar reference](../Reference/Grammar.md). The advanced guide
-also covers descriptions, factory closures, and empty interactions.
+```nami
+func createShop() {
+    mut visits = 0
+
+    select {
+        mut cartCount = 0
+
+        case "add" => { cartCount += 1 }
+        case "leave" => {
+            visits += 1
+            exit (visits, cartCount)
+        }
+    }
+}
+
+let shop = createShop()
+alias(shop, "town.shop")
+```
+
+The host opens a factory by its global variable name or registered alias:
+
+```csharp
+using var shop = await instance.OpenSelectAsync("town.shop");
+```
+
+Within an interaction, `goto select-expression` evaluates another factory, creates a fresh target
+instance, and pushes the current instance onto an interaction-owned navigation stack:
+
+```nami
+func createDetails(itemId) {
+    select {
+        desc ["prompt": "Show item details", "itemId": itemId]
+        case "close" => return
+        case "delete" => exit ("deleted", itemId)
+    }
+}
+
+select browser {
+    mut opened = false
+
+    case "open" (itemId) when !opened => {
+        opened = true
+        goto createDetails(itemId)
+    }
+
+    case "finish" when opened => exit "closed"
+}
+```
+
+The control operations have different scopes:
+
+- `goto select-expression` pushes the current instance and enters a new one.
+- `return` completes the current instance with `nil` and restores one stack frame. At the root, it
+  completes the whole interaction with `nil`.
+- `exit value` completes the whole interaction from any depth, clears the stack, and publishes its
+  optional value as the result.
+
+The same `MinamoSelect` object publishes the active instance's `Name`, `Description`, `Properties`,
+and `Choices`. Each `goto` creates a new instance even when it evaluates the same factory again.
+Instances already on the stack retain their local values; `return` reevaluates their published
+state, while their descriptions retain the value evaluated when those instances were created.
+
+There is no automatic case named `back` and no `back` keyword. Put `return` in whichever case or
+host event should move up one level. A select-level `return` cannot carry a value. Inside an
+explicitly declared nested function, ordinary `return value` still returns from that function.
+
+## Completion and empty selects
+
+`exit`, root-level `return`, and an empty root select complete the interaction. Call `GetValue<T>()`
+only after `IsCompleted` becomes true; before then it throws. `TryGetValue<T>()` returns `false`
+while the interaction is active.
+
+When a publication finds no available cases and the active select declares no host events, Minamo
+implicitly returns from that select with `nil`. A nested select restores its caller; a root select
+completes. Properties alone do not keep an otherwise empty select active and are not published for
+that empty screen. An event-only select remains active with an empty `Choices` list and may publish
+properties.
+
+Use `exit value` when the whole interaction should finish with a meaningful result. `Dispose()`
+abandons the interaction rather than producing a script completion value.
+
+## Concurrency, errors, and limits
+
+Operations on one `MinamoSelect` are serialized internally. Hosts should still avoid issuing
+concurrent actions: after the first operation republishes the screen, another operation may hold a
+stale choice or conflict with a pending request. Coordinate host-owned data changes and the
+corresponding `SendAsync` call through the host's own dispatcher.
+
+The current boundaries are deliberate:
+
+- cases and host events execute serially rather than concurrently;
+- only currently published choice and request objects are accepted;
+- select instances have no public serialization format;
+- scripts own navigation, local values, properties, and available cases, while hosts own rendering,
+  event timing, and external state.
+
+## Testing selects
+
+Automated tests use the application API: execute declarations, call `OpenSelectAsync`, inspect the
+published properties and choices, and drive `SelectAsync`, `SendAsync`, or `RespondAsync`. Assert
+the next publication after each action, or read the completion value after `IsCompleted`.
+
+For a manual test, let the bundled console act as the host:
+
+```powershell
+minamo.exe town.nami --do town
+```
+
+The console loads the file and calls `OpenSelectAsync("town")`. In the REPL, `do town` has the same
+behavior. These are console testing commands, not language syntax; `do expression` is not accepted
+in scripts.
+
+For exact syntax and validation rules, see the [grammar reference](../Reference/Grammar.md).

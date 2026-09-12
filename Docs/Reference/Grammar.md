@@ -210,9 +210,8 @@ The final expression of a block is its value.
 An interactive select publishes properties and cases to the host and executes the selected case
 action. A host opens it through `MinamoInstance.OpenSelectAsync`. The C# API exposes language cases
 as `MinamoChoice` objects in `MinamoSelect.Choices`. See
-[Interactive selects](../Developers/InteractiveSelect.md) for the basic C# protocol and
-[Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md) for asynchronous hosts
-and nested interactions.
+[Interactive selects](../Developers/InteractiveSelect.md) for publication, the C# protocol,
+requests, and nested interactions.
 
 ```text
 select-declaration
