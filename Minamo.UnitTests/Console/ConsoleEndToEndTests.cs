@@ -83,8 +83,8 @@ public sealed class ConsoleEndToEndTests
             await File.WriteAllTextAsync(source, """
                 select counter {
                     mut count = 0
-                    choose "add" label "Add one" when count == 0 => { count += 1 }
-                    choose "finish" label "Finish counting" when count == 1 => {
+                    case "add" when count == 0 ["text": "Add one"] => { count += 1 }
+                    case "finish" when count == 1 ["text": "Finish counting"] => {
                         print(fmt("Count: {0}", count))
                         exit count
                     }
@@ -99,6 +99,36 @@ public sealed class ConsoleEndToEndTests
             Assert.Contains("Add one", result.StandardOutput, StringComparison.Ordinal);
             Assert.Contains("Finish counting", result.StandardOutput, StringComparison.Ordinal);
             Assert.Contains("Count: 1", result.StandardOutput, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ConsoleCanRespondToASelectRequest()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "minamo-cli-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var source = Path.Combine(root, "request.nami");
+            await File.WriteAllTextAsync(source, """
+                select profile {
+                    case "rename" => {
+                        let name = request("text", ["prompt": "Name"])
+                        print(fmt("Hello, {0}", name))
+                        exit name
+                    }
+                }
+                """, Encoding.UTF8);
+
+            var result = await RunWithInputAsync("rename\nMinamo\n", source, "--do", "profile", "-nologo");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("request[text]>", result.StandardOutput, StringComparison.Ordinal);
+            Assert.Contains("Hello, Minamo", result.StandardOutput, StringComparison.Ordinal);
         }
         finally
         {

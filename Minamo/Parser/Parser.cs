@@ -258,14 +258,19 @@ internal sealed partial class HandwrittenParser
             return FinishStatement(ParseSelectDeclaration());
         }
 
-        if (selectDepth > 0 && IsContextualKeyword("goto"))
-        {
-            return FinishStatement(ParseGoto());
-        }
-
-        if (selectDepth > 0 && IsContextualKeyword("exit"))
+        if (IsParsingSelectAction && IsContextualKeyword("exit"))
         {
             return FinishStatement(ParseExit());
+        }
+
+        if (IsParsingSelectAction && IsContextualKeyword("goto"))
+        {
+            return FinishStatement(ParseSelectGoto());
+        }
+
+        if (IsParsingSelectAction && Current.Kind == TokenKind.Return)
+        {
+            return FinishStatement(ParseSelectReturn());
         }
 
         SyntaxNode? node = Current.Kind switch
@@ -701,6 +706,10 @@ internal sealed partial class HandwrittenParser
                     return node;
                 }
                 node = new AccessSyntax(dot.Location) { Target = node, Name = Consume().Text };
+            }
+            else if (IsSelectMetadataStart())
+            {
+                break;
             }
             else if (Match(TokenKind.LeftBracket))
             {
@@ -1143,7 +1152,7 @@ internal sealed partial class HandwrittenParser
 
     private static bool IsStatementNode(SyntaxNode node) => node is
         BindingSyntax or ReturnSyntax or YieldSyntax or YieldBreakSyntax or BreakSyntax or ContinueSyntax or ThrowSyntax
-        or GotoSyntax or ExitSyntax or SelectDeclarationSyntax
+        or ExitSyntax or SelectGotoSyntax or SelectReturnSyntax or SelectDeclarationSyntax
         or IfSyntax or WhileSyntax or ForSyntax or TryCatchSyntax or MatchSyntax or FunctionDeclarationSyntax
         or TypeDeclarationSyntax or ImplDeclarationSyntax or RegionSyntax or ConstDeclarationSyntax;
 

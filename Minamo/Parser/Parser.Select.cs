@@ -5,7 +5,12 @@ namespace Minamo.Parser;
 
 internal sealed partial class HandwrittenParser
 {
-    private int selectDepth;
+    private readonly Stack<int> selectActionFunctionDepths = new();
+    private bool stopAtSelectMetadata;
+
+    private bool IsParsingSelectAction =>
+        selectActionFunctionDepths.Count != 0
+        && functions.Count == selectActionFunctionDepths.Peek();
 
     private SelectDeclarationSyntax? ParseSelectDeclaration()
     {
@@ -44,95 +49,21 @@ internal sealed partial class HandwrittenParser
             }
         }
 
-        selectDepth++;
-        if (IsContextualKeyword("initial") || IsContextualKeyword("state"))
-        {
-            while (!Check(TokenKind.RightBrace) && !IsAtEnd)
-            {
-                var state = ParseSelectState();
-                if (state is not null)
-                {
-                    declaration.States.Add(state);
-                }
-                else
-                {
-                    SynchronizeStatement();
-                }
-            }
-        }
-        else
-        {
-            var state = new SelectStateSyntax(keyword.Location)
-            {
-                Name = string.Empty,
-                IsInitial = true,
-                IsImplicit = true
-            };
-            ParseSelectStateContents(state);
-            declaration.States.Add(state);
-        }
-        selectDepth--;
+        ParseSelectContents(declaration);
         Expect(TokenKind.RightBrace);
         return declaration;
     }
 
-    private SelectStateSyntax? ParseSelectState()
-    {
-        var initial = IsContextualKeyword("initial");
-        if (initial)
-        {
-            Consume();
-        }
-
-        if (!IsContextualKeyword("state"))
-        {
-            ReportExpected(TokenKind.LowerIdentifier);
-            if (!Check(TokenKind.RightBrace) && !IsAtEnd)
-            {
-                Consume();
-            }
-            return null;
-        }
-        Consume();
-
-        if (!IsIdentifier(Current.Kind))
-        {
-            ReportExpected(TokenKind.LowerIdentifier);
-            if (!Check(TokenKind.RightBrace) && !IsAtEnd)
-            {
-                Consume();
-            }
-            return null;
-        }
-
-        var name = Consume();
-        var state = new SelectStateSyntax(name.Location)
-        {
-            Name = name.Text,
-            IsInitial = initial
-        };
-
-        if (!Expect(TokenKind.LeftBrace))
-        {
-            return null;
-        }
-
-        ParseSelectStateContents(state);
-        Expect(TokenKind.RightBrace);
-        return state;
-    }
-
-    private void ParseSelectStateContents(SelectStateSyntax state)
+    private void ParseSelectContents(SelectDeclarationSyntax declaration)
     {
         while (!Check(TokenKind.RightBrace) && !IsAtEnd)
         {
-            if (IsContextualKeyword("enter"))
+            if (IsContextualKeyword("prop"))
             {
-                Consume();
-                var enter = ParseSelectStateHookBody();
-                if (enter is not null)
+                var property = ParseSelectProperty();
+                if (property is not null)
                 {
-                    state.Enter = enter;
+                    declaration.Properties.Add(property);
                 }
                 else
                 {
@@ -141,53 +72,12 @@ internal sealed partial class HandwrittenParser
                 continue;
             }
 
-            if (IsContextualKeyword("leave"))
-            {
-                Consume();
-                var leave = ParseSelectStateHookBody();
-                if (leave is not null)
-                {
-                    state.Leave = leave;
-                }
-                else
-                {
-                    SynchronizeStatement();
-                }
-                continue;
-            }
-
-            if (IsContextualKeyword("on")
-                && Peek(1).Kind == TokenKind.LowerIdentifier
-                && Peek(1).TextSpan.SequenceEqual("empty".AsSpan()))
-            {
-                Consume();
-                Consume();
-                var empty = ParseSelectActionBody();
-                if (empty is not null)
-                {
-                    state.Empty = empty;
-                }
-                else
-                {
-                    SynchronizeStatement();
-                }
-                continue;
-            }
-
-            if (IsContextualKeyword("choose"))
+            if (IsContextualKeyword("case"))
             {
                 var choice = ParseSelectChoice();
-                if (choice is SelectChoiceSyntax staticChoice)
+                if (choice is not null)
                 {
-                    state.Choices.Add(staticChoice);
-                }
-                else if (choice is SelectDynamicChoiceGroupSyntax dynamicChoice)
-                {
-                    state.DynamicChoices.Add(dynamicChoice);
-                }
-                else if (choice is SelectChoiceSpreadSyntax spread)
-                {
-                    state.ChoiceSpreads.Add(spread);
+                    declaration.Choices.Add(choice);
                 }
                 else
                 {
@@ -201,7 +91,7 @@ internal sealed partial class HandwrittenParser
                 var handler = ParseSelectEvent();
                 if (handler is not null)
                 {
-                    state.Events.Add(handler);
+                    declaration.Events.Add(handler);
                 }
                 else
                 {
@@ -216,178 +106,43 @@ internal sealed partial class HandwrittenParser
         }
     }
 
-    private SyntaxNode? ParseSelectChoice()
+    private SelectChoiceSyntax? ParseSelectChoice()
     {
-        if (!IsContextualKeyword("choose"))
+        if (!IsContextualKeyword("case"))
         {
             return null;
         }
 
-        if (Peek(1).Kind == TokenKind.Ellipsis)
+        Consume();
+        if (!Check(TokenKind.String))
         {
-            var spreadKeyword = Consume();
-            Consume();
-            var target = ParseGuardExpression();
-            if (target is null)
+            ReportExpected(TokenKind.String);
+            return null;
+        }
+
+        var name = (StringLiteralSyntax)ParseString();
+        var choice = new SelectChoiceSyntax(name.Location)
+        {
+            Name = name.Value ?? string.Empty
+        };
+        ParseSelectParameters(choice.Parameters);
+
+        if (Match(TokenKind.When))
+        {
+            choice.Guard = ParseSelectGuardExpression();
+            if (choice.Guard is null)
             {
                 return null;
             }
-
-            ExpectSeparator();
-            return new SelectChoiceSpreadSyntax(spreadKeyword.Location) { Target = target };
         }
 
-        // A string immediately followed by a parameter list remains the static-choice form.
-        // Dynamic choices do not accept host-supplied parameters.
-        if (Peek(1).Kind == TokenKind.String && Peek(2).Kind == TokenKind.LeftParen)
+        if (Check(TokenKind.LeftBracket))
         {
-            return ParseSelectStaticChoiceWithParameters();
-        }
-
-        var keyword = Consume();
-        var id = ParseGuardExpression();
-        if (id is null)
-        {
-            return null;
-        }
-
-        SyntaxNode? label = null;
-        SyntaxNode? source = null;
-        SyntaxNode? guard = null;
-        string? itemName = null;
-
-        while (true)
-        {
-            if (IsContextualKeyword("label"))
+            choice.Metadata = ParseSelectDictionary();
+            if (choice.Metadata is null)
             {
-                Consume();
-                label = ParseGuardExpression();
-                if (label is null)
-                {
-                    return null;
-                }
-                continue;
+                return null;
             }
-
-            if (Check(TokenKind.For))
-            {
-                if (itemName is not null)
-                {
-                    Report(ParserError.InvalidStatement, Current);
-                    return null;
-                }
-
-                Consume();
-                if (!Check(TokenKind.LowerIdentifier))
-                {
-                    ReportExpected(TokenKind.LowerIdentifier);
-                    return null;
-                }
-
-                itemName = Consume().Text;
-                if (!Expect(TokenKind.In))
-                {
-                    return null;
-                }
-
-                source = ParseGuardExpression();
-                if (source is null)
-                {
-                    return null;
-                }
-                continue;
-            }
-
-            if (Match(TokenKind.When))
-            {
-                guard = ParseGuardExpression();
-                if (guard is null)
-                {
-                    return null;
-                }
-                continue;
-            }
-
-            break;
-        }
-
-        var body = ParseSelectActionBody();
-        if (body is null)
-        {
-            return null;
-        }
-
-        if (itemName is not null)
-        {
-            var group = new SelectDynamicChoiceGroupSyntax(keyword.Location)
-            {
-                ItemName = itemName,
-                Source = source!
-            };
-            group.Choices.Add(new SelectDynamicChoiceSyntax(keyword.Location)
-            {
-                Id = id,
-                Label = label,
-                Guard = guard,
-                Body = body
-            });
-            return group;
-        }
-
-        if (id is not StringLiteralSyntax name)
-        {
-            ReportExpected(TokenKind.String);
-            return null;
-        }
-
-        if (label is not null && label is not StringLiteralSyntax)
-        {
-            ReportExpected(TokenKind.String);
-            return null;
-        }
-
-        return new SelectChoiceSyntax(name.Location)
-        {
-            Name = name.Value ?? string.Empty,
-            Label = (label as StringLiteralSyntax)?.Value,
-            Guard = guard,
-            Body = body
-        };
-    }
-
-    private SelectChoiceSyntax? ParseSelectStaticChoiceWithParameters()
-    {
-        Consume();
-        var name = (StringLiteralSyntax)ParseString();
-        var choice = new SelectChoiceSyntax(name.Location) { Name = name.Value ?? string.Empty };
-        ParseSelectParameters(choice.Parameters);
-
-        while (true)
-        {
-            if (IsContextualKeyword("label"))
-            {
-                Consume();
-                if (!Check(TokenKind.String))
-                {
-                    ReportExpected(TokenKind.String);
-                    return null;
-                }
-
-                choice.Label = ((StringLiteralSyntax)ParseString()).Value;
-                continue;
-            }
-
-            if (Match(TokenKind.When))
-            {
-                choice.Guard = ParseGuardExpression();
-                if (choice.Guard is null)
-                {
-                    return null;
-                }
-                continue;
-            }
-
-            break;
         }
 
         var body = ParseSelectActionBody();
@@ -398,6 +153,74 @@ internal sealed partial class HandwrittenParser
 
         choice.Body = body;
         return choice;
+    }
+
+    private SyntaxNode? ParseSelectGuardExpression()
+    {
+        var previous = stopAtSelectMetadata;
+        stopAtSelectMetadata = true;
+        try
+        {
+            return ParseGuardExpression();
+        }
+        finally
+        {
+            stopAtSelectMetadata = previous;
+        }
+    }
+
+    private bool IsSelectMetadataStart() =>
+        stopAtSelectMetadata
+        && Check(TokenKind.LeftBracket)
+        && (Peek(1).Kind == TokenKind.RightBracket
+            || Peek(1).Kind == TokenKind.String && Peek(2).Kind == TokenKind.Colon);
+
+    private SelectPropertySyntax? ParseSelectProperty()
+    {
+        var keyword = Consume();
+        string name;
+        if (Check(TokenKind.LowerIdentifier))
+        {
+            name = Consume().Text;
+        }
+        else if (Check(TokenKind.String))
+        {
+            name = ((StringLiteralSyntax)ParseString()).Value ?? string.Empty;
+        }
+        else
+        {
+            ReportExpected(TokenKind.LowerIdentifier);
+            return null;
+        }
+
+        ArrayLiteralSyntax? metadata = null;
+        if (Check(TokenKind.LeftBracket))
+        {
+            metadata = ParseSelectDictionary();
+            if (metadata is null)
+            {
+                return null;
+            }
+        }
+
+        if (!Expect(TokenKind.Arrow))
+        {
+            return null;
+        }
+
+        var expression = ParseExpression();
+        if (expression is null)
+        {
+            return null;
+        }
+
+        ExpectSeparator();
+        return new SelectPropertySyntax(keyword.Location)
+        {
+            Name = name,
+            Metadata = metadata,
+            Expression = expression
+        };
     }
 
     private SelectEventSyntax? ParseSelectEvent()
@@ -422,22 +245,6 @@ internal sealed partial class HandwrittenParser
         return handler;
     }
 
-    private SyntaxNode? ParseSelectStateHookBody()
-    {
-        if (!Expect(TokenKind.Arrow))
-        {
-            return null;
-        }
-
-        if (!Check(TokenKind.LeftBrace))
-        {
-            ReportExpected(TokenKind.LeftBrace);
-            return null;
-        }
-
-        return ParseBlock();
-    }
-
     private ArrayLiteralSyntax? ParseSelectDescription()
     {
         if (!Check(TokenKind.LeftBracket))
@@ -446,19 +253,29 @@ internal sealed partial class HandwrittenParser
             return null;
         }
 
-        var description = (ArrayLiteralSyntax)ParseArray();
-        if (description.Elements.Count == 0)
+        var description = ParseSelectDictionary();
+        if (description is not null)
         {
-            description.IsDictionaryLiteral = true;
+            ExpectSeparator();
+        }
+        return description;
+    }
+
+    private ArrayLiteralSyntax? ParseSelectDictionary()
+    {
+        var dictionary = (ArrayLiteralSyntax)ParseArray();
+        if (dictionary.Elements.Count == 0)
+        {
+            dictionary.IsDictionaryLiteral = true;
         }
 
-        if (!description.IsDictionaryLiteral)
+        if (!dictionary.IsDictionaryLiteral)
         {
             Report(ParserError.InvalidExpression, Current);
             return null;
         }
 
-        foreach (var element in description.Elements)
+        foreach (var element in dictionary.Elements)
         {
             if (element is not LabelLiteralSyntax { FromString: true })
             {
@@ -467,8 +284,7 @@ internal sealed partial class HandwrittenParser
             }
         }
 
-        ExpectSeparator();
-        return description;
+        return dictionary;
     }
 
     private void ParseSelectParameters(List<ParameterSyntax> parameters)
@@ -504,7 +320,15 @@ internal sealed partial class HandwrittenParser
 
         if (Check(TokenKind.LeftBrace))
         {
-            return ParseBlock();
+            selectActionFunctionDepths.Push(functions.Count);
+            try
+            {
+                return ParseBlock();
+            }
+            finally
+            {
+                selectActionFunctionDepths.Pop();
+            }
         }
 
         if (IsContextualKeyword("exit"))
@@ -516,26 +340,20 @@ internal sealed partial class HandwrittenParser
 
         if (IsContextualKeyword("goto"))
         {
-            var body = ParseGoto();
+            var body = ParseSelectGoto();
+            ExpectSeparator();
+            return body;
+        }
+
+        if (Check(TokenKind.Return))
+        {
+            var body = ParseSelectReturn();
             ExpectSeparator();
             return body;
         }
 
         ReportExpected(TokenKind.LeftBrace);
         return null;
-    }
-
-    private SyntaxNode ParseGoto()
-    {
-        var token = Consume();
-        if (!IsIdentifier(Current.Kind))
-        {
-            ReportExpected(TokenKind.LowerIdentifier);
-            return new GotoSyntax(token.Location) { State = string.Empty };
-        }
-
-        var state = Consume();
-        return new GotoSyntax(token.Location) { State = state.Text };
     }
 
     private ParameterSyntax? ParseSelectParameter()
@@ -564,6 +382,34 @@ internal sealed partial class HandwrittenParser
         {
             node.Expression = ParseExpression();
         }
+        return node;
+    }
+
+    private SelectGotoSyntax ParseSelectGoto()
+    {
+        var token = Consume();
+        var node = new SelectGotoSyntax(token.Location);
+        if (!CanStartSameLineExpression())
+        {
+            Report(ParserError.InvalidExpression, Current);
+            node.Target = new NilLiteralSyntax(token.Location);
+            return node;
+        }
+
+        node.Target = ParseExpression() ?? new NilLiteralSyntax(token.Location);
+        return node;
+    }
+
+    private SelectReturnSyntax ParseSelectReturn()
+    {
+        var token = Consume();
+        var node = new SelectReturnSyntax(token.Location);
+        if (CanStartSameLineExpression())
+        {
+            Report(ParserError.InvalidStatement, Current);
+            ParseExpression();
+        }
+
         return node;
     }
 }

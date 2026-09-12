@@ -167,15 +167,6 @@ public sealed class ReturnSyntax : SyntaxNode
     }
 }
 
-public sealed class GotoSyntax : SyntaxNode
-{
-    public GotoSyntax(Location loc) : base(NodeType.Goto, loc) { }
-
-    public string State { get; set; } = null!;
-
-    internal override void ToString(StringBuilder sb) => sb.Append("goto ").Append(State);
-}
-
 public sealed class ExitSyntax : SyntaxNode
 {
     public ExitSyntax(Location loc) : base(NodeType.Exit, loc) { }
@@ -191,6 +182,26 @@ public sealed class ExitSyntax : SyntaxNode
             Expression.ToString(sb);
         }
     }
+}
+
+public sealed class SelectGotoSyntax : SyntaxNode
+{
+    public SelectGotoSyntax(Location loc) : base(NodeType.SelectGoto, loc) { }
+
+    public SyntaxNode Target { get; set; } = null!;
+
+    internal override void ToString(StringBuilder sb)
+    {
+        sb.Append("goto ");
+        Target.ToString(sb);
+    }
+}
+
+public sealed class SelectReturnSyntax : SyntaxNode
+{
+    public SelectReturnSyntax(Location loc) : base(NodeType.SelectReturn, loc) { }
+
+    internal override void ToString(StringBuilder sb) => sb.Append("return");
 }
 
 public sealed class ThrowSyntax : SyntaxNode

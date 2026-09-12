@@ -63,10 +63,10 @@ $recipes = @(
         Description = "Uses a trait as a common billable interface, shares a default description, and accepts multiple concrete types through the trait contract."
     }
     [pscustomobject]@{
-        File = "12-select-composition.nami"
-        Title = "Select composition"
-        Description = "Adds a state-less child select's choices to a parent state and declares host-facing descriptions for both selects."
-        Arguments = "--do setup"
+        File = "12-select-navigation.nami"
+        Title = "Select navigation"
+        Description = 'Uses `goto` to push a select instance, `return` to restore its caller, and `exit` to finish the entire interaction.'
+        Arguments = "--do menu"
     }
 )
 

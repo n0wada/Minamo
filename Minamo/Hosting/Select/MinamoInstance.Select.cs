@@ -126,7 +126,8 @@ public sealed partial class MinamoInstance
 
     internal async Task<ExecutionResult> InvokeSelectActionAsync(
         MinamoFunction action,
-        MinamoObject[] arguments)
+        MinamoObject[] arguments,
+        bool allowRequests = false)
     {
         var ownsGate = !operationScope.Value;
         if (ownsGate)
@@ -146,6 +147,7 @@ public sealed partial class MinamoInstance
             }
 
             var context = CreateExecutionContext(runtimeContext!, control: null);
+            context.SelectRequestsAllowed = allowRequests;
             if (action is not MinamoNativeFunction function)
             {
                 throw new InvalidOperationException("The select action function is unavailable.");
@@ -154,7 +156,63 @@ public sealed partial class MinamoInstance
             var result = await Task.Run(
                 () => MinamoMachine.ExecuteWithArguments(function, arguments, context),
                 CancellationToken.None).ConfigureAwait(false);
-            return await CompleteAwaitablesAsync(result).ConfigureAwait(false);
+            return await CompleteAwaitablesAsync(
+                result,
+                stopAtSelectRequest: allowRequests).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (!nested)
+            {
+                active = false;
+            }
+            if (ownsGate)
+            {
+                operationScope.Value = false;
+                operationGate.Release();
+            }
+        }
+    }
+
+    internal async Task<ExecutionResult> ResumeSelectActionAsync(
+        ExecutionResult suspended,
+        MinamoSelectRequestAwaitable request,
+        MinamoObject response)
+    {
+        ArgumentNullException.ThrowIfNull(suspended);
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(response);
+        if (suspended.Reason is not TerminationReason.Suspended
+            || suspended.Continuation is null
+            || !ReferenceEquals(suspended.Suspension?.Awaitable, request))
+        {
+            throw new InvalidOperationException("The select action is not waiting for this request.");
+        }
+
+        var ownsGate = !operationScope.Value;
+        if (ownsGate)
+        {
+            await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            operationScope.Value = true;
+        }
+
+        var nested = false;
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            nested = active;
+            if (!nested)
+            {
+                BeginOperation();
+            }
+
+            request.Respond(response);
+            var result = await Task.Run(
+                () => MinamoMachine.Resume(suspended.Continuation, request),
+                CancellationToken.None).ConfigureAwait(false);
+            return await CompleteAwaitablesAsync(
+                result,
+                stopAtSelectRequest: true).ConfigureAwait(false);
         }
         finally
         {
@@ -180,15 +238,11 @@ public sealed partial class MinamoInstance
         MinamoObject[] arguments) =>
         EvaluateSelectValueAsync(description, arguments, "description");
 
-    internal Task<MinamoObject> EvaluateSelectDynamicChoiceAsync(
-        MinamoFunction function,
-        MinamoObject[] arguments) =>
-        EvaluateSelectValueAsync(function, arguments, "dynamic choice");
+    internal Task<MinamoObject> EvaluateSelectPropertyAsync(MinamoFunction property) =>
+        EvaluateSelectValueAsync(property, Array.Empty<MinamoObject>(), "property");
 
-    internal Task<MinamoObject> EvaluateSelectChoiceSpreadAsync(
-        MinamoFunction function,
-        MinamoObject[] arguments) =>
-        EvaluateSelectValueAsync(function, arguments, "choice spread");
+    internal Task<MinamoObject> EvaluateSelectMetadataAsync(MinamoFunction metadata) =>
+        EvaluateSelectValueAsync(metadata, Array.Empty<MinamoObject>(), "metadata");
 
     private async Task<MinamoObject> EvaluateSelectValueAsync(
         MinamoFunction function,

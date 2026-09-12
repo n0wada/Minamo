@@ -169,7 +169,11 @@ public sealed class SelectDeclarationSyntax : SyntaxNode
 
     public List<BindingSyntax> Locals { get; } = new();
 
-    public List<SelectStateSyntax> States { get; } = new();
+    public List<SelectPropertySyntax> Properties { get; } = new();
+
+    public List<SelectChoiceSyntax> Choices { get; } = new();
+
+    public List<SelectEventSyntax> Events { get; } = new();
 
     internal override void ToString(StringBuilder sb)
     {
@@ -189,175 +193,43 @@ public sealed class SelectDeclarationSyntax : SyntaxNode
         {
             local.ToString(sb);
         }
-        foreach (var state in States)
+        foreach (var property in Properties)
         {
-            state.ToString(sb);
-        }
-        sb.Append('}');
-    }
-}
-
-public sealed class SelectStateSyntax : SyntaxNode
-{
-    public SelectStateSyntax(Location loc) : base(NodeType.SelectState, loc) { }
-
-    public string Name { get; set; } = null!;
-
-    public bool IsInitial { get; set; }
-
-    internal bool IsImplicit { get; set; }
-
-    public SyntaxNode? Enter { get; set; }
-
-    public SyntaxNode? Leave { get; set; }
-
-    public SyntaxNode? Empty { get; set; }
-
-    public List<SelectChoiceSyntax> Choices { get; } = new();
-
-    public List<SelectDynamicChoiceGroupSyntax> DynamicChoices { get; } = new();
-
-    public List<SelectChoiceSpreadSyntax> ChoiceSpreads { get; } = new();
-
-    public List<SelectEventSyntax> Events { get; } = new();
-
-    internal override void ToString(StringBuilder sb)
-    {
-        if (IsImplicit)
-        {
-            AppendContents(sb);
-            return;
-        }
-
-        if (IsInitial)
-        {
-            sb.Append("initial ");
-        }
-
-        sb.Append("state ");
-        sb.Append(Name);
-        sb.Append(" {");
-        AppendContents(sb);
-        sb.Append('}');
-    }
-
-    private void AppendContents(StringBuilder sb)
-    {
-        if (Enter is not null)
-        {
-            sb.Append(" enter => ");
-            Enter.ToString(sb);
-        }
-        if (Leave is not null)
-        {
-            sb.Append(" leave => ");
-            Leave.ToString(sb);
-        }
-        if (Empty is not null)
-        {
-            sb.Append(" on empty => ");
-            Empty.ToString(sb);
+            property.ToString(sb);
         }
         foreach (var choice in Choices)
         {
             choice.ToString(sb);
         }
-        foreach (var dynamicChoice in DynamicChoices)
-        {
-            dynamicChoice.ToString(sb);
-        }
-        foreach (var spread in ChoiceSpreads)
-        {
-            spread.ToString(sb);
-        }
         foreach (var handler in Events)
         {
             handler.ToString(sb);
         }
+        sb.Append('}');
     }
 }
 
-public sealed class SelectDynamicChoiceGroupSyntax : SyntaxNode
+public sealed class SelectPropertySyntax : SyntaxNode
 {
-    public SelectDynamicChoiceGroupSyntax(Location loc) : base(NodeType.SelectDynamicChoices, loc) { }
+    public SelectPropertySyntax(Location loc) : base(NodeType.SelectProperty, loc) { }
 
-    public string ItemName { get; set; } = null!;
+    public string Name { get; set; } = null!;
 
-    public SyntaxNode Source { get; set; } = null!;
+    public ArrayLiteralSyntax? Metadata { get; set; }
 
-    public List<SelectDynamicChoiceSyntax> Choices { get; } = new();
+    public SyntaxNode Expression { get; set; } = null!;
 
     internal override void ToString(StringBuilder sb)
     {
-        if (Choices.Count == 1)
+        sb.Append("prop ");
+        sb.Append(Name);
+        if (Metadata is not null)
         {
-            var choice = Choices[0];
-            sb.Append("choose ");
-            choice.Id.ToString(sb);
-            if (choice.Label is not null)
-            {
-                sb.Append(" label ");
-                choice.Label.ToString(sb);
-            }
-            sb.Append(" for ");
-            sb.Append(ItemName);
-            sb.Append(" in ");
-            Source.ToString(sb);
-            if (choice.Guard is not null)
-            {
-                sb.Append(" when ");
-                choice.Guard.ToString(sb);
-            }
-            sb.Append(" => ");
-            choice.Body.ToString(sb);
-            return;
-        }
-
-        sb.Append("<invalid dynamic select choice>");
-    }
-}
-
-public sealed class SelectDynamicChoiceSyntax : SyntaxNode
-{
-    public SelectDynamicChoiceSyntax(Location loc) : base(NodeType.SelectDynamicChoice, loc) { }
-
-    public SyntaxNode Id { get; set; } = null!;
-
-    public SyntaxNode? Label { get; set; }
-
-    public SyntaxNode? Guard { get; set; }
-
-    public SyntaxNode Body { get; set; } = null!;
-
-    internal override void ToString(StringBuilder sb)
-    {
-        sb.Append("choose ");
-        Id.ToString(sb);
-        if (Label is not null)
-        {
-            sb.Append(" label ");
-            Label.ToString(sb);
-        }
-        if (Guard is not null)
-        {
-            sb.Append(" when ");
-            Guard.ToString(sb);
+            sb.Append(' ');
+            Metadata.ToString(sb);
         }
         sb.Append(" => ");
-        Body.ToString(sb);
-    }
-}
-
-public sealed class SelectChoiceSpreadSyntax : SyntaxNode
-{
-    public SelectChoiceSpreadSyntax(Location loc) : base(NodeType.SelectChoiceSpread, loc) { }
-
-    public SyntaxNode Target { get; set; } = null!;
-
-    internal override void ToString(StringBuilder sb)
-    {
-        sb.Append("choose ...");
-        Target.ToString(sb);
+        Expression.ToString(sb);
     }
 }
 
@@ -369,7 +241,7 @@ public sealed class SelectChoiceSyntax : SyntaxNode
 
     public List<ParameterSyntax> Parameters { get; } = new();
 
-    public string? Label { get; set; }
+    public ArrayLiteralSyntax? Metadata { get; set; }
 
     public SyntaxNode? Guard { get; set; }
 
@@ -377,7 +249,7 @@ public sealed class SelectChoiceSyntax : SyntaxNode
 
     internal override void ToString(StringBuilder sb)
     {
-        sb.Append("choose \"");
+        sb.Append("case \"");
         sb.Append(Name);
         sb.Append('"');
         if (Parameters.Count > 0)
@@ -387,17 +259,16 @@ public sealed class SelectChoiceSyntax : SyntaxNode
             sb.Append(')');
         }
 
-        if (Label is not null)
-        {
-            sb.Append(" label \"");
-            sb.Append(Label);
-            sb.Append('"');
-        }
-
         if (Guard is not null)
         {
             sb.Append(" when ");
             Guard.ToString(sb);
+        }
+
+        if (Metadata is not null)
+        {
+            sb.Append(' ');
+            Metadata.ToString(sb);
         }
         sb.Append(" => ");
         Body.ToString(sb);

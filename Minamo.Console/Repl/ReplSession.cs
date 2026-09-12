@@ -193,6 +193,26 @@ internal sealed class ReplSession : IDisposable
     {
         while (!select.IsCompleted)
         {
+            if (select.Request is { } request)
+            {
+                ConsoleOutput.Prefix($"request[{request.Kind}]> ");
+                var response = Console.ReadLine();
+                if (response is null or "cancel" or "quit")
+                {
+                    return;
+                }
+
+                try
+                {
+                    await select.RespondAsync(request, response).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    ConsoleOutput.Error(ex.Message);
+                }
+                continue;
+            }
+
             var choices = select.Choices;
             if (choices.Count == 0)
             {
@@ -204,7 +224,7 @@ internal sealed class ReplSession : IDisposable
             for (var i = 0; i < choices.Count; i++)
             {
                 var renderedChoice = choices[i];
-                ConsoleOutput.Output($"{i + 1}. {renderedChoice.Label}");
+                ConsoleOutput.Output($"{i + 1}. {DisplayText(renderedChoice)}");
             }
 
             ConsoleOutput.Prefix("select> ");
@@ -216,7 +236,6 @@ internal sealed class ReplSession : IDisposable
 
             if (input is "cancel" or "quit")
             {
-                select.Cancel();
                 return;
             }
 
@@ -299,6 +318,16 @@ internal sealed class ReplSession : IDisposable
         }
 
         return true;
+    }
+
+    private static string DisplayText(MinamoChoice choice)
+    {
+        var metadata = choice.Metadata?.GetValue<System.Collections.Generic.Dictionary<string, object?>>();
+        return metadata is not null
+            && metadata.TryGetValue("text", out var text)
+            && text is string value
+                ? value
+                : choice.Id;
     }
 
     public void Dispose() => session.Dispose();

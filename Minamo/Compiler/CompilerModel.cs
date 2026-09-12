@@ -156,9 +156,6 @@ internal sealed class CompilerContext
         MatchExit = old.MatchExit;
         IsIteratorBody = old.IsIteratorBody;
         IsTailPosition = old.IsTailPosition;
-        SelectName = old.SelectName;
-        SelectStates = old.SelectStates;
-        SelectIsStateLess = old.SelectIsStateLess;
     }
 
     public Stack<int> Errors { get; }
@@ -182,12 +179,6 @@ internal sealed class CompilerContext
     public bool IsIteratorBody { get; set; }
 
     public bool IsTailPosition { get; set; }
-
-    public string? SelectName { get; set; }
-
-    public IReadOnlySet<string>? SelectStates { get; set; }
-
-    public bool SelectIsStateLess { get; set; }
 
     public bool HasFunctionExit => !FunctionExit.IsEmpty();
 
@@ -237,19 +228,6 @@ internal sealed class CompilerContext
         return ctx;
     }
 
-    public CompilerContext WithSelectStates(
-        string name,
-        IReadOnlySet<string> states,
-        bool isStateLess)
-    {
-        var ctx = new CompilerContext(this)
-        {
-            SelectName = name,
-            SelectStates = states,
-            SelectIsStateLess = isStateLess
-        };
-        return ctx;
-    }
 }
 
 internal static class FunAttr

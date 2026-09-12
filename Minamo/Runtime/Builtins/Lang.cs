@@ -48,6 +48,24 @@ internal sealed partial class Lang : ForeignUnit
         MinamoSelectAliases.Register(ctx, select, name);
     }
 
+    [MinamoStaticMethod("request")]
+    public static MinamoObject Request(
+        ExecutionContext ctx,
+        string kind,
+        [Default] MinamoObject payload)
+    {
+        if (!ctx.SelectRequestsAllowed)
+        {
+            return ctx.InvalidOperation();
+        }
+        if (string.IsNullOrWhiteSpace(kind))
+        {
+            return ctx.InvalidValue(MinamoString.Get(kind));
+        }
+
+        return new MinamoSelectRequestAwaitable(kind, payload ?? Nil);
+    }
+
     [MinamoStaticMethod("print")]
     public static void Print(ExecutionContext ctx, [VarArg]MinamoTuple values, [Default(",")]string separator, [Default("\n")]MinamoObject terminator)
     {

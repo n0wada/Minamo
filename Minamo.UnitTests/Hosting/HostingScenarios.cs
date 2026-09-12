@@ -243,15 +243,29 @@ internal static class HostingScenarios
         AssertNoMethod<MinamoSelect>("Send", "synchronous basic select host event delivery");
         AssertHasMethod<MinamoSelect>("SelectAsync", "asynchronous basic select choice");
         AssertHasMethod<MinamoSelect>("SendAsync", "asynchronous basic select host event delivery");
-        AssertHasMethod<MinamoSelect>("RefreshAsync", "asynchronous select refresh");
-        AssertHasMethod<MinamoSelect>("InvalidateAsync", "asynchronous select invalidation");
-        AssertHasMethod<MinamoSelect>("SelectAtRevisionAsync", "revision-aware select choice");
-        AssertHasMethod<MinamoSelect>("SendAtRevisionAsync", "revision-aware select host event delivery");
+        AssertNoMethod<MinamoSelect>("RefreshAsync", "removed select refresh");
+        AssertNoMethod<MinamoSelect>("Cancel", "removed select cancellation");
+        AssertNoMethod<MinamoSelect>("InvalidateAsync", "removed select invalidation");
+        AssertNoMethod<MinamoSelect>("SelectAtRevisionAsync", "removed revision-aware select choice");
+        AssertNoMethod<MinamoSelect>("SendAtRevisionAsync", "removed revision-aware select host event delivery");
+        AssertHasMethod<MinamoSelect>("RespondAsync", "select request response");
+        AssertNoProperty<MinamoSelect>("State", "removed select state");
+        AssertNoProperty<MinamoSelect>("Revision", "removed select revision");
         AssertHasProperty<MinamoSelect>("Description", "select description");
+        AssertHasProperty<MinamoSelect>("Request", "current select request");
+        AssertNoProperty<MinamoSelect>("IsWaitingForResponse", "removed select request wait state");
+        AssertHasMethod<MinamoSelect>("GetValue", "typed completed select value");
+        AssertHasMethod<MinamoSelect>("TryGetValue", "optional completed select value");
+        Assert(!typeof(MinamoSelect).GetMethods().Any(method =>
+                method.Name == "SelectAsync"
+                && method.GetParameters().FirstOrDefault()?.ParameterType == typeof(string)),
+            "removed string select choice overload");
+        AssertHasMethod<MinamoSelectRequest>("GetPayload", "typed select request payload");
+        AssertHasMethod<MinamoSelectRequest>("TryGetPayload", "optional select request payload");
+        AssertNoProperty<MinamoSelectRequest>("Revision", "removed select request revision");
+        AssertNoProperty<MinamoChoice>("Revision", "removed choice revision");
         Assert(!typeof(MinamoSelectSession).IsPublic, "select session stays internal");
         Assert(!typeof(MinamoSelectSnapshot).IsPublic, "select snapshot stays internal");
-        AssertNoProperty<MinamoSelectResult>("Snapshot", "internal select result snapshot");
-        AssertNoProperty<MinamoSelectRevisionMismatchException>("Snapshot", "internal stale-select snapshot");
         AssertHasMethod<MinamoExecutionResult>("GetValue", "typed execution result");
         AssertHasMethod<MinamoExecutionResult>("TryGetValue", "optional typed execution result");
         AssertNoProperty<MinamoExecutionResult>("Value", "removed raw execution result");

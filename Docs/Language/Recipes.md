@@ -323,38 +323,32 @@ Run it with:
 
 Source: [11-traits-as-interfaces.nami](../../Examples/Language/11-traits-as-interfaces.nami)
 
-## Select composition
+## Select navigation
 
-Adds a state-less child select's choices to a parent state and declares host-facing descriptions for both selects.
+Uses `goto` to push a select instance, `return` to restore its caller, and `exit` to finish the entire interaction.
 
 ```swift
-// The child has no states, so its choices can be expanded into a parent state.
-select quickActions {
-    desc ["scope": "child"]
+select details {
+    desc ["title": "Details"]
 
-    choose "show-advanced" => {
-        print("Show the advanced options.")
-    }
+    case "close" => return
+    case "quit" => exit "closed from details"
 }
 
-select setup {
-    desc ["title": "Quick setup", "kind": "wizard"]
+select menu {
+    desc ["title": "Menu"]
 
-    initial state start {
-        choose "finish" => exit "Setup completed."
-        choose ...quickActions
-    }
+    case "details" => goto details
+    case "quit" => exit "closed"
 }
-
-print("Run this recipe with --do setup to open the composed select.")
 ```
 
 Run it with:
 
 ```powershell
-.\bin\minamo.exe .\Examples\Language\12-select-composition.nami -nologo --do setup
+.\bin\minamo.exe .\Examples\Language\12-select-navigation.nami -nologo --do menu
 ```
 
-Source: [12-select-composition.nami](../../Examples/Language/12-select-composition.nami)
+Source: [12-select-navigation.nami](../../Examples/Language/12-select-navigation.nami)
 
 The Release smoke test executes every listed recipe. Run `scripts/generate-recipes.ps1 -Check` to verify that this page matches the source files.

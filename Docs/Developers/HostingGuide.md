@@ -28,7 +28,7 @@ The Hosting API uses a small set of names consistently on the C# side and the Mi
 | Resources | `host.AddResourceType<T>()`, `context.Resource(...)` | Returned handles | Instance-scoped opaque CLR objects |
 | State | `Environment.State.Set/SetScript` | `host.State` | Instance memory with host-owned and script-owned keys |
 | Signals | `host.AddSignal(...)`, `Environment.Signals` | `host.Signals` | Queued events delivered by `DispatchSignalsAsync()` |
-| Input and output | `MinamoEnvironment.UseInput/UseOutput` | `readLine` (`readline` library), `print` | Instance-local text I/O selected by the host |
+| Input and output | `MinamoEnvironment.UseInputAsync/UseOutput` | `readLine` (`readline` library), `print` | Instance-local text I/O selected by the host |
 | Capabilities | `host.AddCapabilities(...)`, `Environment.Capabilities` | None | Host-owned allow-list for protected features |
 | Logging | `MinamoHostOptions.Log` | `host.Log` | User-facing structured log events |
 | Tracing | `MinamoHostOptions.Trace` | None | Observational diagnostics for the embedding host |
@@ -81,13 +81,14 @@ it between threads; concurrent configuration and instance creation are not suppo
 
 `ExecuteAsync` and `ExecuteFileAsync` return a `MinamoExecutionResult` instead of throwing for script
 compilation errors, runtime errors, input failures, cancellation, and execution limits. Inspect
-`Failure.Kind` to distinguish `Compilation`, `Runtime`, `Input`, `Cancelled`, and `Limit`;
+`Failure.Kind` to distinguish `Compilation`, `Runtime`, `Host`, `Input`, `Cancelled`, and `Limit`;
 `Failure.Limit` identifies the exceeded limit. `Diagnostics`
 contains structured compiler messages with severity, code, source location, and text. The optional
-`Failure.Exception` preserves the originating CLR exception for logging and detailed diagnostics.
-Exceptions thrown by registered host commands are deliberately sanitized before they cross into the
-script. Their CLR type and original message are written to host telemetry at `Error` level, while the
-script receives only a generic host-command failure.
+`Failure.Exception` preserves the exception reported at the operation boundary for logging and
+detailed diagnostics. Exceptions thrown by registered host commands are deliberately sanitized
+before they cross into the script. Their CLR type and original message are written to host telemetry
+at `Error` level, while the script and `MinamoExecutionResult` receive only the sanitized runtime
+failure.
 
 `MinamoExecutionResult` and `MinamoSignalDispatchResult` both implement
 `IMinamoOperationResult`. Generic host reporting can use its `Success`, `Failures`,
@@ -97,8 +98,8 @@ the returned value, or the delivered signal count.
 Use `GetValue<T>()` to convert a successful execution value to a CLR type, or
 `TryGetValue<T>()` when conversion may not be available. A Minamo `nil` converts to
 `default(T)`. `TryGetValue<T>()` returns `false` when an operation has no value or the value cannot
-be converted; `GetValue<T>()` throws in those cases. The raw `Value` remains available for advanced
-runtime integrations.
+be converted; `GetValue<T>()` throws in those cases. Hosting results deliberately do not expose the
+raw runtime value.
 
 Invalid Hosting API usage, such as a duplicate registration or an invalid argument, still throws
 a normal C# exception immediately.
@@ -117,23 +118,26 @@ Generated commands support `Task`, `Task<T>`, `ValueTask`, and `ValueTask<T>`; m
 provides `AsyncCommand(...)`. Minamo suspends the VM while the CLR awaitable completes without adding
 language-level `async` or `await` syntax.
 
-Module, service, signal, resource, and capability names use dotted identifier segments. Commands,
+Module, signal, resource, and capability names use dotted identifier segments. Commands,
 static host types, and parameters use single identifiers. Invalid names are rejected during host
 configuration. Group static host commands with `module.Type(...)`.
 
 ## Instances
 
 `MinamoInstance` is incremental. Definitions created by one successful submission remain available to
-later submissions. Failed builds and runtime failures are rolled back.
+later submissions. A failed submission does not commit its compiled definitions or script signal
+subscriptions. Host-command side effects, emitted signals, and writes to shared host state are not
+transactional and are not rolled back.
 
 ```csharp
 await instance.ExecuteAsync("let boss = game.spawn(\"boss\")");
 await instance.ExecuteAsync("game.teleport(boss, 100, 20)");
 ```
 
-`Reset()` discards compiled definitions, script state and subscriptions, and non-service handles
-while preserving snapshotted host registrations. Dispose every instance when its host scope ends;
-disposal invalidates its handles but does not dispose borrowed host objects.
+`Reset()` discards compiled definitions, state, script subscriptions, queued signals, and transient
+resource handles while preserving snapshotted host registrations, C# signal subscriptions, and
+shared resource handles. Dispose every instance when its host scope ends; disposal invalidates its
+resource handles but does not dispose the borrowed host context.
 
 For repeated execution of the same code across multiple actors or players, compile once into a
 `MinamoProgram` and create separate instances from it:
@@ -195,8 +199,9 @@ var result = await instance.ExecuteAsync("print(\"ready\", terminator: nil)");
 ```
 
 The input delegate receives the operation cancellation token and returns `ValueTask<string?>`;
-`null` represents end of input. The output delegate receives the chunks written by `print`.
-Without delegates, `readline` and `print` use the process console.
+`null` is exposed to the script as an empty string. The output delegate receives the chunks written
+by `print`. When the optional `readline` library is registered, its `readLine` command consumes this
+input delegate. Without configured delegates, `readLine` and `print` use the process console.
 
 Use `ExecuteFileAsync("Scripts/startup.nami")` for a host-selected entry script. Imports still obey
 the configured `FileLookup`; file I/O failures return an `Input` failure.
@@ -329,12 +334,12 @@ script should own and explicitly release a resource. Transient resources receive
 every exposure; `OnRelease` runs once when the handle is released, reset, or disposed.
 
 In every lifetime, the handle is invalidated before `OnRelease` runs. Failures from bulk cleanup
-are collected so every callback is attempted, then reported as an `AggregateException`. Service
-instances remain borrowed host objects and do not participate in resource release.
+are collected so every callback is attempted, then reported as an `AggregateException`. The
+instance host context remains a borrowed object and does not participate in resource release.
 
-Transient handles are invalidated by `Release()`, `Reset()`, or instance disposal. Shared and
-service handles remain valid through `Reset()` and cannot be released by the script. No handle can
-be transferred between instances.
+Transient handles are invalidated by `Release()`, `Reset()`, or instance disposal. Shared handles
+remain valid through `Reset()` and cannot be released by the script. No handle can be transferred
+between instances.
 
 ## Shared state
 
@@ -369,7 +374,9 @@ nothing for host-owned keys, and `Clear` removes only script-owned keys from Min
 and `Clear` still manage the whole store.
 
 Minamo reads require `state.read`; writes, removals, and script clearing require `state.write`.
-These checks are inactive when the host has no explicit allow-list. `Reset()` clears instance state.
+In `Automatic` mode these checks are inactive when the host has no explicit allow-list;
+`Restricted` mode enforces them even when the list is empty, and `Unrestricted` mode bypasses them.
+`Reset()` clears instance state.
 
 ## Signals
 

@@ -45,28 +45,40 @@ internal static class Program
             for (var i = 0; i < choices.Count; i++)
             {
                 var choice = choices[i];
-                Console.WriteLine($"  {i + 1}. {choice.Label}");
+                Console.WriteLine($"  {i + 1}. {DisplayText(choice)}");
             }
 
             Console.Write("Select a number or ID (or 'quit'): ");
             var input = Console.ReadLine()?.Trim();
             if (input is null or "quit")
             {
-                select.Cancel();
                 return;
             }
 
-            string choiceId = int.TryParse(input, out var index) && index is > 0 and <= int.MaxValue
+            var selectedChoice = int.TryParse(input, out var index) && index is > 0 and <= int.MaxValue
                 && index <= choices.Count
-                ? choices[index - 1].Id
-                : input;
-            if (!choices.Any(choice => choice.Id == choiceId))
+                ? choices[index - 1]
+                : choices.FirstOrDefault(candidate => string.Equals(
+                    candidate.Id,
+                    input,
+                    StringComparison.Ordinal));
+            if (selectedChoice is null)
             {
-                Console.WriteLine("That choice is not available.");
+                Console.WriteLine($"Choice '{input}' is not available.");
                 continue;
             }
 
-            await select.SelectAsync(choiceId);
+            await select.SelectAsync(selectedChoice);
         }
+    }
+
+    private static string DisplayText(MinamoChoice choice)
+    {
+        var metadata = choice.Metadata?.GetValue<Dictionary<string, object?>>();
+        return metadata is not null
+            && metadata.TryGetValue("text", out var text)
+            && text is string value
+                ? value
+                : choice.Id;
     }
 }

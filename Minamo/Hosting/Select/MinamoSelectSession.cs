@@ -11,14 +11,17 @@ internal sealed partial class MinamoSelectSession : IDisposable
 {
     private readonly System.Threading.SemaphoreSlim actionGate = new(1, 1);
     private readonly MinamoInstance instance;
-    private readonly SelectInstance selectInstance;
-    private readonly MinamoSelectRevision revision;
+    private readonly Stack<SelectNavigationFrame> navigationStack = new();
+    private SelectInstance selectInstance;
     private MinamoSelectSnapshot snapshot;
     private MinamoSelectDescription? description;
     private IReadOnlyList<ResolvedSelectChoice> availableChoices = Array.Empty<ResolvedSelectChoice>();
-    private readonly Dictionary<SelectChoiceSpreadDefinition, SelectInstance> expandedSelects = new();
-    private bool actionChangedControl;
+    private ExecutionResult? pendingExecution;
     private bool disposed;
+
+    private sealed record SelectNavigationFrame(
+        SelectInstance Instance,
+        MinamoSelectDescription? Description);
 
     internal MinamoSelectSession(
         MinamoInstance instance,
@@ -26,7 +29,6 @@ internal sealed partial class MinamoSelectSession : IDisposable
     {
         this.instance = instance;
         this.selectInstance = selectInstance;
-        revision = new MinamoSelectRevision();
         snapshot = CreateInitialSnapshot();
     }
 
@@ -36,35 +38,48 @@ internal sealed partial class MinamoSelectSession : IDisposable
             selectInstance.Description(),
             Array.Empty<MinamoObject>()).ConfigureAwait(false);
 
-        await EnterCurrentStateAsync().ConfigureAwait(false);
-
-        selectInstance.CompleteIfIdle();
         await PublishSnapshotAsync().ConfigureAwait(false);
     }
 
     internal string Name => CurrentSnapshot.Name;
 
-    internal long Revision => CurrentSnapshot.Revision;
-
     internal MinamoSelectSnapshot Snapshot => CurrentSnapshot;
 
-    internal string State => CurrentSnapshot.State.Id;
-
     internal MinamoSelectDescription? Description => CurrentSnapshot.Description;
+
+    internal IReadOnlyList<MinamoSelectProperty> Properties => CurrentSnapshot.Properties;
 
     internal IReadOnlyList<MinamoChoice> Choices => CurrentSnapshot.Choices;
 
     internal bool IsCompleted => CurrentSnapshot.IsCompleted;
 
+    internal MinamoSelectRequest? Request => CurrentSnapshot.Request;
+
     internal MinamoObject CompletionValue => selectInstance.Value;
+
+    internal T? GetValue<T>()
+    {
+        EnsureCompleted();
+        return MinamoHostValueConverter.Convert<T>(CompletionValue, "Select result");
+    }
+
+    internal bool TryGetValue<T>(out T? result)
+    {
+        if (!IsCompleted)
+        {
+            result = default;
+            return false;
+        }
+
+        return MinamoHostValueConverter.TryConvert(CompletionValue, out result);
+    }
 
     private MinamoSelectSnapshot CurrentSnapshot => snapshot;
 
     private MinamoSelectSnapshot CreateInitialSnapshot() => new(
         selectInstance.Name,
-        revision.Current,
-        new MinamoSelectState(selectInstance.State.Name),
         description,
+        Array.Empty<MinamoSelectProperty>(),
         Array.Empty<MinamoChoice>(),
         selectInstance.IsCompleted);
 
@@ -73,73 +88,38 @@ internal sealed partial class MinamoSelectSession : IDisposable
         availableChoices = Array.Empty<ResolvedSelectChoice>();
         snapshot = new(
             selectInstance.Name,
-            revision.Current,
-            new MinamoSelectState(selectInstance.State.Name),
             description,
+            CurrentSnapshot.Properties,
             Array.Empty<MinamoChoice>(),
             isCompleted: true);
     }
 
     private MinamoSelectSnapshot CreateSnapshot(
+        IReadOnlyList<MinamoSelectProperty> properties,
         IReadOnlyList<MinamoChoice> choices) =>
         new(
             selectInstance.Name,
-            revision.Current,
-            new MinamoSelectState(selectInstance.State.Name),
             description,
+            properties,
             choices,
             selectInstance.IsCompleted);
 
-    internal Task<MinamoSelectSnapshot> RefreshAsync() => RefreshCoreAsync(invalidate: false);
+    internal Task SelectAsync(MinamoChoice choice) =>
+        SelectCoreAsync(choice.Id, null, hasArgument: false, expectedChoice: choice);
 
-    internal Task<MinamoSelectSnapshot> InvalidateAsync() => RefreshCoreAsync(invalidate: true);
+    internal Task SelectAsync(MinamoChoice choice, object? argument) =>
+        SelectCoreAsync(choice.Id, argument, hasArgument: true, expectedChoice: choice);
 
-    internal Task<MinamoSelectResult> SelectAsync(string choiceId) =>
-        SelectCoreAsync(choiceId, null, hasArgument: false, expectedRevision: null);
+    internal Task SendAsync(string eventId) =>
+        SendCoreAsync(eventId, null, hasArgument: false);
 
-    internal Task<MinamoSelectResult> SelectAsync(string choiceId, object? argument) =>
-        SelectCoreAsync(choiceId, argument, hasArgument: true, expectedRevision: null);
+    internal Task SendAsync(string eventId, object? argument) =>
+        SendCoreAsync(eventId, argument, hasArgument: true);
 
-    internal Task<MinamoSelectResult> SelectAtRevisionAsync(string choiceId, long expectedRevision) =>
-        SelectCoreAsync(choiceId, null, hasArgument: false, expectedRevision);
-
-    internal Task<MinamoSelectResult> SelectAtRevisionAsync(
-        string choiceId,
-        object? argument,
-        long expectedRevision) =>
-        SelectCoreAsync(choiceId, argument, hasArgument: true, expectedRevision);
-
-    internal Task<MinamoSelectResult> SendAsync(string eventId) =>
-        SendCoreAsync(eventId, null, hasArgument: false, expectedRevision: null);
-
-    internal Task<MinamoSelectResult> SendAsync(string eventId, object? argument) =>
-        SendCoreAsync(eventId, argument, hasArgument: true, expectedRevision: null);
-
-    internal Task<MinamoSelectResult> SendAtRevisionAsync(string eventId, long expectedRevision) =>
-        SendCoreAsync(eventId, null, hasArgument: false, expectedRevision);
-
-    internal Task<MinamoSelectResult> SendAtRevisionAsync(
-        string eventId,
-        object? argument,
-        long expectedRevision) =>
-        SendCoreAsync(eventId, argument, hasArgument: true, expectedRevision);
-
-    internal void Cancel()
-    {
-        actionGate.Wait();
-        try
-        {
-            ThrowIfDisposed();
-            expandedSelects.Clear();
-            selectInstance.Cancel();
-            revision.Advance();
-            PublishCompletedSnapshot();
-        }
-        finally
-        {
-            actionGate.Release();
-        }
-    }
+    internal Task RespondAsync(
+        MinamoSelectRequest request,
+        object? response) =>
+        RespondCoreAsync(request, response);
 
     public void Dispose()
     {
@@ -151,8 +131,8 @@ internal sealed partial class MinamoSelectSession : IDisposable
                 return;
             }
 
-            expandedSelects.Clear();
-            selectInstance.Cancel();
+            AbandonPendingRequest();
+            CancelAllSelects();
             disposed = true;
         }
         finally
@@ -161,38 +141,19 @@ internal sealed partial class MinamoSelectSession : IDisposable
         }
     }
 
-    private async Task<MinamoSelectSnapshot> RefreshCoreAsync(bool invalidate)
-    {
-        await actionGate.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            ThrowIfDisposed();
-            if (invalidate)
-            {
-                revision.Advance();
-            }
-
-            await PublishSnapshotAsync().ConfigureAwait(false);
-            return CurrentSnapshot;
-        }
-        finally
-        {
-            actionGate.Release();
-        }
-    }
-
-    private async Task<MinamoSelectResult> SelectCoreAsync(
+    private async Task SelectCoreAsync(
         string choiceId,
         object? argument,
         bool hasArgument,
-        long? expectedRevision)
+        MinamoChoice? expectedChoice)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(choiceId);
         await actionGate.WaitAsync().ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
-            EnsureExpectedRevision(expectedRevision);
+            EnsureNotWaitingForResponse();
+            EnsureCurrentChoice(expectedChoice);
             if (selectInstance.IsCompleted)
             {
                 throw new InvalidOperationException($"Select session '{Name}' has already completed.");
@@ -203,17 +164,16 @@ internal sealed partial class MinamoSelectSession : IDisposable
             if (choice is null)
             {
                 throw new ArgumentException(
-                    $"Choice '{choiceId}' is not currently available in select state '{selectInstance.State.Name}'.",
+                    $"Choice '{choiceId}' is not currently available in select '{Name}'.",
                     nameof(choiceId));
             }
 
-            var arguments = AddArguments(
-                choice.BoundArguments,
-                ConvertArguments(choice, argument, hasArgument));
+            var arguments = ConvertArguments(choice, argument, hasArgument);
             var result = await instance.InvokeSelectActionAsync(
                 choice.Action ?? throw new InvalidOperationException("The select choice action is unavailable."),
-                arguments).ConfigureAwait(false);
-            return await ApplyActionExecutionAsync(result).ConfigureAwait(false);
+                arguments,
+                allowRequests: true).ConfigureAwait(false);
+            await ApplyActionExecutionAsync(result).ConfigureAwait(false);
         }
         finally
         {
@@ -221,52 +181,49 @@ internal sealed partial class MinamoSelectSession : IDisposable
         }
     }
 
-    private async Task<MinamoSelectResult> SendCoreAsync(
+    private async Task SendCoreAsync(
         string eventId,
         object? argument,
-        bool hasArgument,
-        long? expectedRevision)
+        bool hasArgument)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
         await actionGate.WaitAsync().ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
-            EnsureExpectedRevision(expectedRevision);
+            EnsureNotWaitingForResponse();
             if (selectInstance.IsCompleted)
             {
                 throw new InvalidOperationException($"Select session '{Name}' has already completed.");
             }
 
-            var handlers = await GetEventHandlersAsync(eventId).ConfigureAwait(false);
+            var eventOwner = selectInstance;
+            var handlers = GetEventHandlers(eventId);
             if (handlers.Count == 0)
             {
                 throw new ArgumentException(
-                    $"Event '{eventId}' is not handled in select state '{selectInstance.State.Name}'.",
+                    $"Event '{eventId}' is not handled in select '{Name}'.",
                     nameof(eventId));
             }
 
-            MinamoSelectResult? applied = null;
             foreach (var handler in handlers)
             {
                 var arguments = ConvertArguments(
-                    handler.Handler.Name,
-                    handler.Handler.ParameterCount,
+                    handler.Name,
+                    handler.ParameterCount,
                     "Event",
                     argument,
                     hasArgument);
                 var result = await instance.InvokeSelectActionAsync(
-                    handler.Owner.Event(handler.Handler),
+                    eventOwner.Event(handler),
                     arguments).ConfigureAwait(false);
-                applied = await ApplyActionExecutionAsync(result).ConfigureAwait(false);
-                if (selectInstance.IsCompleted
-                    || actionChangedControl)
+                await ApplyActionExecutionAsync(result).ConfigureAwait(false);
+                if (eventOwner.IsCompleted
+                    || !ReferenceEquals(selectInstance, eventOwner))
                 {
-                    return applied;
+                    return;
                 }
             }
-
-            return applied ?? WaitingResult();
         }
         finally
         {
@@ -274,84 +231,198 @@ internal sealed partial class MinamoSelectSession : IDisposable
         }
     }
 
-    private async Task<MinamoSelectResult> ApplyActionExecutionAsync(ExecutionResult result)
+    private async Task ApplyActionExecutionAsync(ExecutionResult result)
     {
-        actionChangedControl = false;
+        if (result.Reason is TerminationReason.Suspended
+            && result.Suspension?.Awaitable is MinamoSelectRequestAwaitable request)
+        {
+            PublishRequest(result, request);
+            return;
+        }
         if (result.Reason is not TerminationReason.Complete)
         {
             throw new InvalidOperationException("The select action did not complete successfully.");
         }
 
         var outcome = selectInstance.Apply(result.Value ?? MinamoNil.Instance);
-        actionChangedControl = outcome.LeavingState is not null;
-        await ApplyLifecycleHooksAsync(outcome).ConfigureAwait(false);
-        selectInstance.CompleteIfIdle();
-        revision.Advance();
-        await PublishSnapshotAsync().ConfigureAwait(false);
-        return selectInstance.IsCompleted
-            ? CompletedResult(selectInstance.Value)
-            : WaitingResult();
+        switch (outcome.Kind)
+        {
+            case SelectActionOutcomeKind.Continue:
+                await PublishSnapshotAsync().ConfigureAwait(false);
+                break;
+            case SelectActionOutcomeKind.Goto:
+                await NavigateAsync(outcome.Target!).ConfigureAwait(false);
+                break;
+            case SelectActionOutcomeKind.Return:
+                ReturnFromCurrentSelect();
+                await PublishSnapshotAsync().ConfigureAwait(false);
+                break;
+            case SelectActionOutcomeKind.Exit:
+                ExitAllSelects(outcome.Value ?? MinamoNil.Instance);
+                PublishCompletedSnapshot();
+                break;
+            default:
+                throw new InvalidOperationException("Unknown select action outcome.");
+        }
     }
 
-    private async Task ApplyLifecycleHooksAsync(SelectActionOutcome outcome)
+    private async Task NavigateAsync(MinamoSelectFactory target)
     {
-        if (outcome.LeavingState is { } leaving)
+        var next = instance.CreateSelectInstance(target);
+        var nextDescription = await CreateDescriptionAsync(
+            next.Description(),
+            Array.Empty<MinamoObject>()).ConfigureAwait(false);
+
+        var previous = new SelectNavigationFrame(selectInstance, description);
+        navigationStack.Push(previous);
+        selectInstance = next;
+        description = nextDescription;
+
+        try
         {
-            await RunExpandedLifecycleHooksAsync(leaving, entering: false).ConfigureAwait(false);
-            if (selectInstance.Leave(leaving) is { } leave)
+            await PublishSnapshotAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            if (ReferenceEquals(selectInstance, next)
+                && navigationStack.TryPeek(out var current)
+                && ReferenceEquals(current, previous))
             {
-                await RunLifecycleHookAsync(leave).ConfigureAwait(false);
+                next.Cancel();
+                navigationStack.Pop();
+                selectInstance = previous.Instance;
+                description = previous.Description;
+            }
+
+            throw;
+        }
+    }
+
+    private bool ReturnFromCurrentSelect()
+    {
+        selectInstance.Complete();
+        if (!navigationStack.TryPop(out var previous))
+        {
+            return false;
+        }
+
+        selectInstance = previous.Instance;
+        description = previous.Description;
+        return true;
+    }
+
+    private void ExitAllSelects(MinamoObject value)
+    {
+        selectInstance.Complete(value);
+        while (navigationStack.TryPop(out var previous))
+        {
+            previous.Instance.Cancel();
+        }
+    }
+
+    private void CancelAllSelects()
+    {
+        selectInstance.Cancel();
+        while (navigationStack.TryPop(out var previous))
+        {
+            previous.Instance.Cancel();
+        }
+    }
+
+    private void PublishRequest(
+        ExecutionResult execution,
+        MinamoSelectRequestAwaitable awaitable)
+    {
+        if (pendingExecution is not null)
+        {
+            throw new InvalidOperationException("The select is already waiting for a host response.");
+        }
+
+        var request = new MinamoSelectRequest(awaitable);
+        pendingExecution = execution;
+        availableChoices = Array.Empty<ResolvedSelectChoice>();
+        snapshot = new(
+            selectInstance.Name,
+            description,
+            CurrentSnapshot.Properties,
+            Array.Empty<MinamoChoice>(),
+            isCompleted: false,
+            request);
+    }
+
+    private async Task RespondCoreAsync(
+        MinamoSelectRequest request,
+        object? response)
+    {
+        await actionGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
+            if (pendingExecution is not { } execution
+                || CurrentSnapshot.Request is not { } current
+                || !ReferenceEquals(current, request)
+                || !ReferenceEquals(current.Awaitable, execution.Suspension?.Awaitable))
+            {
+                throw new InvalidOperationException("The select is not waiting for this request.");
+            }
+
+            var value = MinamoCommandConvert.FromObject(response);
+            pendingExecution = null;
+            try
+            {
+                var result = await instance.ResumeSelectActionAsync(
+                    execution,
+                    current.Awaitable,
+                    value).ConfigureAwait(false);
+                await ApplyActionExecutionAsync(result).ConfigureAwait(false);
+            }
+            catch
+            {
+                CancelAllSelects();
+                PublishCompletedSnapshot();
+                throw;
             }
         }
-
-        if (outcome.EnteringState is not null)
+        finally
         {
-            expandedSelects.Clear();
-            await EnterCurrentStateAsync().ConfigureAwait(false);
+            actionGate.Release();
         }
     }
 
-    private async Task RunLifecycleHookAsync(MinamoFunction hook)
+    private void EnsureCurrentChoice(MinamoChoice? expectedChoice)
     {
-        EnsureLifecycleHookResult(
-            await instance.InvokeSelectActionAsync(
-                hook,
-                Array.Empty<MinamoObject>()).ConfigureAwait(false));
-    }
-
-    private static void EnsureLifecycleHookResult(ExecutionResult result)
-    {
-        if (result.Reason is not TerminationReason.Complete)
-        {
-            throw new InvalidOperationException(
-                "A select state lifecycle hook cannot suspend or fail.");
-        }
-
-        if (result.Value is MinamoTuple { Count: 2 or 3 } tuple
-            && tuple[0] is MinamoString marker
-            && (marker.Value == SelectControlSignal.Goto
-                || marker.Value == SelectControlSignal.Exit))
-        {
-            throw new InvalidOperationException(
-                "A select state lifecycle hook cannot change select state or exit the select.");
-        }
-    }
-
-    private MinamoSelectResult WaitingResult() => new(CurrentSnapshot);
-
-    private MinamoSelectResult CompletedResult(MinamoObject value) =>
-        new(CurrentSnapshot, value);
-
-    private void EnsureExpectedRevision(long? expectedRevision)
-    {
-        if (expectedRevision is null || expectedRevision == CurrentSnapshot.Revision)
+        if (expectedChoice is null
+            || CurrentSnapshot.Choices.Any(choice => ReferenceEquals(choice, expectedChoice)))
         {
             return;
         }
 
-        throw new MinamoSelectRevisionMismatchException(
-            expectedRevision.Value,
-            CurrentSnapshot);
+        throw new ArgumentException(
+            $"Choice '{expectedChoice.Id}' is not currently available in select '{Name}'.",
+            nameof(expectedChoice));
+    }
+
+    private void EnsureNotWaitingForResponse()
+    {
+        if (pendingExecution is not null)
+        {
+            throw new InvalidOperationException(
+                $"Select session '{Name}' is waiting for a host response.");
+        }
+    }
+
+    private void EnsureCompleted()
+    {
+        if (!IsCompleted)
+        {
+            throw new InvalidOperationException("The select has not completed.");
+        }
+    }
+
+    private void AbandonPendingRequest()
+    {
+        pendingExecution?.Continuation?.Complete();
+        pendingExecution = null;
     }
 
     private void ThrowIfDisposed()

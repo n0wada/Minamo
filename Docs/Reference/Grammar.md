@@ -15,6 +15,11 @@ item | item ::= alternatives
 "text"      ::= literal source text
 ```
 
+Broad categories such as `statement`, `expression`, and `primary` are cross-references to the
+corresponding sections rather than a second, fully expanded expression grammar. Lexical categories
+and context-sensitive boundaries such as `separator` and `same-line-expression` are explained in
+the adjacent prose.
+
 ## Source text and separators
 
 Source is Unicode. Whitespace and comments separate tokens. A statement ends at a line break,
@@ -39,7 +44,7 @@ Identifiers begin with `_` or a Unicode letter; later characters may include dig
 
 ```text
 identifier     ::= identifier-start { identifier-part }
-qualified-name ::= identifier [ "." identifier ]
+qualified-name ::= identifier { "." identifier }
 ```
 
 Reserved words include:
@@ -50,8 +55,8 @@ let match mut nil not or private return set static throw true try type
 use when while with yield
 ```
 
-`const`, `struct`, `enum`, `trait`, `impl`, `guard`, `finally`, `select`, `initial`, `state`,
-`choose`, `on`, `empty`, `desc`, `goto`, `exit`, `label`, `enter`, and `leave` are
+`const`, `struct`, `enum`, `trait`, `impl`, `guard`, `finally`, `select`, `prop`, `case`, `on`,
+`desc`, `goto`, and `exit` are
 contextual keywords.
 
 ## Numeric literals
@@ -60,7 +65,10 @@ contextual keywords.
 integer  ::= digits | ("0x" | "0X") hex-digits
 fraction ::= digits "." digits | "." digits
 exponent ::= ("e" | "E") [ "+" | "-" ] digits
-float    ::= (fraction [ exponent ] | digits exponent) [ "f" | "F" ]
+float    ::= fraction [ exponent ] [ float-suffix ]
+           | digits exponent [ float-suffix ]
+           | digits float-suffix
+float-suffix ::= "f" | "F"
 ```
 
 Underscores may separate digits. `Integer` is signed 64-bit; `Float` uses .NET `double`. The `f`
@@ -90,10 +98,13 @@ Adjacent ordinary strings are concatenated.
 ## Literals and collections
 
 ```text
-literal ::= "nil" | "true" | "false" | integer | float | string | character
-tuple   ::= "(" [ argument { "," argument } ] ")"
-array   ::= "[" [ array-element { "," array-element } ] "]"
-label   ::= (identifier | string) ":" expression
+literal       ::= "nil" | "true" | "false" | integer | float
+                | string | multiline-string | character
+argument      ::= expression | label
+array-element ::= expression | label
+label         ::= [ "let" | "mut" ] (identifier | string) ":" expression
+tuple         ::= "(" [ argument { "," argument } [ "," ] ] ")"
+array         ::= "[" [ array-element { "," array-element } [ "," ] ] "]"
 ```
 
 One unlabeled parenthesized expression is grouping. A comma or label creates a tuple.
@@ -161,15 +172,29 @@ function ::=
     [ "static" ] "func" function-signature (block | "=>" arrow-body)
 
 function-signature ::=
-    [ "get" | "set" ] function-name
-    "(" [ parameter { "," parameter } ] ")"
-    [ ":" type-annotation ]
+    [ "get" | "set" ] function-name parameter-list [ ":" type-annotation ]
+  | [ "get" | "set" ] type-name indexer-parameter-list [ ":" type-annotation ]
+  | type-name "as" type-name
+  | identifier function-operator parameter-list [ ":" type-annotation ]
+
+function-name ::= identifier | type-name "." identifier
+parameter-list ::= "(" [ parameter { "," parameter } [ "," ] ] ")"
+indexer-parameter-list ::= "[" [ parameter { "," parameter } [ "," ] ] "]"
+
+function-operator ::=
+    "+" | "-" | "*" | "/" | "%" | "!"
+  | "==" | "!=" | "<" | ">" | "<=" | ">=" | "<<" | ">>"
 
 parameter ::=
     [ type-annotation ] identifier
     [ ":" type-annotation ]
     [ "=" expression ]
     [ "..." ]
+
+arrow-body ::=
+    binding | assignment | expression
+  | return-statement | yield-statement | break-statement | "continue" | throw-statement
+  | if-form | guard-form | while-loop | do-while-loop | for-loop | match
 ```
 
 ```swift
@@ -182,17 +207,17 @@ The final expression of a block is its value.
 
 ## Interactive selects
 
-An interactive select presents choices to the host and executes the selected actions. A host opens it
-through `MinamoInstance.OpenSelectAsync`. Named states optionally organize the interaction. The host
-renders current choices and sends a selected choice back to the select. See
+An interactive select publishes properties and cases to the host and executes the selected case
+action. A host opens it through `MinamoInstance.OpenSelectAsync`. The C# API exposes language cases
+as `MinamoChoice` objects in `MinamoSelect.Choices`. See
 [Interactive selects](../Developers/InteractiveSelect.md) for the basic C# protocol and
-[Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md) for revision-aware,
-asynchronous hosts and nested interactions.
+[Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md) for asynchronous hosts
+and nested interactions.
 
 ```text
 select-declaration
-    ::= "select" [ identifier ] "{" [ select-description ] select-local*
-        ( state-declaration+ | select-body ) "}"
+    ::= "select" [ identifier ] "{" [ select-description ] { select-local }
+        { select-property | case-declaration | event-declaration } "}"
 
 select-description
     ::= "desc" string-key-dictionary-literal
@@ -203,108 +228,117 @@ string-key-dictionary-literal
 select-local
     ::= ( "let" | "mut" ) pattern "=" expression
 
-state-declaration
-    ::= [ "initial" ] "state" identifier
-        "{" { state-hook | empty-declaration | choice-declaration | event-declaration } "}"
+select-property
+    ::= "prop" ( identifier | string ) [ select-metadata ] "=>" expression
 
-select-body
-    ::= { state-hook | empty-declaration | choice-declaration | event-declaration }
+case-declaration
+    ::= "case" string [ select-parameters ]
+        [ "when" expression ] [ select-metadata ]
+        "=>" select-action-body
 
-state-hook
-    ::= ( "enter" | "leave" ) "=>" block
-
-empty-declaration
-    ::= "on" "empty" "=>" choice-body
-
-choice-declaration
-    ::= "choose" string [ parameters ]
-        [ "label" string ]
-        [ "when" expression ]
-        "=>" choice-body
-     |  "choose" expression
-        [ "label" expression ]
-        "for" identifier "in" expression
-        [ "when" expression ]
-        "=>" choice-body
-     |  "choose" "..." expression
+select-metadata
+    ::= string-key-dictionary-literal
 
 event-declaration
-    ::= "on" string [ parameters ]
-        "=>" choice-body
+    ::= "on" string [ select-parameters ]
+        "=>" select-action-body
 
-parameters
-    ::= "(" parameter { "," parameter } ")"
+select-parameters
+    ::= "(" [ select-parameter { "," select-parameter } [ "," ] ] ")"
 
-parameter
+select-parameter
     ::= identifier [ ":" type-annotation ]
 
-choice-body
-    ::= block | goto-statement | exit-statement
+select-action-body
+    ::= block | select-control-statement
 
-goto-statement ::= "goto" identifier
+select-control-statement
+    ::= goto-statement | select-return-statement | exit-statement
+
+goto-statement
+    ::= "goto" same-line-expression
+
+select-return-statement
+    ::= "return"
 
 exit-statement
-    ::= "exit" [ expression ]
-
-select-alias
-    ::= "alias" "(" expression "," string ")"
+    ::= "exit" [ same-line-expression ]
 
 ```
 
-Named select declarations are permitted only at global (module) scope. A select either declares
-one or more states, exactly one of which is marked `initial`, or it uses a state-less `select-body`.
-The two forms cannot be mixed. Select locals are created for each select instance and must appear
-before states or choices. Without `goto`, an action remains in its current state. A state-less
-select has one implicit state and republishes its choices after an action unless it exits. A
-state-less select may use `goto` only when it is expanded into a parent state; its target is then
-resolved against that parent at run time. Used directly, such a `goto` fails at run time. `goto`
-exposes the target state directly, and a state without choices,
-events, or an `on empty` handler completes immediately. `exit` completes the session. Choice and event names are unique within their
-respective channels in one state. Both receive either no argument, one value, or a tuple whose
-elements bind to their parameters. `choose` declarations are visible through `Choices`; `on`
-declarations are hidden and delivered through the host's `Send` API. `label` provides host-facing
-display text; `when` controls whether a choice is currently available.
-`on empty` runs at most once after entering a state when no choice is available and the state has
-no host events; its body may `goto` or `exit`. `enter` runs when a state is entered, including the
-initial state, and `leave` runs before a `goto` or `exit` leaves it. Lifecycle hooks are blocks and
-cannot themselves change state, exit, or suspend. In a named select, `goto` targets must name a
-state declared by that select. Select-local values are available to all states in an interaction.
+Named select declarations are permitted only at global (module) scope. Select locals are created
+for each interaction instance and must appear before properties, cases, or events. A `prop`
+declaration publishes a read-only value to the host. Its name may be an identifier or string.
+Properties and their optional metadata dictionaries are reevaluated for every successful
+publication. After an ordinary action finishes, the current select republishes its properties and
+choices. `goto expression` evaluates an expression
+that must produce a select factory, creates a fresh instance from it, pushes the current instance
+onto the interaction's navigation stack, and publishes the new instance. `return` completes the
+current instance with `nil` and restores the preceding instance. At the root it completes the
+interaction with `nil`. `exit` completes the whole interaction, discarding every stacked instance,
+and may supply the interaction's result. There is no `back` keyword.
+Property names, case IDs, and event names are unique within their respective channels. Cases and
+events receive either no
+argument, one value, or a tuple whose
+elements bind to their parameters. `case` declarations are visible through `Choices`; `on`
+declarations are hidden and delivered through `MinamoSelect.SendAsync`. `when` controls whether a
+case is currently available. A case's optional metadata dictionary is evaluated only when that case
+is available. Select metadata is free-form UI guidance; Minamo requires string keys but does not
+assign meanings to them.
+When no choice is available and the select has no host events, the interaction completes with
+`nil`; when the current select was reached by `goto`, this behaves like `return` and restores its
+caller. Select-local values are available to all actions in their select instance and remain intact
+while that instance is on the navigation stack.
 Selects are opened and driven by the host; scripts cannot invoke them with `do expression`.
-A `choose` declaration with a `for` clause
-generates one choice for each item in its source. Its ID, label, guard, and action receive
-the loop item; dynamic choices do not accept host-supplied parameters.
-A `choose ...` declaration directly expands a state-less child select into the current parent
-state. The child keeps its own select-local values. Its choices, `on empty`, lifecycle hooks, and
-host events participate in the parent interaction; child behavior runs before parent behavior.
-`exit` in the child exits the parent select, while `goto target` is resolved against the parent's
-states at run time. Child `desc` metadata remains metadata of the child factory and is not merged
-into the parent description. Choice spreads require an explicit named parent state and cannot
-appear in a state-less select. If child and parent declarations overlap (for example, host event
-names), their ordering is defined but avoiding conflicting effects is the script author's
-responsibility.
-`desc` is optional select-level dictionary metadata. It must be a dictionary literal whose keys are
-strings, and is evaluated once when an interaction instance opens.
+A case action may call `request(kind, payload?)` to yield an application-defined input request to
+the host. The host responds through `MinamoSelect.RespondAsync`, and the response becomes the return
+value of `request`. Requests are not valid in host events, guards, or descriptions.
+The select control statements are valid in case and event action bodies. They do not change the
+meaning of `return` inside a function declared within an action: there it remains an ordinary
+function return and may carry a value. A select-level `return` cannot carry a value.
+`desc` is an optional free-form select description. It must be a dictionary literal whose keys are
+strings, and is evaluated once when an interaction instance opens. A host may use it as explanatory
+text, an AI prompt, or broad layout guidance. Metadata dictionaries on properties and cases provide
+more local UI hints and are reevaluated with the published state.
+The `request(...)` and `alias(...)` calls are ordinary built-in function calls rather than select
+syntax.
 
 ```swift
 select player {
-    initial state stopped {
-        choose "play" label "Play" when music.HasSelectedTrack() => {
-            music.Play()
-            goto playing
-        }
+    mut playing = false
+
+    prop playing => playing
+
+    case "play" when !playing && music.HasSelectedTrack() [
+        "text": "Play",
+        "control": "button"
+    ] => {
+        music.Play()
+        playing = true
     }
 
-    state playing {
-        choose "stop" => {
-            music.Stop()
-            goto stopped
-        }
-
-        choose "exit" => exit "done"
+    case "stop" when playing => {
+        music.Stop()
+        playing = false
     }
+
+    case "exit" => exit "done"
 }
 
 alias(player, "music.player")
+```
+
+Select navigation uses factory expressions rather than names encoded as strings:
+
+```swift
+select details {
+    case "close" => return
+}
+
+select menu {
+    case "details" => goto details
+    case "quit" => exit "done"
+}
 ```
 
 ## Lambdas
@@ -312,7 +346,7 @@ alias(player, "music.player")
 ```text
 lambda ::=
     identifier "=>" expression
-  | "(" [ parameter { "," parameter } ] ")" "=>" expression
+  | parameter-list "=>" expression
 ```
 
 ```swift
@@ -355,7 +389,7 @@ postfix ::=
     primary
     { "." identifier
     | "[" expression "]"
-    | "(" [ argument { "," argument } ] ")"
+    | "(" [ argument { "," argument } [ "," ] ] ")"
     }
 ```
 
@@ -408,6 +442,8 @@ Iterator.Range(0, 10, 2)
 ```text
 assignment-operator ::=
     "=" | "??=" | "+=" | "-=" | "*=" | "/=" | "%="
+
+assignment ::= expression assignment-operator expression
 ```
 
 Plain `=` also supports destructuring rebinding:
@@ -446,8 +482,11 @@ return-statement ::= "return" [ same-line-expression ]
 break-statement  ::= "break" [ same-line-expression ]
 throw-statement  ::= "throw" [ same-line-expression ]
 yield-statement  ::= "yield" expression | "yield" "break"
+same-line-expression ::= expression
 ```
 
+No line break may occur between `return`, `break`, `throw`, or `exit` and its optional expression.
+The required expression following a select `goto` must also start on the same line.
 A function containing `yield` is an iterator function.
 
 ## Patterns
@@ -461,13 +500,17 @@ range-pattern ::= primary-pattern [ ".." primary-pattern ]
 primary-pattern ::=
     identifier | "_" | literal | "nil"
   | "not" primary-pattern
-  | "(" pattern { "," pattern } ")"
-  | "[" [ range-pattern { "," range-pattern } ] "]"
+  | "(" pattern ")"
+  | tuple-pattern
+  | "[" [ range-pattern { "," range-pattern } [ "," ] ] "]"
   | constructor-pattern
 
+tuple-pattern ::=
+    "(" pattern "," [ pattern { "," pattern } [ "," ] ] ")"
+
 constructor-pattern ::=
-    [ module "." ] [ type "." ] constructor
-    "(" [ pattern { "," pattern } ] ")"
+    identifier [ "." identifier [ "." identifier ] ]
+    "(" [ pattern { "," pattern } [ "," ] ] ")"
 ```
 
 Lowercase names bind values. Uppercase bare names denote types or nullary constructors.
@@ -476,7 +519,7 @@ Lowercase names bind values. Uppercase bare names denote types or nullary constr
 
 ```text
 match ::= "match" expression "{"
-            match-entry { "," match-entry }
+            [ match-entry { "," match-entry } [ "," ] ]
           "}"
 
 match-entry ::= pattern [ "when" expression ] "=>" expression
@@ -495,8 +538,8 @@ match value {
 ## Structs
 
 ```text
-struct ::= "struct" type-name "{"
-             [ field { "," field } ]
+struct ::= "struct" identifier "{"
+             [ field { "," field } [ "," ] ]
            "}"
 
 field ::= [ "mut" ] identifier
@@ -509,8 +552,8 @@ individual field as writable.
 ## Enums
 
 ```text
-enum      ::= "enum" type-name "{" enum-case { "," enum-case } "}"
-enum-case ::= identifier [ "(" [ field { "," field } ] ")" ] [ block ]
+enum      ::= "enum" identifier "{" [ enum-case { "," enum-case } [ "," ] ] "}"
+enum-case ::= identifier [ "(" [ field { "," field } [ "," ] ] ")" ] [ block ]
 ```
 
 ```swift
@@ -521,7 +564,7 @@ enum Result { Ok(value), Err(error) }
 ## Traits
 
 ```text
-trait ::= "trait" type-name "{"
+trait ::= "trait" identifier "{"
             { "func" function-signature separator }
           "}"
 ```
@@ -531,11 +574,14 @@ Trait functions are contracts without bodies.
 ## Implementations
 
 ```text
-impl ::= "impl" declared-type
-         [ "with" declared-type { "," declared-type } ]
+impl ::= "impl" identifier
+         [ "with" type-name { "," type-name } ]
          "{"
-           { function | internal-binding }
+           { function | impl-binding }
          "}"
+
+impl-binding ::= ( "let" | "mut" ) identifier
+                 [ ":" type-annotation ] [ "=" expression ]
 ```
 
 An `impl` can provide internal state, an `init` function, methods, properties, and trait
@@ -553,11 +599,12 @@ impl Point with Displayable {
 
 ```text
 import ::=
-    "import" module-path [ "as" identifier ]
-  | "import" identifier "from" module-path
+    "import" module-path [ "as" import-name ]
+  | "import" import-name "from" module-path
   | "import" "*" "from" module-path
 
-module-path ::= [ "./" ] path-part { "/" path-part }
+module-path ::= [ "./" ] import-name { "/" import-name }
+import-name ::= identifier | string
 ```
 
 Imports are local and are not re-exported. Module declarations are public by default. `private`
@@ -578,7 +625,7 @@ try-form ::= "try" block
 ## Regions
 
 ```text
-region ::= '#region' string { statement } '#endregion'
+region ::= '#region' (identifier | string) { statement } '#endregion'
 ```
 
 Regions are primarily used by the `.nami` test corpus to name independent test cases.

@@ -198,21 +198,13 @@ public enum CompilerError
 
     AmbiguousEnumConstructor = 278,
 
-    SelectRequiresState = 286,
-
-    SelectRequiresOneInitialState = 287,
-
-    SelectDuplicateState = 288,
-
     SelectDuplicateChoice = 289,
 
     SelectOnlyGlobalScope = 290,
 
-    SelectStateNotFound = 291,
-
     SelectDuplicateEvent = 292,
 
-    SelectChoiceSpreadRequiresNamedState = 293,
+    SelectDuplicateProperty = 293,
 
     IfExpressionRequiresElse = 279,
 

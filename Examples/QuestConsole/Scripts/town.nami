@@ -2,47 +2,53 @@ func questGame() {
     select {
         mut courierQuestKnown = false
         mut courierQuestAccepted = false
+        mut screen = "square"
 
-        initial state square {
-            choose "guard"
-                label "Talk to the guard" => goto guard
-
-            choose "board"
-                label "Check the quest board" => {
-                if courierQuestAccepted {
-                    print("\nQuest board: You have one active quest.")
-                } else {
-                    print("\nQuest board: Ask the guard about work in the town square.")
-                }
-            }
-
-            choose "active-quest"
-                label "Review your active quest"
-                when courierQuestAccepted => {
-                print("\nActive quest: Find the missing courier.")
-            }
-
-            choose "leave" label "Leave the town square" => exit
+        case "guard" when screen == "square" [
+            "text": "Talk to the guard"
+        ] => {
+            screen = "guard"
         }
 
-        state guard {
-            choose "ask"
-                label "Ask about the missing courier"
-                when !courierQuestKnown => {
-                courierQuestKnown = true
-                print("\nGuard: A courier vanished near the old bridge.")
+        case "board" when screen == "square" [
+            "text": "Check the quest board"
+        ] => {
+            if courierQuestAccepted {
+                print("\nQuest board: You have one active quest.")
+            } else {
+                print("\nQuest board: Ask the guard about work in the town square.")
             }
+        }
 
-            choose "accept"
-                label "Accept the courier quest"
-                when courierQuestKnown && !courierQuestAccepted => {
-                courierQuestAccepted = true
-                print("\nQuest accepted: Find the missing courier.")
-                goto square
-            }
+        case "active-quest" when screen == "square" && courierQuestAccepted [
+            "text": "Review your active quest"
+        ] => {
+            print("\nActive quest: Find the missing courier.")
+        }
 
-            choose "back"
-                label "Return to the town square" => goto square
+        case "leave" when screen == "square" [
+            "text": "Leave the town square"
+        ] => exit
+
+        case "ask" when screen == "guard" && !courierQuestKnown [
+            "text": "Ask about the missing courier"
+        ] => {
+            courierQuestKnown = true
+            print("\nGuard: A courier vanished near the old bridge.")
+        }
+
+        case "accept" when screen == "guard" && courierQuestKnown && !courierQuestAccepted [
+            "text": "Accept the courier quest"
+        ] => {
+            courierQuestAccepted = true
+            screen = "square"
+            print("\nQuest accepted: Find the missing courier.")
+        }
+
+        case "back" when screen == "guard" [
+            "text": "Return to the town square"
+        ] => {
+            screen = "square"
         }
     }
 }

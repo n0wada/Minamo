@@ -64,7 +64,7 @@ public enum NodeType
     
     Function,
     Select,
-    SelectState,
+    SelectProperty,
     SelectChoice,
     Tuple,
     Array,
@@ -98,12 +98,10 @@ public enum NodeType
 
     TryCatch
 
-    ,Goto
     ,Exit
+    ,SelectGoto
+    ,SelectReturn
     ,SelectEvent
-    ,SelectDynamicChoices
-    ,SelectDynamicChoice
-    ,SelectChoiceSpread
 }
 
 public interface INamedNode

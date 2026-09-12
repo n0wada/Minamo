@@ -504,12 +504,19 @@ public sealed partial class MinamoInstance : IDisposable
             cancellationToken);
     }
 
-    private async ValueTask<ExecutionResult> CompleteAwaitablesAsync(ExecutionResult result)
+    private async ValueTask<ExecutionResult> CompleteAwaitablesAsync(
+        ExecutionResult result,
+        bool stopAtSelectRequest = false)
     {
         while (result.Reason is TerminationReason.Suspended
             && result.Continuation is not null
             && result.Suspension?.Awaitable is { } awaitable)
         {
+            if (stopAtSelectRequest && awaitable is MinamoSelectRequestAwaitable)
+            {
+                break;
+            }
+
             await awaitable.WaitAsync().ConfigureAwait(false);
 
             result = MinamoMachine.Resume(result.Continuation, awaitable);

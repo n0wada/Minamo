@@ -102,106 +102,53 @@ internal sealed class LoweringPass
             locals[i] = Lower(node.Locals[i], ctx);
         }
 
-        var states = new LoweredSelectState[node.States.Count];
-        for (var i = 0; i < node.States.Count; i++)
+        var properties = new LoweredSelectProperty[node.Properties.Count];
+        for (var i = 0; i < node.Properties.Count; i++)
         {
-            var state = node.States[i];
-            var choices = new LoweredSelectChoice[state.Choices.Count];
-            for (var j = 0; j < state.Choices.Count; j++)
-            {
-                var choice = state.Choices[j];
-                choices[j] = new(
-                    choice.Location,
-                    choice.Name,
-                    LowerParameters(choice.Parameters),
-                    choice.Label ?? choice.Name,
-                    choice.Guard is null ? null : LowerNode(choice.Guard, new CompilerContext()),
-                    LowerNode(choice.Body, new CompilerContext()));
-            }
-
-            var events = new LoweredSelectEvent[state.Events.Count];
-            for (var j = 0; j < state.Events.Count; j++)
-            {
-                var handler = state.Events[j];
-                events[j] = new(
-                    handler.Location,
-                    handler.Name,
-                    LowerParameters(handler.Parameters),
-                    LowerNode(handler.Body, new CompilerContext()));
-            }
-
-            var dynamicChoices = new LoweredSelectDynamicChoiceGroup[state.DynamicChoices.Count];
-            for (var j = 0; j < state.DynamicChoices.Count; j++)
-            {
-                var group = state.DynamicChoices[j];
-                var templates = new LoweredSelectDynamicChoice[group.Choices.Count];
-                for (var k = 0; k < group.Choices.Count; k++)
-                {
-                    var choice = group.Choices[k];
-                    templates[k] = new(
-                        choice.Location,
-                        LowerNode(choice.Id, new CompilerContext()),
-                        choice.Label is null ? null : LowerNode(choice.Label, new CompilerContext()),
-                        choice.Guard is null ? null : LowerNode(choice.Guard, new CompilerContext()),
-                        LowerNode(choice.Body, new CompilerContext()));
-                }
-
-                dynamicChoices[j] = new(
-                    group.Location,
-                    new(
-                        group.Location,
-                        group.ItemName,
-                        DefaultValue: null,
-                        HasDefaultValue: false,
-                        DefaultValueLocation: group.Location,
-                        TypeAnnotation: null,
-                        IsVarArgs: false,
-                        Mutable: false),
-                    LowerNode(group.Source, new CompilerContext()),
-                    templates);
-            }
-
-            var choiceSpreads = new LoweredSelectChoiceSpread[state.ChoiceSpreads.Count];
-            for (var j = 0; j < state.ChoiceSpreads.Count; j++)
-            {
-                var spread = state.ChoiceSpreads[j];
-                choiceSpreads[j] = new(
-                    spread.Location,
-                    LowerNode(spread.Target, new CompilerContext()));
-            }
-
-            states[i] = new(
-                state.Location,
-                state.Name,
-                state.IsInitial,
-                state.Enter is null ? null : LowerNode(state.Enter, new CompilerContext()),
-                state.Leave is null ? null : LowerNode(state.Leave, new CompilerContext()),
-                state.Empty is null ? null : LowerNode(state.Empty, new CompilerContext()),
-                choices,
-                dynamicChoices,
-                choiceSpreads,
-                events);
+            var property = node.Properties[i];
+            properties[i] = new(
+                property.Location,
+                property.Name,
+                property.Metadata is null
+                    ? null
+                    : Lower(property.Metadata, new CompilerContext()),
+                LowerNode(property.Expression, new CompilerContext()));
         }
 
-        return new(node.Location, node.Name, description, locals, states);
-    }
+        var choices = new LoweredSelectChoice[node.Choices.Count];
+        for (var i = 0; i < node.Choices.Count; i++)
+        {
+            var choice = node.Choices[i];
+            choices[i] = new(
+                choice.Location,
+                choice.Name,
+                LowerParameters(choice.Parameters),
+                choice.Metadata is null
+                    ? null
+                    : Lower(choice.Metadata, new CompilerContext()),
+                choice.Guard is null ? null : LowerNode(choice.Guard, new CompilerContext()),
+                LowerNode(choice.Body, new CompilerContext()));
+        }
 
-    public LoweredControlTransfer Lower(GotoSyntax node, CompilerContext ctx)
-    {
-        var controlValues = new LoweredNode[2];
-        controlValues[0] = new LoweredLiteral(
-            node.Location,
-            SelectControlSignal.Goto,
-            LoweredLiteralKind.String);
-        controlValues[1] = new LoweredLiteral(
-            node.Location,
-            node.State,
-            LoweredLiteralKind.String);
+        var events = new LoweredSelectEvent[node.Events.Count];
+        for (var i = 0; i < node.Events.Count; i++)
+        {
+            var handler = node.Events[i];
+            events[i] = new(
+                handler.Location,
+                handler.Name,
+                LowerParameters(handler.Parameters),
+                LowerNode(handler.Body, new CompilerContext()));
+        }
+
         return new(
             node.Location,
-            new LoweredTuple(node.Location, controlValues),
-            LoweredControlTransferKind.Goto,
-            node.State);
+            node.Name,
+            description,
+            locals,
+            properties,
+            choices,
+            events);
     }
 
     public LoweredControlTransfer Lower(ExitSyntax node, CompilerContext ctx) =>
@@ -214,6 +161,28 @@ internal sealed class LoweringPass
                     node.Expression is null
                         ? new LoweredLiteral(node.Location, null, LoweredLiteralKind.Nil)
                         : LowerNode(node.Expression, ctx)
+                ]),
+            LoweredControlTransferKind.Return);
+
+    public LoweredControlTransfer Lower(SelectGotoSyntax node, CompilerContext ctx) =>
+        new(
+            node.Location,
+            new LoweredTuple(
+                node.Location,
+                [
+                    new LoweredLiteral(node.Location, SelectControlSignal.Goto, LoweredLiteralKind.String),
+                    LowerNode(node.Target, ctx)
+                ]),
+            LoweredControlTransferKind.Return);
+
+    public LoweredControlTransfer Lower(SelectReturnSyntax node) =>
+        new(
+            node.Location,
+            new LoweredTuple(
+                node.Location,
+                [
+                    new LoweredLiteral(node.Location, SelectControlSignal.Return, LoweredLiteralKind.String),
+                    new LoweredLiteral(node.Location, null, LoweredLiteralKind.Nil)
                 ]),
             LoweredControlTransferKind.Return);
 
@@ -555,8 +524,9 @@ internal sealed class LoweringPass
             NodeType.Range => Lower((RangeSyntax)node, ctx),
             NodeType.Rebinding => Lower((RebindingSyntax)node, ctx),
             NodeType.Return => Lower((ReturnSyntax)node, ctx),
-            NodeType.Goto => Lower((GotoSyntax)node, ctx),
             NodeType.Exit => Lower((ExitSyntax)node, ctx),
+            NodeType.SelectGoto => Lower((SelectGotoSyntax)node, ctx),
+            NodeType.SelectReturn => Lower((SelectReturnSyntax)node),
             NodeType.String => Lower((StringLiteralSyntax)node),
             NodeType.Throw => Lower((ThrowSyntax)node, ctx),
             NodeType.TryCatch => Lower((TryCatchSyntax)node, ctx),

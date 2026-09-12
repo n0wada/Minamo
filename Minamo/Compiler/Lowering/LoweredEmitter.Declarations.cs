@@ -598,108 +598,66 @@ internal sealed partial class LoweredEmitter
             VarFlags.Const | VarFlags.Private,
             args: 0);
 
-        var states = new List<SelectStateDefinition>(node.States.Count);
-        var initialCount = 0;
-        var stateNames = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var state in node.States)
-        {
-            if (!stateNames.Add(state.Name))
-            {
-                target.AddError(CompilerError.SelectDuplicateState, node.Location, state.Name);
-            }
-        }
-
-        var selectContext = ctx.WithSelectStates(
-            node.Name ?? "<anonymous>",
-            stateNames,
-            node.States.Count == 1 && node.States[0].Name.Length == 0);
         var closureCount = 0;
         var descriptionSlot = EmitSelectHook(
             node.Description,
             $"$select-description:{node.Name ?? "anonymous"}",
             Array.Empty<LoweredParameter>(),
-            selectContext,
+            ctx,
             ref closureCount);
 
-        for (var i = 0; i < node.States.Count; i++)
+        var propertyNames = new HashSet<string>(StringComparer.Ordinal);
+        var properties = new List<SelectPropertyDefinition>(node.Properties.Count);
+        for (var i = 0; i < node.Properties.Count; i++)
         {
-            var state = node.States[i];
-            if (state.IsInitial)
+            var property = node.Properties[i];
+            if (!propertyNames.Add(property.Name))
             {
-                initialCount++;
+                target.AddError(CompilerError.SelectDuplicateProperty, property.Location, property.Name);
             }
 
-            if (state.Name.Length == 0)
+            var metadataSlot = EmitSelectHook(
+                property.Metadata,
+                $"$select-property-metadata:{node.Name ?? "anonymous"}:{i}",
+                Array.Empty<LoweredParameter>(),
+                ctx,
+                ref closureCount);
+            var valueSlot = EmitSelectHook(
+                property.Expression,
+                $"$select-property:{node.Name ?? "anonymous"}:{i}",
+                Array.Empty<LoweredParameter>(),
+                ctx,
+                ref closureCount)
+                ?? throw new InvalidOperationException("A select property must have an expression.");
+            properties.Add(new(property.Name, valueSlot, metadataSlot));
+        }
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        var choices = new List<SelectChoiceDefinition>(node.Choices.Count);
+        for (var i = 0; i < node.Choices.Count; i++)
+        {
+            var choice = node.Choices[i];
+            if (!names.Add(choice.Name))
             {
-                foreach (var spread in state.ChoiceSpreads)
-                {
-                    target.AddError(
-                        CompilerError.SelectChoiceSpreadRequiresNamedState,
-                        spread.Location);
-                }
+                target.AddError(CompilerError.SelectDuplicateChoice, choice.Location, choice.Name);
             }
 
-            var enterSlot = EmitSelectHook(
-                state.Enter,
-                $"$select-enter:{node.Name ?? "anonymous"}:{i}",
+            var metadataSlot = EmitSelectHook(
+                choice.Metadata,
+                $"$select-case-metadata:{node.Name ?? "anonymous"}:{i}",
                 Array.Empty<LoweredParameter>(),
-                selectContext,
+                ctx,
                 ref closureCount);
-            var leaveSlot = EmitSelectHook(
-                state.Leave,
-                $"$select-leave:{node.Name ?? "anonymous"}:{i}",
-                Array.Empty<LoweredParameter>(),
-                selectContext,
-                ref closureCount);
-            var emptySlot = EmitSelectHook(
-                state.Empty,
-                $"$select-empty:{node.Name ?? "anonymous"}:{i}",
-                Array.Empty<LoweredParameter>(),
-                selectContext,
-                ref closureCount);
-
-            var names = new HashSet<string>(StringComparer.Ordinal);
-            var choices = new List<SelectChoiceDefinition>(state.Choices.Count);
-            for (var j = 0; j < state.Choices.Count; j++)
+            var hiddenName = $"$select:{node.Name ?? "anonymous"}:{i}";
+            int? guardSlot = null;
+            if (choice.Guard is not null)
             {
-                var choice = state.Choices[j];
-                if (!names.Add(choice.Name))
-                {
-                    target.AddError(CompilerError.SelectDuplicateChoice, choice.Location, choice.Name, state.Name);
-                }
-
-                var hiddenName = $"$select:{node.Name ?? "anonymous"}:{i}:{j}";
-                int? guardSlot = null;
-                if (choice.Guard is not null)
-                {
-                    var hiddenGuardName = $"$select-guard:{node.Name}:{i}:{j}";
-                    var guard = new LoweredFunctionDeclaration(
-                        choice.Location,
-                        TypeName: null,
-                        TargetTypeName: null,
-                        Name: hiddenGuardName,
-                        IsStatic: false,
-                        IsIndexer: false,
-                        IsConstructor: false,
-                        Getter: false,
-                        Setter: false,
-                        IsIterator: false,
-                        IsImplInitializer: false,
-                        IsPrivate: true,
-                        Parameters: Array.Empty<LoweredParameter>(),
-                        Body: choice.Guard,
-                        NeedsValue: false,
-                        IteratorBody: false,
-                        IsStdCall: !target.NoOptimizations);
-                    EmitFunctionBody(-1, guard, selectContext, iteratorBody: false);
-                    guardSlot = closureCount++;
-                }
-
-                var function = new LoweredFunctionDeclaration(
+                var hiddenGuardName = $"$select-guard:{node.Name}:{i}";
+                var guard = new LoweredFunctionDeclaration(
                     choice.Location,
                     TypeName: null,
                     TargetTypeName: null,
-                    Name: hiddenName,
+                    Name: hiddenGuardName,
                     IsStatic: false,
                     IsIndexer: false,
                     IsConstructor: false,
@@ -708,157 +666,83 @@ internal sealed partial class LoweredEmitter
                     IsIterator: false,
                     IsImplInitializer: false,
                     IsPrivate: true,
-                    Parameters: choice.Parameters,
-                    Body: choice.Body,
+                    Parameters: Array.Empty<LoweredParameter>(),
+                    Body: choice.Guard,
                     NeedsValue: false,
                     IteratorBody: false,
                     IsStdCall: !target.NoOptimizations);
-                EmitFunctionBody(-1, function, selectContext, iteratorBody: false);
-                var functionSlot = closureCount++;
-                choices.Add(new(
-                    choice.Name,
-                    choice.Label,
-                    functionSlot,
-                    guardSlot,
-                    SelectParameters(choice.Parameters)));
+                EmitFunctionBody(-1, guard, ctx, iteratorBody: false);
+                guardSlot = closureCount++;
             }
 
-            var eventNames = new HashSet<string>(StringComparer.Ordinal);
-            var dynamicChoices = new List<SelectDynamicChoiceGroupDefinition>(state.DynamicChoices.Count);
-            for (var j = 0; j < state.DynamicChoices.Count; j++)
+            var function = new LoweredFunctionDeclaration(
+                choice.Location,
+                TypeName: null,
+                TargetTypeName: null,
+                Name: hiddenName,
+                IsStatic: false,
+                IsIndexer: false,
+                IsConstructor: false,
+                Getter: false,
+                Setter: false,
+                IsIterator: false,
+                IsImplInitializer: false,
+                IsPrivate: true,
+                Parameters: choice.Parameters,
+                Body: choice.Body,
+                NeedsValue: false,
+                IteratorBody: false,
+                IsStdCall: !target.NoOptimizations);
+            EmitFunctionBody(-1, function, ctx, iteratorBody: false);
+            var functionSlot = closureCount++;
+            choices.Add(new(
+                choice.Name,
+                functionSlot,
+                guardSlot,
+                metadataSlot,
+                SelectParameters(choice.Parameters)));
+        }
+
+        var eventNames = new HashSet<string>(StringComparer.Ordinal);
+        var events = new List<SelectEventDefinition>(node.Events.Count);
+        for (var i = 0; i < node.Events.Count; i++)
+        {
+            var handler = node.Events[i];
+            if (!eventNames.Add(handler.Name))
             {
-                var group = state.DynamicChoices[j];
-                var sourceSlot = EmitSelectHook(
-                    group.Source,
-                    $"$select-dynamic-source:{node.Name ?? "anonymous"}:{i}:{j}",
-                    Array.Empty<LoweredParameter>(),
-                    selectContext,
-                    ref closureCount)
-                    ?? throw new InvalidOperationException("A dynamic select choice source is unavailable.");
-                IReadOnlyList<LoweredParameter> parameters = [group.Item];
-                var templates = new List<SelectDynamicChoiceDefinition>(group.Choices.Count);
-                for (var k = 0; k < group.Choices.Count; k++)
-                {
-                    var choice = group.Choices[k];
-                    var idSlot = EmitSelectHook(
-                        choice.Id,
-                        $"$select-dynamic-id:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
-                        parameters,
-                        selectContext,
-                        ref closureCount)
-                        ?? throw new InvalidOperationException("A dynamic select choice ID is unavailable.");
-                    var labelSlot = EmitSelectHook(
-                        choice.Label,
-                        $"$select-dynamic-label:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
-                        parameters,
-                        selectContext,
-                        ref closureCount);
-                    var guardSlot = EmitSelectHook(
-                        choice.Guard,
-                        $"$select-dynamic-guard:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
-                        parameters,
-                        selectContext,
-                        ref closureCount);
-                    var action = new LoweredFunctionDeclaration(
-                        choice.Location,
-                        TypeName: null,
-                        TargetTypeName: null,
-                        Name: $"$select-dynamic:{node.Name ?? "anonymous"}:{i}:{j}:{k}",
-                        IsStatic: false,
-                        IsIndexer: false,
-                        IsConstructor: false,
-                        Getter: false,
-                        Setter: false,
-                        IsIterator: false,
-                        IsImplInitializer: false,
-                        IsPrivate: true,
-                        Parameters: parameters,
-                        Body: choice.Body,
-                        NeedsValue: false,
-                        IteratorBody: false,
-                        IsStdCall: !target.NoOptimizations);
-                    EmitFunctionBody(-1, action, selectContext, iteratorBody: false);
-                    templates.Add(new(
-                        idSlot,
-                        labelSlot,
-                        guardSlot,
-                        closureCount++));
-                }
-
-                dynamicChoices.Add(new(sourceSlot, templates));
+                target.AddError(CompilerError.SelectDuplicateEvent, handler.Location, handler.Name);
             }
 
-            var choiceSpreads = new List<SelectChoiceSpreadDefinition>(state.ChoiceSpreads.Count);
-            for (var j = 0; j < state.ChoiceSpreads.Count; j++)
-            {
-                var spread = state.ChoiceSpreads[j];
-                var sourceSlot = EmitSelectHook(
-                    spread.Target,
-                    $"$select-spread:{node.Name ?? "anonymous"}:{i}:{j}",
-                    Array.Empty<LoweredParameter>(),
-                    selectContext,
-                    ref closureCount)
-                    ?? throw new InvalidOperationException("A select choice spread source is unavailable.");
-                choiceSpreads.Add(new(sourceSlot));
-            }
+            var function = new LoweredFunctionDeclaration(
+                handler.Location,
+                TypeName: null,
+                TargetTypeName: null,
+                Name: $"$select-event:{node.Name ?? "anonymous"}:{i}",
+                IsStatic: false,
+                IsIndexer: false,
+                IsConstructor: false,
+                Getter: false,
+                Setter: false,
+                IsIterator: false,
+                IsImplInitializer: false,
+                IsPrivate: true,
+                Parameters: handler.Parameters,
+                Body: handler.Body,
+                NeedsValue: false,
+                IteratorBody: false,
+                IsStdCall: !target.NoOptimizations);
+            EmitFunctionBody(-1, function, ctx, iteratorBody: false);
+            events.Add(new(handler.Name, closureCount++, SelectParameters(handler.Parameters)));
+        }
 
-            var events = new List<SelectEventDefinition>(state.Events.Count);
-            for (var j = 0; j < state.Events.Count; j++)
-            {
-                var handler = state.Events[j];
-                if (!eventNames.Add(handler.Name))
-                {
-                    target.AddError(
-                        CompilerError.SelectDuplicateEvent,
-                        handler.Location,
-                        handler.Name,
-                        state.Name);
-                }
-
-                var function = new LoweredFunctionDeclaration(
-                    handler.Location,
-                    TypeName: null,
-                    TargetTypeName: null,
-                    Name: $"$select-event:{node.Name ?? "anonymous"}:{i}:{j}",
-                    IsStatic: false,
-                    IsIndexer: false,
-                    IsConstructor: false,
-                    Getter: false,
-                    Setter: false,
-                    IsIterator: false,
-                    IsImplInitializer: false,
-                    IsPrivate: true,
-                    Parameters: handler.Parameters,
-                    Body: handler.Body,
-                    NeedsValue: false,
-                    IteratorBody: false,
-                    IsStdCall: !target.NoOptimizations);
-                EmitFunctionBody(-1, function, selectContext, iteratorBody: false);
-                events.Add(new(handler.Name, closureCount++, SelectParameters(handler.Parameters)));
-            }
-
-            states.Add(new(
-                state.Name,
-                state.IsInitial,
-                enterSlot,
-                leaveSlot,
-                emptySlot,
+        cw.CreateSelectFactory(new MinamoSelectDefinitionValue(
+            new SelectDefinition(
+                node.Name,
+                descriptionSlot,
+                properties,
                 choices,
-                dynamicChoices,
-                choiceSpreads,
-                events));
-        }
-
-        if (node.States.Count == 0)
-        {
-            target.AddError(CompilerError.SelectRequiresState, node.Location);
-        }
-        else if (initialCount != 1)
-        {
-            target.AddError(CompilerError.SelectRequiresOneInitialState, node.Location);
-        }
-
-        cw.CreateSelectFactory(new MinamoSelectDefinitionValue(new SelectDefinition(node.Name, descriptionSlot, states), closureCount), closureCount);
+                events),
+            closureCount), closureCount);
         if (node.Name is not null && !node.IsInstanceFactory)
         {
             if (keepResult)

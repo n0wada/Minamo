@@ -28,7 +28,13 @@ public sealed class ExecutionContext
 
     internal ExecutionContext(RuntimeContext rtx) : this(new(), rtx) { }
 
-    public ExecutionContext Clone() => new(CallStack, RuntimeContext) { Control = Control };
+    public ExecutionContext Clone() => new(CallStack, RuntimeContext)
+    {
+        Control = Control,
+        SelectRequestsAllowed = SelectRequestsAllowed
+    };
+
+    internal bool SelectRequestsAllowed { get; set; }
 
     #region CallBack
     internal MinamoFunction? CallBackFunction { get; set; }

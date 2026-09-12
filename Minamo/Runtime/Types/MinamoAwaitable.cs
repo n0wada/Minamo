@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Minamo.Runtime.Types;
 
-internal sealed class MinamoAwaitable : MinamoObject
+internal class MinamoAwaitable : MinamoObject
 {
     private readonly Task task;
     private readonly Func<MinamoObject> getResult;
@@ -81,6 +81,41 @@ internal sealed class MinamoAwaitable : MinamoObject
         finally
         {
             completed?.Invoke();
+        }
+    }
+}
+
+internal sealed class MinamoSelectRequestAwaitable : MinamoAwaitable
+{
+    private readonly TaskCompletionSource<MinamoObject> response;
+
+    internal MinamoSelectRequestAwaitable(string kind, MinamoObject payload)
+        : this(
+            kind,
+            payload,
+            new TaskCompletionSource<MinamoObject>(
+                TaskCreationOptions.RunContinuationsAsynchronously)) { }
+
+    private MinamoSelectRequestAwaitable(
+        string kind,
+        MinamoObject payload,
+        TaskCompletionSource<MinamoObject> response)
+        : base(response.Task, () => response.Task.GetAwaiter().GetResult())
+    {
+        Kind = kind;
+        Payload = payload;
+        this.response = response;
+    }
+
+    internal string Kind { get; }
+
+    internal MinamoObject Payload { get; }
+
+    internal void Respond(MinamoObject value)
+    {
+        if (!response.TrySetResult(value))
+        {
+            throw new InvalidOperationException("The select request has already been answered.");
         }
     }
 }

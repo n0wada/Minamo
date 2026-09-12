@@ -1,7 +1,6 @@
 using Minamo.Compiler;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace Minamo.Runtime.Types;
@@ -63,47 +62,25 @@ internal sealed class MinamoSelectFactory : MinamoObject
         return new(this);
     }
 
-    internal SelectStateDefinition InitialState =>
-        Definition!.States.Single(candidate => candidate.IsInitial);
-
     internal string Name => name;
 
     internal MinamoFunction Choice(SelectChoiceDefinition choice) => closures![choice.FunctionSlot];
 
+    internal MinamoFunction? ChoiceMetadata(SelectChoiceDefinition choice) =>
+        choice.MetadataFunctionSlot is int slot ? closures![slot] : null;
+
     internal MinamoFunction? Guard(SelectChoiceDefinition choice) =>
         choice.GuardFunctionSlot is int slot ? closures![slot] : null;
 
-    internal MinamoFunction DynamicChoiceSource(SelectDynamicChoiceGroupDefinition group) =>
-        closures![group.SourceFunctionSlot];
+    internal MinamoFunction Property(SelectPropertyDefinition property) => closures![property.FunctionSlot];
 
-    internal MinamoFunction DynamicChoiceId(SelectDynamicChoiceDefinition choice) =>
-        closures![choice.IdFunctionSlot];
-
-    internal MinamoFunction? DynamicChoiceLabel(SelectDynamicChoiceDefinition choice) =>
-        choice.LabelFunctionSlot is int slot ? closures![slot] : null;
-
-    internal MinamoFunction? DynamicChoiceGuard(SelectDynamicChoiceDefinition choice) =>
-        choice.GuardFunctionSlot is int slot ? closures![slot] : null;
-
-    internal MinamoFunction DynamicChoiceAction(SelectDynamicChoiceDefinition choice) =>
-        closures![choice.FunctionSlot];
-
-    internal MinamoFunction ChoiceSpreadSource(SelectChoiceSpreadDefinition spread) =>
-        closures![spread.SourceFunctionSlot];
+    internal MinamoFunction? PropertyMetadata(SelectPropertyDefinition property) =>
+        property.MetadataFunctionSlot is int slot ? closures![slot] : null;
 
     internal MinamoFunction Event(SelectEventDefinition handler) => closures![handler.FunctionSlot];
 
-    internal MinamoFunction? Enter(SelectStateDefinition state) =>
-        state.EnterFunctionSlot is int slot ? closures![slot] : null;
-
     internal MinamoFunction? Description() =>
         Definition!.DescriptionFunctionSlot is int slot ? closures![slot] : null;
-
-    internal MinamoFunction? Leave(SelectStateDefinition state) =>
-        state.LeaveFunctionSlot is int slot ? closures![slot] : null;
-
-    internal MinamoFunction? Empty(SelectStateDefinition state) =>
-        state.EmptyFunctionSlot is int slot ? closures![slot] : null;
 
     public override string TypeName => "SelectFactory";
 
@@ -117,26 +94,20 @@ internal sealed class MinamoSelectFactory : MinamoObject
 internal sealed class SelectInstance
 {
     private readonly MinamoSelectFactory factory;
-    private SelectStateDefinition state;
     private bool completed;
-    private bool emptyTriggered;
-
-    internal SelectInstance(MinamoSelectFactory factory)
-    {
-        this.factory = factory;
-        state = factory.InitialState;
-    }
-
-    internal SelectStateDefinition State => state;
+    internal SelectInstance(MinamoSelectFactory factory) => this.factory = factory;
 
     internal string Name => factory.Name;
 
-    internal bool IsCompleted => completed;
+    internal SelectDefinition Definition => factory.Definition!;
 
-    internal bool ShouldRunEmpty =>
-        !emptyTriggered
-        && state.EmptyFunctionSlot is not null
-        && state.Events.Count == 0;
+    internal IReadOnlyList<SelectChoiceDefinition> Choices => Definition.Choices;
+
+    internal IReadOnlyList<SelectPropertyDefinition> Properties => Definition.Properties;
+
+    internal IReadOnlyList<SelectEventDefinition> Events => Definition.Events;
+
+    internal bool IsCompleted => completed;
 
     internal MinamoObject Value { get; private set; } = MinamoNil.Instance;
 
@@ -148,49 +119,29 @@ internal sealed class SelectInstance
 
     internal MinamoFunction Choice(SelectChoiceDefinition choice) => factory.Choice(choice);
 
+    internal MinamoFunction? ChoiceMetadata(SelectChoiceDefinition choice) =>
+        factory.ChoiceMetadata(choice);
+
     internal MinamoFunction? Guard(SelectChoiceDefinition choice) => factory.Guard(choice);
 
-    internal MinamoFunction DynamicChoiceSource(SelectDynamicChoiceGroupDefinition group) =>
-        factory.DynamicChoiceSource(group);
+    internal MinamoFunction Property(SelectPropertyDefinition property) => factory.Property(property);
 
-    internal MinamoFunction DynamicChoiceId(SelectDynamicChoiceDefinition choice) =>
-        factory.DynamicChoiceId(choice);
-
-    internal MinamoFunction? DynamicChoiceLabel(SelectDynamicChoiceDefinition choice) =>
-        factory.DynamicChoiceLabel(choice);
-
-    internal MinamoFunction? DynamicChoiceGuard(SelectDynamicChoiceDefinition choice) =>
-        factory.DynamicChoiceGuard(choice);
-
-    internal MinamoFunction DynamicChoiceAction(SelectDynamicChoiceDefinition choice) =>
-        factory.DynamicChoiceAction(choice);
-
-    internal MinamoFunction ChoiceSpreadSource(SelectChoiceSpreadDefinition spread) =>
-        factory.ChoiceSpreadSource(spread);
+    internal MinamoFunction? PropertyMetadata(SelectPropertyDefinition property) =>
+        factory.PropertyMetadata(property);
 
     internal MinamoFunction Event(SelectEventDefinition handler) => factory.Event(handler);
 
-    internal MinamoFunction? Enter(SelectStateDefinition target) => factory.Enter(target);
-
     internal MinamoFunction? Description() => factory.Description();
 
-    internal MinamoFunction? Leave(SelectStateDefinition target) => factory.Leave(target);
-
-    internal MinamoFunction? Empty() => factory.Empty(state);
-
-    internal void MarkEmptyTriggered() => emptyTriggered = true;
-
-    internal void CompleteIfIdle()
+    internal void Complete()
     {
-        if (state.Choices.Count == 0
-            && state.DynamicChoices.Count == 0
-            && state.ChoiceSpreads.Count == 0
-            && state.Events.Count == 0
-            && state.EmptyFunctionSlot is null)
-        {
-            completed = true;
-            Value = MinamoNil.Instance;
-        }
+        Complete(MinamoNil.Instance);
+    }
+
+    internal void Complete(MinamoObject value)
+    {
+        completed = true;
+        Value = value;
     }
 
     internal SelectActionOutcome Apply(MinamoObject result)
@@ -199,40 +150,42 @@ internal sealed class SelectInstance
             && tuple.Count == 2
             && tuple[0] is MinamoString marker)
         {
-            if (marker.Value == SelectControlSignal.Exit && tuple.Count == 2)
+            if (marker.Value == SelectControlSignal.Exit)
             {
-                var leavingState = state;
-                completed = true;
-                Value = tuple[1];
-                return new(
-                    IsCompleted: true,
-                    Value: Value,
-                    LeavingState: leavingState,
-                    EnteringState: null);
+                return new(SelectActionOutcomeKind.Exit, tuple[1]);
             }
 
-            if (marker.Value == SelectControlSignal.Goto && tuple[1] is MinamoString target)
+            if (marker.Value == SelectControlSignal.Goto)
             {
-                var leavingState = state;
-                var enteringState = factory.Definition!.States.SingleOrDefault(candidate => candidate.Name == target.Value)
-                    ?? throw new InvalidOperationException($"The select has no state named '{target.Value}'.");
-                state = enteringState;
-                emptyTriggered = false;
-                return new(
-                    IsCompleted: false,
-                    Value: Value,
-                    LeavingState: leavingState,
-                    EnteringState: enteringState);
+                if (tuple[1] is not MinamoSelectFactory target)
+                {
+                    throw new InvalidOperationException(
+                        "A select goto target must evaluate to a select.");
+                }
+
+                return new(SelectActionOutcomeKind.Goto, Target: target);
+            }
+
+            if (marker.Value == SelectControlSignal.Return)
+            {
+                return new(SelectActionOutcomeKind.Return);
             }
         }
 
-        return new(IsCompleted: false, MinamoNil.Instance);
+        return new(SelectActionOutcomeKind.Continue);
     }
 
 }
 
 internal readonly record struct SelectActionOutcome(
-    bool IsCompleted,
-    MinamoObject Value,
-    SelectStateDefinition? LeavingState = null,
-    SelectStateDefinition? EnteringState = null);
+    SelectActionOutcomeKind Kind,
+    MinamoObject? Value = null,
+    MinamoSelectFactory? Target = null);
+
+internal enum SelectActionOutcomeKind
+{
+    Continue,
+    Goto,
+    Return,
+    Exit
+}

@@ -25,8 +25,15 @@ var result = await instance.ExecuteAsync("40 + 2");
 
 Application code does not need to construct a parser, linker, compiler unit, runtime context, or
 evaluation stack. Typed result, signal, state, and command helpers keep ordinary host code outside
-the runtime object model. `MinamoEnvironment` can supply instance-local input and output when
-hosted scripts use `print`; console input is provided by the optional `readline` library.
+the runtime object model. `MinamoEnvironment.UseOutput` routes `print` output, while
+`UseInputAsync` supplies input to the optional `readline` library.
+
+Interactive UIs use `MinamoInstance.OpenSelectAsync` and the live `MinamoSelect` application
+surface. `MinamoSelectProperty` publishes script-defined read-only values, while
+`MinamoSelectDescription` and `MinamoSelectMetadata` expose free-form string-key dictionaries
+through typed host conversion. Language-level `case` declarations appear as `MinamoChoice`
+objects in `MinamoSelect.Choices`; hosts select the published object rather than parsing or
+invoking script syntax directly.
 
 Compiler and parser results expose a fixed `Messages` snapshot together with filtered `Errors` and
 `Warnings` lists. Use `TryGetValue(out var value)` for normal branching or `GetValueOrThrow()` when
@@ -49,6 +56,10 @@ For common compilation, use `MinamoCompiler.Compile(source)` or
 an explicitly configured `FileLookup`. Advanced pipelines can use `MinamoLinker` directly; its
 `BuilderOptions` always come from the supplied lookup and cannot be specified a second time.
 
+File-based tooling can choose its lookup scope explicitly. `FileLookup.Standard(options)` searches
+relative to the importing file and in `MINAMO_LIBS`; `FileLookup.Restricted(options)` searches
+only paths added by the caller. Neither mode searches beside the Minamo executable.
+
 Tooling consumers should import only the specific namespaces they use. Tooling contracts can
 evolve separately from the application-facing Hosting contract.
 
@@ -60,10 +71,6 @@ interop conversion belong here. This layer assumes knowledge of VM lifetime and 
 
 Prefer generated Hosting commands and opaque resources unless direct runtime participation is
 actually required.
-
-File-based tooling can choose its lookup scope explicitly. `FileLookup.Standard(options)` searches
-relative to the importing file and in `MINAMO_LIBS`; `FileLookup.Restricted(options)` searches
-only paths added by the caller. Neither mode searches beside the Minamo executable.
 
 ## Internal implementation
 

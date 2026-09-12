@@ -145,6 +145,7 @@ These functions are available without importing a standard-library module.
 | `referenceEquals(left, right)` | Tests whether two values are the same runtime object. |
 | `isCallable(value)` | Tests whether a value can be called. |
 | `caller()` | Returns the calling function when one is available; otherwise returns `nil`. |
+| `request(kind, payload?)` | Yields an input request from a select case and returns the host response. |
 
 ```swift
 print(fmt("{0} + {1} = {2}", 2, 3, 2 + 3))
@@ -156,6 +157,10 @@ print(constructorName(Ok(42)))
 `print` writes through an instance-specific output stream when the host supplies one. Otherwise it
 uses the process console. See [Hosting API guide](../Developers/HostingGuide.md#instance-input-and-output)
 for host-controlled input and output.
+
+`request` is valid only while a select case is running. It
+suspends that action without blocking a thread. The host receives the kind and optional payload
+through `MinamoSelectRequest`, then resumes the action with `MinamoSelect.RespondAsync`.
 
 ## Standard library modules
 

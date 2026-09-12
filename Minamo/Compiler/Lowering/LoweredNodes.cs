@@ -119,45 +119,24 @@ internal sealed record LoweredSelectDeclaration(
     string? Name,
     LoweredArray? Description,
     IReadOnlyList<LoweredBinding> Locals,
-    IReadOnlyList<LoweredSelectState> States,
-    bool IsInstanceFactory = false) : LoweredNode(Location);
-
-internal sealed record LoweredSelectState(
-    Location Location,
-    string Name,
-    bool IsInitial,
-    LoweredNode? Enter,
-    LoweredNode? Leave,
-    LoweredNode? Empty,
+    IReadOnlyList<LoweredSelectProperty> Properties,
     IReadOnlyList<LoweredSelectChoice> Choices,
-    IReadOnlyList<LoweredSelectDynamicChoiceGroup> DynamicChoices,
-    IReadOnlyList<LoweredSelectChoiceSpread> ChoiceSpreads,
-    IReadOnlyList<LoweredSelectEvent> Events);
+    IReadOnlyList<LoweredSelectEvent> Events,
+    bool IsInstanceFactory = false) : LoweredNode(Location);
 
 internal sealed record LoweredSelectChoice(
     Location Location,
     string Name,
     IReadOnlyList<LoweredParameter> Parameters,
-    string Label,
+    LoweredArray? Metadata,
     LoweredNode? Guard,
     LoweredNode Body);
 
-internal sealed record LoweredSelectDynamicChoiceGroup(
+internal sealed record LoweredSelectProperty(
     Location Location,
-    LoweredParameter Item,
-    LoweredNode Source,
-    IReadOnlyList<LoweredSelectDynamicChoice> Choices);
-
-internal sealed record LoweredSelectDynamicChoice(
-    Location Location,
-    LoweredNode Id,
-    LoweredNode? Label,
-    LoweredNode? Guard,
-    LoweredNode Body);
-
-internal sealed record LoweredSelectChoiceSpread(
-    Location Location,
-    LoweredNode Target);
+    string Name,
+    LoweredArray? Metadata,
+    LoweredNode Expression);
 
 internal sealed record LoweredSelectEvent(
     Location Location,
@@ -289,15 +268,13 @@ internal sealed record LoweredApplication(
 internal sealed record LoweredControlTransfer(
     Location Location,
     LoweredNode? Expression,
-    LoweredControlTransferKind Kind,
-    string? SelectState = null) : LoweredNode(Location);
+    LoweredControlTransferKind Kind) : LoweredNode(Location);
 
 internal enum LoweredControlTransferKind
 {
     Break,
     Continue,
     Return,
-    Goto,
     Throw,
     Yield,
     YieldBreak

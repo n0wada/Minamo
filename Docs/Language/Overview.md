@@ -153,17 +153,24 @@ for item in items when item.Enabled {
 
 ## Interactive selects
 
-`select` defines a host-driven interaction with choices, suitable for menus, dialogue, and
-quests. A select expression produces a reusable factory; each invocation creates a new
+`select` defines a host-driven interaction suitable for menus, dialogue, games, and conventional
+GUI screens. A select expression produces a reusable factory; each invocation creates a new
 interaction instance.
 
 ```swift
 let shop = select {
-    choose "browse" => {
+    desc ["prompt": "Show a small shop panel"]
+
+    mut visits = 0
+
+    prop visits ["format": "number"] => visits
+
+    case "browse" ["text": "Browse", "control": "button"] => {
+        visits += 1
         print("You browse the shelves.")
     }
 
-    choose "leave" => exit "closed"
+    case "leave" => exit "closed"
 }
 ```
 
@@ -173,15 +180,25 @@ Save the script as `shop.nami`, then start its named select from the console:
 minamo.exe shop.nami --do shop
 ```
 
-The console presents the choices after it executes the file. Selecting `"browse"` runs its choice
-body and republishes the same interaction; selecting `"leave"` exits it. Hidden host events may be
-declared with `on` and delivered from C# with `Send`; `on empty` handles an interaction with no
-available choices or host events. Use named `state` declarations and `goto` when the interaction
-needs explicit state transitions. Named selects can also be opened from C#.
+The console presents the cases after it executes the file. The C# API calls these published items
+`Choices`. Selecting `"browse"` runs its case body and republishes the same interaction; selecting
+`"leave"` exits it. `desc` is a free-form dictionary evaluated once for each select instance.
+`prop` publishes read-only values, and the optional dictionaries after `prop` and `case` provide
+free-form UI hints; properties and member metadata are reevaluated whenever the interaction is
+published. Minamo assigns no built-in meaning to metadata keys.
+
+Hidden host events may be declared with `on` and delivered from C# with `SendAsync`. An interaction
+with no available cases or host events completes with `nil`. Select-local values and `when` guards
+let earlier actions change which cases are presented next. A case action can call
+`request(kind, payload?)` to yield an input request to the host and continue with its response.
+Named selects can also be opened from C#.
+An action can use `goto select-expression` to create and enter another select while preserving the
+current instance on a navigation stack. `return` restores the preceding instance, and `exit`
+finishes the whole interaction from any depth. No `back` keyword is defined.
 
 See [Interactive selects](../Developers/InteractiveSelect.md) for basic host integration and
-[Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md) for factory lifetime,
-expanded child choices, aliases, and the C# session API.
+[Advanced interactive selects](../Developers/InteractiveSelectAdvanced.md) for navigation, factory
+lifetime, aliases, and the C# session API.
 
 ## Collections
 
