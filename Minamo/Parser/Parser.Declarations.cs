@@ -244,7 +244,7 @@ internal sealed partial class HandwrittenParser
             prefixAnnotation = ParseTypeAnnotation();
         }
 
-        if (Current.Kind != TokenKind.LowerIdentifier)
+        if (!IsIdentifier(Current.Kind))
         {
             ReportExpected(TokenKind.LowerIdentifier);
             return null;
@@ -385,9 +385,22 @@ internal sealed partial class HandwrittenParser
         return null;
     }
 
-    private bool IsTypeAnnotationPrefix() =>
-        Current.Kind == TokenKind.UpperIdentifier
-        || Current.Kind == TokenKind.LowerIdentifier && Peek(1).Kind == TokenKind.Dot;
+    private bool IsTypeAnnotationPrefix()
+    {
+        if (Current.Kind == TokenKind.LowerIdentifier)
+        {
+            return Peek(1).Kind == TokenKind.Dot;
+        }
+
+        if (Current.Kind != TokenKind.UpperIdentifier)
+        {
+            return false;
+        }
+
+        var next = Peek(1).Kind;
+        return IsIdentifier(next)
+            || next is TokenKind.Dot or TokenKind.Less or TokenKind.Question or TokenKind.Pipe;
+    }
 
     private SyntaxNode? ParseFunctionArrowBody()
     {
@@ -420,7 +433,7 @@ internal sealed partial class HandwrittenParser
             return false;
         }
 
-        if (Current.Kind == TokenKind.LowerIdentifier)
+        if (IsIdentifier(Current.Kind))
         {
             return Peek(1).Kind == TokenKind.Arrow;
         }

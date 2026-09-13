@@ -33,6 +33,27 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
+    public async Task InteractiveSelectAcceptsUppercaseIdentifiers()
+    {
+        using var instance = new MinamoHost().CreateInstance();
+        var initialization = await instance.ExecuteAsync("""
+            select Flow {
+                prop Status => "ready"
+                case "finish" (Value) => exit Value
+            }
+            """);
+        Assert.True(initialization.Success, initialization.Failure?.Message);
+
+        using var select = await instance.OpenSelectAsync("Flow");
+        Assert.Equal("ready", Property(select, "Status").GetValue<string>());
+
+        await select.SelectAsync(Choice(select, "finish"), 42);
+
+        Assert.True(select.IsCompleted);
+        Assert.Equal(42L, select.GetValue<long>());
+    }
+
+    [Fact]
     public async Task SelectRepublishesChoicesUntilExit()
     {
         using var instance = new MinamoHost().CreateInstance();

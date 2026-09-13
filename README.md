@@ -158,7 +158,7 @@ For focused work, the xUnit project can be run directly:
 dotnet test .\Minamo.UnitTests\Minamo.UnitTests.csproj
 ```
 
-See [Compatibility](Docs/Operations/Compatibility.md) for the supported framework contract and
+See [Compatibility](Docs/Developers/Compatibility.md) for the supported framework contract and
 validation levels.
 
 ## Documentation
@@ -197,7 +197,7 @@ observability, and security defaults.
 
 ### Tools and operations
 
-- [Compatibility](Docs/Operations/Compatibility.md)
+- [Compatibility](Docs/Developers/Compatibility.md)
 
 Compatibility documents current target frameworks and the repository validation suites.
 

@@ -16,7 +16,7 @@ internal sealed partial class HandwrittenParser
     {
         var keyword = Consume();
         var declaration = new SelectDeclarationSyntax(keyword.Location);
-        if (Check(TokenKind.LowerIdentifier))
+        if (IsIdentifier(Current.Kind))
         {
             declaration.Name = Consume().Text;
         }
@@ -179,7 +179,7 @@ internal sealed partial class HandwrittenParser
     {
         var keyword = Consume();
         string name;
-        if (Check(TokenKind.LowerIdentifier))
+        if (IsIdentifier(Current.Kind))
         {
             name = Consume().Text;
         }
@@ -358,7 +358,7 @@ internal sealed partial class HandwrittenParser
 
     private ParameterSyntax? ParseSelectParameter()
     {
-        if (!Check(TokenKind.LowerIdentifier))
+        if (!IsIdentifier(Current.Kind))
         {
             ReportExpected(TokenKind.LowerIdentifier);
             return null;

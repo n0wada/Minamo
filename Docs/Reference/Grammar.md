@@ -22,8 +22,10 @@ the adjacent prose.
 
 ## Source text and separators
 
-Source is Unicode. Whitespace and comments separate tokens. A statement ends at a line break,
-semicolon, closing brace, or end of file.
+Source is Unicode. Whitespace and comments separate tokens. Once a statement is syntactically
+complete, a line break, semicolon, closing brace, or end of file terminates it. A line break does
+not terminate a statement while the surrounding syntax still requires or permits continuation,
+for example before or after a binary or assignment operator, or after a comma in a delimited list.
 
 ```text
 block ::= "{" { statement separator } "}"
@@ -50,7 +52,7 @@ qualified-name ::= identifier { "." identifier }
 Reserved words include:
 
 ```text
-as break catch continue do else false for from func get if import in is
+and as break catch continue do else false for from func get if import in is
 let match mut nil not or private return set static throw true try type
 use when while with yield
 ```
@@ -121,8 +123,14 @@ One unlabeled parenthesized expression is grouping. A comma or label creates a t
 Comprehensions are:
 
 ```text
-"[" expression "for" pattern "in" expression [ "when" expression ] "]"
-"[" key ":" value "for" pattern "in" expression [ "when" expression ] "]"
+array-comprehension ::=
+    "[" expression "for" for-pattern "in" expression [ "when" expression ] "]"
+
+dictionary-comprehension ::=
+    "[" expression ":" expression "for" for-pattern "in" expression
+    [ "when" expression ] "]"
+
+for-pattern ::= pattern { "," pattern }
 ```
 
 ## Type annotations
@@ -222,10 +230,10 @@ select-description
     ::= "desc" string-key-dictionary-literal
 
 string-key-dictionary-literal
-    ::= "[" [ string ":" expression { "," string ":" expression } ] "]"
+    ::= "[" [ string ":" expression { "," string ":" expression } [ "," ] ] "]"
 
 select-local
-    ::= ( "let" | "mut" ) pattern "=" expression
+    ::= ( "let" | "mut" ) pattern [ "=" expression ]
 
 select-property
     ::= "prop" ( identifier | string ) [ select-metadata ] "=>" expression
@@ -460,14 +468,14 @@ guard-form ::= "guard" expression block [ "else" (guard-form | block) ]
 ```
 
 `guard condition { body }` executes `body` when the condition is false. Both forms may be used as
-expressions.
+expressions, but an `else` branch is required when either form is used as an expression.
 
 ## Loops
 
 ```text
 while-loop    ::= "while" expression block
 do-while-loop ::= "do" block "while" expression
-for-loop      ::= "for" pattern "in" expression
+for-loop      ::= "for" for-pattern "in" expression
                   [ "when" expression ] block [ "else" block ]
 ```
 
@@ -502,10 +510,13 @@ primary-pattern ::=
   | "(" pattern ")"
   | tuple-pattern
   | "[" [ range-pattern { "," range-pattern } [ "," ] ] "]"
+  | qualified-type-pattern
   | constructor-pattern
 
 tuple-pattern ::=
     "(" pattern "," [ pattern { "," pattern } [ "," ] ] ")"
+
+qualified-type-pattern ::= identifier "." identifier
 
 constructor-pattern ::=
     identifier [ "." identifier [ "." identifier ] ]
@@ -521,7 +532,7 @@ match ::= "match" expression "{"
             [ match-entry { "," match-entry } [ "," ] ]
           "}"
 
-match-entry ::= pattern [ "when" expression ] "=>" expression
+match-entry ::= pattern [ "when" expression ] "=>" (assignment | expression)
 ```
 
 ```swift

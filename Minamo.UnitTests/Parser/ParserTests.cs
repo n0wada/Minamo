@@ -183,6 +183,31 @@ public sealed class ParserTests
     }
 
     [Fact]
+    public void ExecutesUppercaseFunctionAndLambdaParameters()
+    {
+        using var session = new MinamoHost().CreateInstance();
+
+        var result = session.Execute("""
+            func identity(Value) => Value
+            func annotated(String Value): String => Value
+            func suffixed(Value: Integer) => Value
+            func defaulted(Value = 42) => Value
+
+            let single = Value => Value
+            let pair = (Left, Right) => Left + Right
+
+            assert(42, identity(42))
+            assert("ready", annotated("ready"))
+            assert(7, suffixed(7))
+            assert(42, defaulted())
+            assert(12, single(12))
+            assert(5, pair(2, 3))
+            """);
+
+        Assert.True(result.Success, result.Failure?.Message);
+    }
+
+    [Fact]
     public void IgnoresParameterizedHintArgumentsDuringExecution()
     {
         using var session = new MinamoHost().CreateInstance();
@@ -206,8 +231,10 @@ public sealed class ParserTests
     }
 
     [Theory]
+    [InlineData("struct Legacy { Field }")]
     [InlineData("struct Legacy { String value }")]
     [InlineData("struct Legacy { let value }")]
+    [InlineData("enum Legacy { Value(Field) }")]
     [InlineData("enum Legacy { Value(String value) }")]
     public void RejectsLegacyFieldSyntax(string source)
     {

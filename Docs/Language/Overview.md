@@ -442,6 +442,6 @@ telemetry, and C# integration.
 - [Language recipes](Recipes.md)
 - [Interactive selects](../Developers/InteractiveSelect.md)
 - [Hosting API](../Developers/HostingGuide.md)
-- [Compatibility](../Operations/Compatibility.md)
+- [Compatibility](../Developers/Compatibility.md)
 - [Runnable Station Console example](../../Examples/StationConsole/README.md)
 - [Interactive Quest Console example](../../Examples/QuestConsole/README.md)

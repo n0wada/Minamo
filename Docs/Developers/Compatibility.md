@@ -35,7 +35,7 @@ Add a target framework only for a concrete embedding host. Before calling it sup
 
 1. `Minamo.dll` and generated bindings load in the host.
 2. Parsing, compilation, execution, cancellation, limits, and disposal pass there.
-3. Host commands, registry values, resources, and telemetry cross the boundary correctly.
+3. Host commands, registry values, resources, and structured logs cross the boundary correctly.
 4. The optional library remains separate so a restricted host can omit it.
 5. Platform-specific APIs stay outside the core assembly or are guarded by the target.
 

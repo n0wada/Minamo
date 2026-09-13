@@ -6,8 +6,10 @@ For the complete parser grammar, see the [grammar reference](../Reference/Gramma
 
 ## Source text and statements
 
-Minamo source is Unicode text. Whitespace and comments separate tokens. A statement ends at a
-line break, a semicolon, a closing brace, or the end of the source file.
+Minamo source is Unicode text. Whitespace and comments separate tokens. Once a statement is
+syntactically complete, a line break, semicolon, closing brace, or the end of the source file
+terminates it. A line break can still occur while the surrounding syntax continues the statement,
+for example before or after a binary or assignment operator, or after a comma in a delimited list.
 
 Use braces to form a block when several statements belong together:
 
