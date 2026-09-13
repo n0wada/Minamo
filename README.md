@@ -53,18 +53,49 @@ Start the interactive console:
 .\bin\minamo.exe
 ```
 
-Start an interactive select declared by the file:
-
-```powershell
-.\bin\minamo.exe .\Player.nami --do music.player
-```
-
-Inside the REPL, use the console command `do music.player`. This command and `--do` drive the C#
-hosting API for testing; scripts have no select invocation syntax. The console displays the currently available choices;
-enter their number.
-
 Use `--help` or `--version` for command-line information; enter `#help` in the REPL for
 interactive commands.
+
+## Interactive selects
+
+`select` declares a host-driven interaction such as a menu, dialogue, or GUI screen. Select-local
+values keep the interaction state, `prop` publishes read-only values, and `case` declares the
+choices currently available to the host:
+
+```swift
+select Player {
+    desc ["title": "Player"]
+
+    mut player = loadPlayer()
+    prop state => player.state
+
+    case "play" when player.state == "stopped" => {
+        player.state = "playing"
+        player.play()
+    }
+
+    case "stop" when player.state == "playing" => {
+        player.state = "stopped"
+        player.stop()
+    }
+
+    case "close" => exit player
+}
+```
+
+Save the declarations as `player.nami`, then start the select from the console:
+
+```powershell
+.\bin\minamo.exe .\player.nami --do Player
+```
+
+Inside the REPL, use the console command `do Player`. This command and `--do` drive the C# hosting
+API for testing; scripts have no select invocation syntax. An ordinary case action updates the
+state and republishes the select, while `exit` completes the interaction and may return a value.
+
+See the [select navigation example](Examples/Language/12-select-navigation.nami) for `goto` and
+`return`. The [interactive-select guide](Docs/Developers/InteractiveSelect.md) covers the complete
+language and host integration model.
 
 ## Embed Minamo in C#
 
