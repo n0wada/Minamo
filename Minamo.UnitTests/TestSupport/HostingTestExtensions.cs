@@ -32,9 +32,4 @@ internal static class HostingTestExtensions
         this MinamoInstance instance,
         string name) =>
         instance.OpenSelectSessionAsync(name).GetAwaiter().GetResult();
-
-    internal static MinamoSignalDispatchResult DispatchSignals(
-        this MinamoInstance instance,
-        CancellationToken cancellationToken = default) =>
-        instance.DispatchSignalsAsync(cancellationToken).GetAwaiter().GetResult();
 }

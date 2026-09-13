@@ -56,8 +56,7 @@ if ($LASTEXITCODE -ne 0)
 
 $stationText = $stationOutput -join "`n"
 foreach ($expected in @(
-    "Startup automation: OK",
-    "Emergency signal: OK",
+    "Emergency automation: OK",
     "reactor=85%",
     "locked=[engineering]"))
 {
@@ -75,8 +74,7 @@ if ($LASTEXITCODE -ne 0)
 
 $workflowText = $workflowOutput -join "`n"
 foreach ($expected in @(
-    "Load workflow: OK",
-    "Shipment requested: OK",
+    "Run workflow: OK",
     "ORD-1001: shipped via courier (express)",
     "ORD-1002: not accepted"))
 {

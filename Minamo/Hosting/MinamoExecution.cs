@@ -131,7 +131,6 @@ public sealed class MinamoExecutionLimits
     public long? MaxInstructions { get; init; }
     public TimeSpan? MaxExecutionTime { get; init; }
     public int? MaxHostCommands { get; init; }
-    public int? MaxSignals { get; init; }
     public int? MaxCallDepth { get; init; }
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
@@ -139,7 +138,6 @@ public sealed class MinamoExecutionLimits
         MaxInstructions is not null
         || MaxExecutionTime is not null
         || MaxHostCommands is not null
-        || MaxSignals is not null
         || MaxCallDepth is not null;
 
     internal void Validate()
@@ -148,7 +146,6 @@ public sealed class MinamoExecutionLimits
         Positive(MaxInstructions, nameof(MaxInstructions));
         Positive(MaxExecutionTime, nameof(MaxExecutionTime));
         Positive(MaxHostCommands, nameof(MaxHostCommands));
-        Positive(MaxSignals, nameof(MaxSignals));
         Positive(MaxCallDepth, nameof(MaxCallDepth));
     }
 
@@ -176,8 +173,7 @@ public sealed record MinamoExecutionMetrics(
     TimeSpan CompilationDuration,
     TimeSpan VmDuration,
     long Instructions,
-    int HostCommands,
-    int Signals);
+    int HostCommands);
 
 public sealed class MinamoExecution
 {
@@ -196,82 +192,6 @@ public sealed class MinamoExecution
     public string Operation { get; }
 
     public MinamoExecutionMetrics Metrics { get; }
-}
-
-public enum MinamoTraceKind
-{
-    ExecutionStarted,
-    ExecutionCompleted,
-    Compilation,
-    VmExecution,
-    HostCommand,
-    CapabilityDenied,
-    SignalEmitted,
-    SignalDelivered,
-    ResourceCreated,
-    ResourceReleased
-}
-
-public sealed record MinamoTraceEvent(
-    DateTimeOffset Timestamp,
-    MinamoTraceKind Kind,
-    Guid ExecutionId,
-    string? Name,
-    TimeSpan? Duration,
-    IReadOnlyDictionary<string, object?> Data);
-
-public sealed class MinamoTracing
-{
-    private static readonly IReadOnlyDictionary<string, object?> EmptyData =
-        new ReadOnlyDictionary<string, object?>(new Dictionary<string, object?>());
-
-    private readonly IReadOnlyList<Action<MinamoTraceEvent>> handlers;
-    private readonly MinamoTelemetry telemetry;
-
-    internal MinamoTracing(
-        IReadOnlyList<Action<MinamoTraceEvent>> handlers,
-        MinamoTelemetry telemetry) =>
-        (this.handlers, this.telemetry) = (handlers, telemetry);
-
-    public bool Enabled => handlers.Count != 0;
-
-    internal void Write(
-        MinamoTraceKind kind,
-        string? name = null,
-        TimeSpan? duration = null,
-        IReadOnlyDictionary<string, object?>? data = null)
-    {
-        if (handlers.Count == 0)
-        {
-            return;
-        }
-
-        var traceEvent = new MinamoTraceEvent(
-            DateTimeOffset.UtcNow,
-            kind,
-            telemetry.ExecutionId,
-            name,
-            duration,
-            Copy(data));
-        foreach (var handler in handlers)
-        {
-            try
-            {
-                handler(traceEvent);
-            }
-            catch
-            {
-                // Tracing is observational and must not change script behavior.
-            }
-        }
-    }
-
-    private static IReadOnlyDictionary<string, object?> Copy(
-        IReadOnlyDictionary<string, object?>? data) =>
-        data is null || data.Count == 0
-            ? EmptyData
-            : new ReadOnlyDictionary<string, object?>(
-                new Dictionary<string, object?>(data, StringComparer.OrdinalIgnoreCase));
 }
 
 public enum MinamoLogLevel

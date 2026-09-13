@@ -1,5 +1,4 @@
 using Minamo.Codegen;
-using Minamo.Hosting;
 using Minamo.Runtime;
 using Minamo.Runtime.Types;
 using System.IO;
@@ -72,15 +71,9 @@ public sealed partial class MinamoConsoleTypeInfo : MinamoForeignTypeInfo
     internal static char Read() => (char)Console.Read();
 
     [MinamoStaticMethod]
-    internal static async ValueTask<string> ReadLine(ExecutionContext ctx)
-    {
-        var environment = ctx.GetContextVariable<MinamoEnvironment>(MinamoEnvironment.ContextKey);
-        return environment is null
-            ? await Console.In.ReadLineAsync(
-                ctx.Control?.CancellationToken ?? default).ConfigureAwait(false) ?? string.Empty
-            : await environment.ReadLineAsync(
-                ctx.Control?.CancellationToken ?? default).ConfigureAwait(false);
-    }
+    internal static async ValueTask<string> ReadLine(ExecutionContext ctx) =>
+        await Console.In.ReadLineAsync(
+            ctx.Control?.CancellationToken ?? default).ConfigureAwait(false) ?? string.Empty;
 
     [MinamoStaticMethod]
     internal static void Clear(ExecutionContext ctx, string? backColor = null)

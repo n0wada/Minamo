@@ -155,8 +155,8 @@ print(constructorName(Ok(42)))
 ```
 
 `print` writes through an instance-specific output stream when the host supplies one. Otherwise it
-uses the process console. See [Hosting API guide](../Developers/HostingGuide.md#instance-input-and-output)
-for host-controlled input and output.
+uses the process console. See [Hosting API guide](../Developers/HostingGuide.md#host-input) for
+host-provided input values.
 
 `request` is valid only while a select case is running. It
 suspends that action without blocking a thread. The host receives the kind and optional payload
@@ -176,7 +176,7 @@ print(sqrt(81))
 | Modules | Main capabilities |
 | --- | --- |
 | `collections` | Collection types beyond the core collection types. |
-| `readline` | Console input through `readLine`. |
+| `readline` | Minamo.Console input through `readLine`. |
 | `io` | Files, directories, paths, drives, and file attributes. |
 | `math` | General numeric functions and constants. |
 | `random` | Independent pseudo-random generators. |
@@ -184,7 +184,8 @@ print(sqrt(81))
 | `time` | UTC and local date-time values, durations, and fixed offsets. |
 | `uuid` | UUID parsing, formatting, and generation. |
 
-For example, `readline` provides input while `print` remains a core function:
+For example, `readline` reads `Console.In` while `print` remains a core function. It does not
+consume values configured with the Hosting API's `UseInputAsync`:
 
 ```swift
 import * from readline

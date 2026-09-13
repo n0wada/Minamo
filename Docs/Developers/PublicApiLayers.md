@@ -24,9 +24,9 @@ var result = await instance.ExecuteAsync("40 + 2");
 ```
 
 Application code does not need to construct a parser, linker, compiler unit, runtime context, or
-evaluation stack. Typed result, signal, state, and command helpers keep ordinary host code outside
-the runtime object model. `MinamoEnvironment.UseOutput` routes `print` output, while
-`UseInputAsync` supplies input to the optional `readline` library.
+evaluation stack. Typed result, registry, and command helpers keep ordinary host code outside
+the runtime object model. `MinamoEnvironment.UseInputAsync` supplies arbitrary values through
+`host.Input()`, while `UseOutput` routes text written by `print`.
 
 Interactive UIs use `MinamoInstance.OpenSelectAsync` and the live `MinamoSelect` application
 surface. `MinamoSelectProperty` publishes script-defined read-only values, while

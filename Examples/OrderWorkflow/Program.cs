@@ -11,27 +11,15 @@ internal static class Program
         var scripts = Path.Combine(AppContext.BaseDirectory, "Scripts");
         var ledger = new OrderLedger();
         var host = CreateHost(scripts, ledger);
-
-        using var instance = host.CreateInstance(
-            new MinamoEnvironment().UseOutput(Console.Write));
-        if (!Succeeded("Load workflow", await instance.ExecuteFileAsync(Path.Combine(scripts, "main.nami"))))
-        {
-            return 1;
-        }
-
         var accepted = new object[] { "ORD-1001", "Ada", 1250.0 };
         var rejected = new object[] { "ORD-1002", "", -10.0 };
+        var environment = new MinamoEnvironment()
+            .UseOutput(Console.Write)
+            .Expose("submittedOrders", new object[] { accepted, rejected })
+            .Expose("confirmedPayments", new object[] { accepted });
 
-        instance.Environment.Signals.Emit("order.submitted", accepted);
-        instance.Environment.Signals.Emit("order.submitted", rejected);
-        if (!Succeeded("Submitted orders", await instance.DispatchSignalsAsync()))
-        {
-            return 1;
-        }
-
-        instance.Environment.Signals.Emit("order.payment.confirmed", accepted);
-        if (!Succeeded("Payment confirmed", await instance.DispatchSignalsAsync())
-            || !Succeeded("Shipment requested", await instance.DispatchSignalsAsync()))
+        using var instance = host.CreateInstance(environment);
+        if (!Succeeded("Run workflow", await instance.ExecuteFileAsync(Path.Combine(scripts, "main.nami"))))
         {
             return 1;
         }
@@ -39,10 +27,10 @@ internal static class Program
         Console.WriteLine("\nFinal order states:");
         Console.WriteLine($"  ORD-1001: {ledger.Status("ORD-1001")}");
         Console.WriteLine($"  ORD-1002: {ledger.Status("ORD-1002")}");
-        Console.WriteLine("\nScript-owned counters:");
-        Console.WriteLine($"  submitted={instance.Environment.State.Get<long>("submitted")}");
-        Console.WriteLine($"  paid={instance.Environment.State.Get<long>("paid")}");
-        Console.WriteLine($"  shipped={instance.Environment.State.Get<long>("shipped")}");
+        Console.WriteLine("\nInstance registry counters:");
+        Console.WriteLine($"  submitted={instance.Environment.Registry.Get<long>("submitted")}");
+        Console.WriteLine($"  paid={instance.Environment.Registry.Get<long>("paid")}");
+        Console.WriteLine($"  shipped={instance.Environment.Registry.Get<long>("shipped")}");
         Console.WriteLine("\nHost ledger:");
         foreach (var entry in ledger.Timeline)
         {
@@ -69,19 +57,12 @@ internal static class Program
                 MaxInstructions = 50_000,
                 MaxExecutionTime = TimeSpan.FromSeconds(2),
                 MaxHostCommands = 20,
-                MaxSignals = 20,
                 MaxCallDepth = 32
             },
             Log = entry => Console.WriteLine($"[{entry.Level}] {entry.Message}")
         })
             .UseFileLookup(lookup)
-            .AddCapabilities("orders.*", "workflow.*", "state.*", "log.write")
-            .AddSignal("order.submitted", listenCapability: "workflow.listen")
-            .AddSignal("order.payment.confirmed", listenCapability: "workflow.listen")
-            .AddSignal(
-                "order.shipment.requested",
-                listenCapability: "workflow.listen",
-                emitCapability: "workflow.emit");
+            .AddCapabilities("orders.*", "registry.read", "log.write");
 
         host.AddModule(new OrderCommands(ledger));
         return host;
@@ -91,10 +72,7 @@ internal static class Program
     {
         if (result.Success)
         {
-            var delivered = result is MinamoSignalDispatchResult signals
-                ? $", delivered={signals.Delivered}"
-                : string.Empty;
-            Console.WriteLine($"{name}: OK{delivered}");
+            Console.WriteLine($"{name}: OK");
             return true;
         }
 

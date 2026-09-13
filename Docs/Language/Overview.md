@@ -405,7 +405,7 @@ await second.ExecuteAsync();
 ```
 
 The `MinamoProgram` holds the compiled code; each `MinamoInstance` keeps its own environment
-and mutable state. C# can expose instance-specific names through that environment:
+and mutable runtime data. C# can expose instance-specific names through that environment:
 
 ```csharp
 var env = new MinamoEnvironment(game)
@@ -424,14 +424,13 @@ Then `host` is not declared in the script, and only names explicitly exposed thr
 
 ## Host integration
 
-A hosted instance can expose deliberately selected modules, state, signals, and resource
+A hosted instance can expose deliberately selected modules, host-written registry values, and resource
 handles through the global `host` object.
 
 ```swift
 import scene
 let player = scene.Find("player")
-host.State["selected"] = "player"
-host.Signals.On("player.hit", damage => print(damage))
+let selected = host.Registry["selected"]
 ```
 
 See the [Hosting API guide](../Developers/HostingGuide.md) for capabilities, execution limits, resource lifetime,

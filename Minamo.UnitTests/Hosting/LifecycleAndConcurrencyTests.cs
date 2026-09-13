@@ -41,29 +41,29 @@ public sealed class LifecycleAndConcurrencyTests
     [Fact]
     public void RejectsOperationsAfterDisposal()
     {
-        var instance = new MinamoHost()
-            .AddSignal("tick")
-            .CreateInstance();
-        var state = instance.Environment.State;
-        var signals = instance.Environment.Signals;
+        var instance = new MinamoHost().CreateInstance();
+        var registry = instance.Environment.Registry;
 
         instance.Dispose();
         instance.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => instance.Execute("1"));
-        Assert.Throws<ObjectDisposedException>(() => instance.DispatchSignals());
-        Assert.Throws<ObjectDisposedException>(() => state.Contains("value"));
-        Assert.Throws<ObjectDisposedException>(() => signals.Emit("tick"));
+        Assert.Throws<ObjectDisposedException>(() => registry.Contains("value"));
     }
 
     [Fact]
     public void ResetsProgramBackedInstanceWithoutLosingProgram()
     {
-        var host = new MinamoHost().AddCapabilities("state.*");
+        var host = new MinamoHost()
+            .Module("counter", module => module.Command("Increment", context =>
+            {
+                var next = context.Environment.Registry.Get<long>("runs") + 1;
+                context.Environment.Registry.Set("runs", next);
+                return next;
+            }));
         var program = host.Compile("""
-            let current = if host.State["runs"] is nil { 0 } else { host.State["runs"] }
-            host.State["runs"] = current + 1
-            host.State["runs"]
+            import counter
+            counter.Increment()
             """).GetValueOrThrow();
         using var instance = host.CreateInstance(program);
 

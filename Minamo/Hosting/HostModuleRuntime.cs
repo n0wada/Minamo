@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using Minamo.Compiler;
 using Minamo.Debug;
@@ -111,17 +110,12 @@ internal sealed class HostCommandFunction : MinamoForeignFunction
     protected override MinamoObject CallWithMemoryLayout(ExecutionContext ctx, MinamoObject[] args)
     {
         var environment = ctx.GetContextVariable<MinamoHostEnvironment>(MinamoHostEnvironment.ContextKey);
-        var traceStarted = 0L;
         MinamoCallbackScope? callbackScope = null;
         var deferredCompletion = false;
         try
         {
             environment?.Capabilities.Demand(command.Capability);
             ctx.Control?.OnHostCommand();
-            if (environment?.Tracing.Enabled == true)
-            {
-                traceStarted = Stopwatch.GetTimestamp();
-            }
 
             using var commandScope = environment?.Telemetry.EnterCommand(command.Name);
             callbackScope = new MinamoCallbackScope();
@@ -139,11 +133,7 @@ internal sealed class HostCommandFunction : MinamoForeignFunction
                     },
                     (completionContext, exception) =>
                         CompleteFailure(completionContext, environment, exception),
-                    () =>
-                    {
-                        callbackScope.Dispose();
-                        WriteTrace(environment, traceStarted);
-                    });
+                    () => callbackScope.Dispose());
             }
 
             ctx.Control?.Checkpoint();
@@ -173,7 +163,6 @@ internal sealed class HostCommandFunction : MinamoForeignFunction
             if (!deferredCompletion)
             {
                 callbackScope?.Dispose();
-                WriteTrace(environment, traceStarted);
             }
         }
     }
@@ -223,17 +212,6 @@ internal sealed class HostCommandFunction : MinamoForeignFunction
 
         ReportFailure(environment, exception);
         return context.ExternalFunctionFailure(this, HostFailureMessage);
-    }
-
-    private void WriteTrace(MinamoHostEnvironment? environment, long traceStarted)
-    {
-        if (traceStarted != 0)
-        {
-            environment!.Tracing.Write(
-                MinamoTraceKind.HostCommand,
-                command.Name,
-                Stopwatch.GetElapsedTime(traceStarted));
-        }
     }
 
     private static Par[] CreateParameters(IReadOnlyList<MinamoCommandParameter> parameters)

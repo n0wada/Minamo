@@ -10,6 +10,6 @@ public sealed class CapabilitiesTests
         HostingScenarios.CapabilityAndCatalog();
 
     [Fact]
-    public void ProtectsState() =>
-        HostingScenarios.StateCapabilities();
+    public void ProtectsRegistry() =>
+        HostingScenarios.RegistryCapabilities();
 }

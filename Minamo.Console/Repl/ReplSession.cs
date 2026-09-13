@@ -29,8 +29,7 @@ internal sealed class ReplSession : IDisposable
             nofn ? Environment.CurrentDirectory! : Path.GetDirectoryName(options.FileNames![0])!, options.Paths);
         host.UseFileLookup(lookup);
         var minamoEnvironment = new MinamoEnvironment()
-                .UseInputAsync(cancellationToken => Console.In.ReadLineAsync(cancellationToken))
-                .UseOutput(Console.Write);
+            .UseOutput(Console.Write);
         session = host.CreateInstance(minamoEnvironment, options.UserArguments);
         CompilationLinker = new MinamoIncrementalLinker(lookup, options.UserArguments);
         commands = new ReplCommands(this);

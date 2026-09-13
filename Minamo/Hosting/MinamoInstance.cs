@@ -103,146 +103,6 @@ public sealed partial class MinamoInstance : IDisposable
             MinamoFailureKind.Input);
     }
 
-    public Task<MinamoSignalDispatchResult> DispatchSignalsAsync(
-        CancellationToken cancellationToken = default) =>
-        DispatchSignalsCoreAsync(cancellationToken);
-
-    private async Task<MinamoSignalDispatchResult> DispatchSignalsCoreAsync(
-        CancellationToken cancellationToken)
-    {
-        if (operationScope.Value)
-        {
-            throw new InvalidOperationException("A host instance cannot be entered recursively.");
-        }
-
-        await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
-
-        operationScope.Value = true;
-        try
-        {
-            ObjectDisposedException.ThrowIf(disposed, this);
-            BeginOperation();
-            var started = Stopwatch.GetTimestamp();
-            var executionId = Guid.NewGuid();
-            Environment.Telemetry.BeginExecution(executionId);
-            Environment.Tracing.Write(MinamoTraceKind.ExecutionStarted, "DispatchSignals");
-            using var control = CreateControl(cancellationToken);
-            var errors = new List<Exception>();
-            var delivered = 0;
-            var completed = false;
-            try
-            {
-                var pending = Environment.Signals.PendingCount;
-                var stop = false;
-
-                for (var i = 0; i < pending && !stop; i++)
-                {
-                    try
-                    {
-                        control?.OnSignal();
-                    }
-                    catch (Exception ex) when (ex is MinamoRuntimeException or OperationCanceledException)
-                    {
-                        errors.Add(ex);
-                        break;
-                    }
-
-                    if (!Environment.Signals.TryDequeue(out var signal))
-                    {
-                        break;
-                    }
-
-                    delivered++;
-                    Environment.Tracing.Write(MinamoTraceKind.SignalDelivered, signal.Name);
-                    foreach (var handler in Environment.Signals.GetHostHandlers(signal.Name))
-                    {
-                        try
-                        {
-                            await Task.Run(
-                                () => handler(signal),
-                                CancellationToken.None).ConfigureAwait(false);
-                            control?.Checkpoint();
-                        }
-                        catch (Exception ex)
-                        {
-                            errors.Add(ex);
-                            if (IsExecutionStop(ex))
-                            {
-                                stop = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (stop || runtimeContext is null)
-                    {
-                        continue;
-                    }
-
-                    foreach (var handler in Environment.Signals.GetScriptHandlers(signal.Name))
-                    {
-                        try
-                        {
-                            var context = CreateExecutionContext(runtimeContext, control);
-                            var payload = MinamoHostRootTypeInfo.Wrap(context, signal.RawPayload);
-                            if (handler is MinamoNativeFunction function)
-                            {
-                                var execution = await Task.Run(
-                                    () => MinamoMachine.ExecuteWithArguments(
-                                        function,
-                                        [payload],
-                                        context),
-                                    CancellationToken.None).ConfigureAwait(false);
-                                await CompleteAwaitablesAsync(execution).ConfigureAwait(false);
-                            }
-                            else
-                            {
-                                handler.Call(context, payload);
-                            }
-                            context.ThrowIf();
-                        }
-                        catch (Exception ex)
-                        {
-                            errors.Add(ex);
-                            if (IsExecutionStop(ex))
-                            {
-                                stop = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                var result = new MinamoSignalDispatchResult(
-                    delivered,
-                    errors,
-                    executionId,
-                    Metrics(started, TimeSpan.Zero, Stopwatch.GetElapsedTime(started), control));
-                completed = true;
-                return result;
-            }
-            finally
-            {
-                Environment.Tracing.Write(
-                    MinamoTraceKind.ExecutionCompleted,
-                    "DispatchSignals",
-                    Stopwatch.GetElapsedTime(started),
-                    new Dictionary<string, object?>
-                    {
-                        ["success"] = completed && errors.Count == 0,
-                        ["delivered"] = delivered
-                    });
-                Environment.Telemetry.EndExecution();
-                active = false;
-            }
-        }
-        finally
-        {
-            operationScope.Value = false;
-            operationGate.Release();
-        }
-    }
-
     private async Task<MinamoExecutionResult> ExecuteCoreAsync(
         Func<Result<UnitComposition>> compile,
         string operationName,
@@ -265,11 +125,7 @@ public sealed partial class MinamoInstance : IDisposable
             var started = Stopwatch.GetTimestamp();
             var executionId = Guid.NewGuid();
             Environment.Telemetry.BeginExecution(executionId);
-            Environment.Tracing.Write(MinamoTraceKind.ExecutionStarted, operationName);
             using var control = CreateControl(cancellationToken);
-            var signalCheckpoint = Environment.Signals.CreateScriptSubscriptionCheckpoint();
-            var committed = false;
-            var succeeded = false;
             var linkerTouched = false;
             var compileDuration = TimeSpan.Zero;
             var vmDuration = TimeSpan.Zero;
@@ -281,8 +137,6 @@ public sealed partial class MinamoInstance : IDisposable
                 linkerTouched = touchesLinker;
                 var made = await Task.Run(compile, CancellationToken.None).ConfigureAwait(false);
                 compileDuration = Stopwatch.GetElapsedTime(compileStarted);
-                Environment.Tracing.Write(
-                    MinamoTraceKind.Compilation, duration: compileDuration);
                 messages = made.Messages.ToArray();
                 control?.Checkpoint();
 
@@ -311,15 +165,12 @@ public sealed partial class MinamoInstance : IDisposable
                 finally
                 {
                     vmDuration = Stopwatch.GetElapsedTime(vmStarted);
-                    Environment.Tracing.Write(MinamoTraceKind.VmExecution, duration: vmDuration);
                 }
                 control?.Checkpoint();
                 if (touchesLinker)
                 {
                     linker.Commit();
                 }
-                committed = true;
-                succeeded = true;
                 return new(result.Value, messages, null, operationName, executionId,
                     Metrics(started, compileDuration, vmDuration, control));
             }
@@ -335,16 +186,6 @@ public sealed partial class MinamoInstance : IDisposable
             }
             finally
             {
-                if (!committed)
-                {
-                    Environment.Signals.RollbackScriptSubscriptions(signalCheckpoint);
-                }
-
-                Environment.Tracing.Write(
-                    MinamoTraceKind.ExecutionCompleted,
-                    operationName,
-                    Stopwatch.GetElapsedTime(started),
-                    new Dictionary<string, object?> { ["success"] = succeeded });
                 Environment.Telemetry.EndExecution();
                 active = false;
             }
@@ -489,7 +330,7 @@ public sealed partial class MinamoInstance : IDisposable
     private ExecutionControl? CreateControl(CancellationToken cancellationToken)
     {
         var limits = Environment.Limits;
-        if (!limits.RequiresControl && !Environment.Tracing.Enabled && !cancellationToken.CanBeCanceled)
+        if (!limits.RequiresControl && !cancellationToken.CanBeCanceled)
         {
             return null;
         }
@@ -498,7 +339,6 @@ public sealed partial class MinamoInstance : IDisposable
             limits.MaxInstructions,
             limits.MaxExecutionTime,
             limits.MaxHostCommands,
-            limits.MaxSignals,
             limits.MaxCallDepth,
             limits.TimeProvider,
             cancellationToken);
@@ -551,9 +391,5 @@ public sealed partial class MinamoInstance : IDisposable
             compilation,
             vm,
             control?.Instructions ?? 0,
-            control?.HostCommands ?? 0,
-            control?.Signals ?? 0);
-
-    private static bool IsExecutionStop(Exception exception) =>
-        exception is MinamoExecutionLimitException or OperationCanceledException;
+            control?.HostCommands ?? 0);
 }

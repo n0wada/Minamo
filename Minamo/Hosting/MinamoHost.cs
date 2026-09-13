@@ -25,9 +25,7 @@ public sealed class MinamoHostOptions
     public BuilderOptions? BuilderOptions { get; init; }
     public MinamoCapabilityMode CapabilityMode { get; init; }
     public MinamoExecutionLimits Limits { get; init; } = new();
-    public MinamoSignalOptions Signals { get; init; } = new();
     public Action<MinamoLogEntry>? Log { get; init; }
-    public Action<MinamoTraceEvent>? Trace { get; init; }
     public bool ExposeHostObject { get; init; } = true;
 }
 
@@ -38,15 +36,11 @@ public sealed class MinamoHost
         new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> capabilities = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<Type, HostResourceDefinition> resourceTypes = new();
-    private readonly Dictionary<string, HostSignalDefinition> signals =
-        new(StringComparer.OrdinalIgnoreCase);
     private readonly BuilderOptions options;
     private FileLookup? lookup;
     private bool fileImportsDisabled;
     private readonly IReadOnlyList<Action<MinamoLogEntry>> logHandlers;
-    private readonly IReadOnlyList<Action<MinamoTraceEvent>> traceHandlers;
     private readonly MinamoExecutionLimits limits;
-    private readonly int? maxPendingSignals;
     private readonly MinamoCapabilityMode capabilityMode;
     private readonly bool exposeHostObject;
 
@@ -64,12 +58,7 @@ public sealed class MinamoHost
         limits = options.Limits
             ?? throw new ArgumentNullException(nameof(options), "Limits cannot be null.");
         limits.Validate();
-        var signalOptions = options.Signals
-            ?? throw new ArgumentNullException(nameof(options), "Signals cannot be null.");
-        signalOptions.Validate();
-        maxPendingSignals = signalOptions.MaxPending;
         logHandlers = Handlers(options.Log);
-        traceHandlers = Handlers(options.Trace);
         exposeHostObject = options.ExposeHostObject;
     }
 
@@ -121,22 +110,6 @@ public sealed class MinamoHost
         }
 
         resourceTypes.Add(typeof(T), definition);
-        return this;
-    }
-
-    public MinamoHost AddSignal(
-        string name,
-        string? listenCapability = null,
-        string? emitCapability = null)
-    {
-        HostNames.ValidateDottedName(name, nameof(name), "signal");
-        HostNames.ValidateCapability(listenCapability, nameof(listenCapability), optional: true);
-        HostNames.ValidateCapability(emitCapability, nameof(emitCapability), optional: true);
-        if (!signals.TryAdd(name, new(name, listenCapability, emitCapability)))
-        {
-            throw new InvalidOperationException($"Host signal '{name}' is already registered.");
-        }
-
         return this;
     }
 
@@ -197,7 +170,6 @@ public sealed class MinamoHost
             environment.HostContext,
             definitions,
             resourceTypes.Values,
-            signals.Values,
             capabilities,
             unrestricted: capabilityMode switch
             {
@@ -207,9 +179,7 @@ public sealed class MinamoHost
                 _ => throw new InvalidOperationException("Unknown capability mode.")
             },
             logHandlers.ToArray(),
-            traceHandlers.ToArray(),
-            limits,
-            maxPendingSignals);
+            limits);
         return new MinamoInstance(instanceLookup, hostEnvironment, environment, program, arguments);
     }
 

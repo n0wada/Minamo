@@ -18,19 +18,12 @@ internal static class Program
 
         Console.WriteLine();
 
-        var scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "emergency.nami");
-        var startup = await instance.ExecuteFileAsync(scriptPath);
-        if (!PrintResult("Startup automation", startup))
-        {
-            return 1;
-        }
-
         Console.WriteLine($"\nBefore incident: {station.Status()}");
         station.OxygenLevel = 24;
-        instance.Environment.Signals.Emit("station.alert", "engineering");
 
-        var dispatch = await instance.DispatchSignalsAsync();
-        if (!PrintResult("Emergency signal", dispatch))
+        var scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "emergency.nami");
+        var automation = await instance.ExecuteFileAsync(scriptPath);
+        if (!PrintResult("Emergency automation", automation))
         {
             return 1;
         }
@@ -49,31 +42,18 @@ internal static class Program
                 MaxInstructions = 50_000,
                 MaxExecutionTime = TimeSpan.FromSeconds(2),
                 MaxHostCommands = 100,
-                MaxSignals = 10,
                 MaxCallDepth = 64
             },
             Log = entry =>
-                Console.WriteLine($"[{entry.Level}] {entry.Message}"),
-            Trace = trace =>
-            {
-                if (trace.Kind is MinamoTraceKind.HostCommand)
-                {
-                    Console.WriteLine($"[trace] command {trace.Name}");
-                }
-            }
+                Console.WriteLine($"[{entry.Level}] {entry.Message}")
         });
 
         host.AddCapabilities(
             "station.read",
             "station.control",
-            "station.alert.listen",
             "log.write");
 
         host.DisableFileImports();
-
-        host.AddSignal(
-            "station.alert",
-            listenCapability: "station.alert.listen");
 
         host.AddResourceType<StationReactorResource>();
         host.AddResourceType<StationDoorResource>();
@@ -86,14 +66,10 @@ internal static class Program
     {
         if (result.Success)
         {
-            var delivered = result is MinamoSignalDispatchResult signals
-                ? $", {signals.Delivered} signals"
-                : string.Empty;
             Console.WriteLine(
                 $"{operation}: OK "
                 + $"({result.Metrics.Instructions} instructions, "
                 + $"{result.Metrics.HostCommands} host commands"
-                + delivered
                 + ")");
             return true;
         }

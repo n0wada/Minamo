@@ -21,6 +21,14 @@ public sealed class OrderCommands
     [MinamoCommand(Description = "Returns the current lifecycle state for an order.",
         Capability = "orders.read")]
     public string Status(string id) => ledger.Status(id);
+
+    [MinamoCommand(Description = "Records an instance-local workflow counter.",
+        Capability = "orders.write")]
+    public void Record(MinamoCommandContext context, string name)
+    {
+        var next = context.Environment.Registry.Get<long>(name) + 1;
+        context.Environment.Registry.Set(name, next);
+    }
 }
 
 internal sealed class OrderLedger

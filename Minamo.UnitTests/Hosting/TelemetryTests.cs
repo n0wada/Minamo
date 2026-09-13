@@ -12,8 +12,4 @@ public sealed class TelemetryTests
     [Fact]
     public void IsolatesCorrelationByExecutionContext() =>
         HostingScenarios.TelemetryExecutionContextIsolation();
-
-    [Fact]
-    public void EmitsTraceEventsWithoutChangingExecution() =>
-        HostingScenarios.Tracing();
 }

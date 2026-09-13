@@ -33,7 +33,7 @@ public sealed class MinamoEnvironment
     internal const string ContextKey = "Minamo.Hosting.MinamoEnvironment";
 
     private readonly Dictionary<string, object?> bindings = new(StringComparer.OrdinalIgnoreCase);
-    private Func<CancellationToken, ValueTask<string?>>? input;
+    private Func<CancellationToken, ValueTask<object?>>? input;
     private Action<string>? output;
 
     public MinamoEnvironment(object? hostContext = null) => HostContext = hostContext;
@@ -53,9 +53,11 @@ public sealed class MinamoEnvironment
     public MinamoEnvironment Set(string name, object? value) =>
         Expose(name, value);
 
-    public MinamoEnvironment UseInputAsync(Func<CancellationToken, ValueTask<string?>> readLine)
+    public MinamoEnvironment UseInputAsync<T>(Func<CancellationToken, ValueTask<T>> receive)
     {
-        input = readLine ?? throw new ArgumentNullException(nameof(readLine));
+        ArgumentNullException.ThrowIfNull(receive);
+        input = async cancellationToken =>
+            await receive(cancellationToken).ConfigureAwait(false);
         return this;
     }
 
@@ -68,15 +70,18 @@ public sealed class MinamoEnvironment
     public bool TryGet(string name, out object? value) =>
         bindings.TryGetValue(name, out value);
 
-    internal async ValueTask<string> ReadLineAsync(CancellationToken cancellationToken)
+    internal ValueTask<MinamoObject> ReadInputAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var readLine = input ?? ReadConsoleLineAsync;
-        return await readLine(cancellationToken).ConfigureAwait(false) ?? string.Empty;
+        var receive = input ?? throw new InvalidOperationException(
+            "Host input is not configured for this instance.");
+        return ConvertInputAsync(receive, cancellationToken);
     }
 
-    private static async ValueTask<string?> ReadConsoleLineAsync(CancellationToken cancellationToken) =>
-        await Console.In.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+    private static async ValueTask<MinamoObject> ConvertInputAsync(
+        Func<CancellationToken, ValueTask<object?>> receive,
+        CancellationToken cancellationToken) =>
+        TypeConverter.ConvertFrom(await receive(cancellationToken).ConfigureAwait(false));
 
     internal void Write(string value)
     {

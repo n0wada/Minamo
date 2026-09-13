@@ -4,17 +4,9 @@ import workflow/shipping as shipping
 import workflow/notifications as notifications
 import orders
 
-host.State["submitted"] = 0
-host.State["paid"] = 0
-host.State["shipped"] = 0
-
-func increase(key) {
-    host.State[key] = (host.State[key] ?? 0) + 1
-}
-
 func onSubmitted(payload) {
     let order = model.FromPayload(payload)
-    increase("submitted")
+    orders.Record("submitted")
 
     if validation.Accept(order) {
         orders.RequestPayment(order.id)
@@ -28,22 +20,30 @@ func onPaymentConfirmed(payload) {
     let order = model.FromPayload(payload)
     let plan = shipping.For(order)
 
-    increase("paid")
+    orders.Record("paid")
     host.Log.Info(notifications.Paid(order, plan))
-    host.Signals.Emit("order.shipment.requested", (order, plan))
+    onShipmentRequested((order, plan))
 }
 
 func onShipmentRequested(event) {
     let order = event[0]
     let plan = event[1]
 
-    increase("shipped")
+    orders.Record("shipped")
     orders.CreateShipment(order.id, plan.carrier, plan.priority)
     host.Log.Info(notifications.Shipped(order, plan))
 }
 
-host.Signals.On("order.submitted", onSubmitted)
-host.Signals.On("order.payment.confirmed", onPaymentConfirmed)
-host.Signals.On("order.shipment.requested", onShipmentRequested)
+for payload in submittedOrders {
+    onSubmitted(payload)
+}
 
-print("Order workflow loaded.")
+for payload in confirmedPayments {
+    onPaymentConfirmed(payload)
+}
+
+print(fmt(
+    "Order workflow completed: submitted={0}, paid={1}, shipped={2}.",
+    host.Registry["submitted"],
+    host.Registry["paid"],
+    host.Registry["shipped"]))

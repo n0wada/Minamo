@@ -12,16 +12,13 @@ public sealed class MinamoCapabilitySet
 {
     private readonly HashSet<string> allowed;
     private readonly ReadOnlyCollection<string> allowedView;
-    private readonly Action<string>? denied;
 
     internal MinamoCapabilitySet(
         IEnumerable<string> allowed,
-        bool unrestricted,
-        Action<string>? denied = null)
+        bool unrestricted)
     {
         this.allowed = new(allowed, StringComparer.OrdinalIgnoreCase);
         allowedView = new(this.allowed.ToArray());
-        this.denied = denied;
         IsUnrestricted = unrestricted;
     }
 
@@ -57,7 +54,6 @@ public sealed class MinamoCapabilitySet
     {
         if (!Allows(capability))
         {
-            denied?.Invoke(capability!);
             throw new InvalidOperationException($"Capability '{capability}' is not available in this instance.");
         }
     }
@@ -188,10 +184,6 @@ internal sealed class MinamoResourceRegistry : IDisposable
             sharedResources.Add(resource, entry);
         }
 
-        environment.Tracing.Write(
-            MinamoTraceKind.ResourceCreated,
-            typeName,
-            data: new Dictionary<string, object?> { ["id"] = id });
         return entry.View;
     }
 
@@ -308,11 +300,6 @@ internal sealed class MinamoResourceRegistry : IDisposable
 
     private static MinamoBool Bool(bool value) => value ? MinamoBool.True : MinamoBool.False;
 
-    private void TraceReleased(ResourceEntry entry) => environment.Tracing.Write(
-        MinamoTraceKind.ResourceReleased,
-        entry.TypeName,
-        data: new Dictionary<string, object?> { ["id"] = entry.Id });
-
     private sealed class ResourceEntry
     {
         public ResourceEntry(
@@ -336,7 +323,6 @@ internal sealed class MinamoResourceRegistry : IDisposable
 
     private void ReleaseEntry(ResourceEntry entry)
     {
-        TraceReleased(entry);
         entry.Release?.Invoke();
     }
 
@@ -361,26 +347,18 @@ public sealed class MinamoHostEnvironment : IDisposable
         object? hostContext,
         IEnumerable<HostModuleDefinition> modules,
         IEnumerable<HostResourceDefinition> resourceTypes,
-        IEnumerable<HostSignalDefinition> signals,
         IEnumerable<string> capabilities,
         bool unrestricted,
         IReadOnlyList<Action<MinamoLogEntry>> logHandlers,
-        IReadOnlyList<Action<MinamoTraceEvent>> traceHandlers,
-        MinamoExecutionLimits limits,
-        int? maxPendingSignals)
+        MinamoExecutionLimits limits)
     {
         HostContext = hostContext;
         Limits = limits;
         Telemetry = new(logHandlers);
-        Tracing = new(traceHandlers, Telemetry);
-        Capabilities = new(
-            capabilities,
-            unrestricted,
-            capability => Tracing.Write(MinamoTraceKind.CapabilityDenied, capability));
+        Capabilities = new(capabilities, unrestricted);
         resourceDefinitions = resourceTypes.ToDictionary(definition => definition.ResourceType);
         Resources = new(this);
-        State = new();
-        Signals = new(this, signals, maxPendingSignals);
+        Registry = new();
         Commands = new(this, modules, resourceDefinitions.Values);
         Root = CreateRoot();
     }
@@ -389,10 +367,8 @@ public sealed class MinamoHostEnvironment : IDisposable
     public MinamoCapabilitySet Capabilities { get; }
     public MinamoCommandCatalog Commands { get; }
     internal MinamoResourceRegistry Resources { get; }
-    public MinamoStateStore State { get; }
-    public MinamoSignalDispatcher Signals { get; }
+    public MinamoRegistry Registry { get; }
     public MinamoTelemetry Telemetry { get; }
-    public MinamoTracing Tracing { get; }
     public MinamoExecutionLimits Limits { get; }
     internal MinamoObject Root { get; }
 
@@ -404,8 +380,7 @@ public sealed class MinamoHostEnvironment : IDisposable
         }
         finally
         {
-            State.Clear();
-            Signals.Reset();
+            Registry.Clear();
         }
     }
 
@@ -422,8 +397,7 @@ public sealed class MinamoHostEnvironment : IDisposable
         }
         finally
         {
-            State.Dispose();
-            Signals.Dispose();
+            Registry.Dispose();
             disposed = true;
         }
     }
@@ -449,78 +423,37 @@ public sealed class MinamoHostEnvironment : IDisposable
     }
 
     private MinamoObject CreateRoot() => View(
-        new("Commands", CreateCommandsApi()),
-        new("State", CreateStateApi()),
-        new("Signals", CreateSignalsApi()),
+        new("Input", CreateInputApi()),
+        new("Registry", CreateRegistryApi()),
         new("Log", CreateLogApi()));
 
-    private MinamoObject CreateCommandsApi() => View(
-        new("List", Api("List", Array.Empty<Par>(), _ => CatalogEntries(Commands.List()))),
-        new("Find", Api("Find", new[] { new Par("text") }, arguments =>
-            CatalogEntries(Commands.Find(arguments[0].ToString())))),
-        new("Describe", Api("Describe", new[] { new Par("name") }, arguments =>
+    private MinamoFunction CreateInputApi() => Api(
+        "Input",
+        Array.Empty<Par>(),
+        (ctx, _) =>
         {
-            var entry = Commands.Describe(arguments[0].ToString());
-            return entry is null ? MinamoNil.Instance : CatalogEntry(entry);
-        })));
+            var environment = ctx.GetContextVariable<MinamoEnvironment>(MinamoEnvironment.ContextKey)
+                ?? throw new InvalidOperationException("Host input is not available outside a hosted instance.");
+            return MinamoCommandConvert.FromAwaitable(environment.ReadInputAsync(
+                ctx.Control?.CancellationToken ?? default));
+        });
 
-    private MinamoObject CreateStateApi() => IndexedView(
+    private MinamoObject CreateRegistryApi() => IndexedView(
         (ctx, index) =>
         {
-            Capabilities.Demand("state.read");
-            return State.GetRaw(Key(index)) ?? MinamoNil.Instance;
-        },
-        (ctx, index, value) =>
-        {
-            Capabilities.Demand("state.write");
-            State.SetFromScript(Key(index), value);
+            Capabilities.Demand("registry.read");
+            return Registry.GetRaw(Key(index)) ?? MinamoNil.Instance;
         },
         new("Keys", Api("Keys", Array.Empty<Par>(), _ =>
         {
-            Capabilities.Demand("state.read");
-            return Strings(State.Keys);
+            Capabilities.Demand("registry.read");
+            return Strings(Registry.Keys);
         })),
         new("Has", Api("Has", new[] { new Par("key") }, arguments =>
         {
-            Capabilities.Demand("state.read");
-            return Bool(State.Contains(Key(arguments[0])));
-        })),
-        new("Owner", Api("Owner", new[] { new Par("key") }, arguments =>
-        {
-            Capabilities.Demand("state.read");
-            var owner = State.GetOwner(Key(arguments[0]));
-            return owner is null ? MinamoNil.Instance : new MinamoString(owner.Value.ToString());
-        })),
-        new("Remove", Api("Remove", new[] { new Par("key") }, arguments =>
-        {
-            Capabilities.Demand("state.write");
-            return Bool(State.RemoveFromScript(Key(arguments[0])));
-        })),
-        new("Clear", Api("Clear", Array.Empty<Par>(), _ =>
-        {
-            Capabilities.Demand("state.write");
-            State.ClearScript();
-            return MinamoNil.Instance;
+            Capabilities.Demand("registry.read");
+            return Bool(Registry.Contains(Key(arguments[0])));
         })));
-
-    private MinamoObject CreateSignalsApi() => View(
-        new("List", Api("List", Array.Empty<Par>(), _ => Strings(Signals.Names))),
-        new("On", Api("On", new[] { new Par("name"), new Par("handler") }, (ctx, arguments) =>
-            SubscribeSignal(ctx, arguments, once: false))),
-        new("Once", Api("Once", new[] { new Par("name"), new Par("handler") }, (ctx, arguments) =>
-            SubscribeSignal(ctx, arguments, once: true))),
-        new("Off", Api("Off", new[] { new Par("subscription") }, (ctx, arguments) =>
-        {
-            var id = TypeConverter.ConvertTo<long>(ctx, arguments[0]);
-            return ctx.HasErrors ? MinamoNil.Instance : Bool(Signals.UnsubscribeScript(id));
-        })),
-        new("Emit", Api("Emit", new[] { new Par("name"), new Par("payload", MinamoNil.Instance) }, arguments =>
-        {
-            Signals.EmitFromScript(Key(arguments[0]), arguments[1]);
-            return MinamoNil.Instance;
-        })),
-        new("TryEmit", Api("TryEmit", new[] { new Par("name"), new Par("payload", MinamoNil.Instance) }, arguments =>
-            Bool(Signals.TryEmitFromScript(Key(arguments[0]), arguments[1])))));
 
     private MinamoObject CreateLogApi() => View(
         new("Debug", LogApi("Debug", MinamoLogLevel.Debug)),
@@ -538,17 +471,6 @@ public sealed class MinamoHostEnvironment : IDisposable
             return MinamoNil.Instance;
         });
 
-    private MinamoObject SubscribeSignal(
-        ExecutionContext context,
-        MinamoObject[] arguments,
-        bool once)
-    {
-        var handler = arguments[1].ToFunction(context);
-        return handler is null || context.HasErrors
-            ? MinamoNil.Instance
-            : MinamoInteger.Get(Signals.SubscribeScript(Key(arguments[0]), handler, once));
-    }
-
     private static MinamoFunction Api(string name, Par[] parameters, Func<MinamoObject[], MinamoObject> handler) =>
         new HostApiFunction(name, parameters, (_, arguments) => handler(arguments));
 
@@ -557,20 +479,6 @@ public sealed class MinamoHostEnvironment : IDisposable
         Par[] parameters,
         Func<ExecutionContext, MinamoObject[], MinamoObject> handler) =>
         new HostApiFunction(name, parameters, handler);
-
-    private static MinamoObject CatalogEntries(IEnumerable<MinamoCommandCatalogEntry> entries) =>
-        new MinamoArray(entries.Select(CatalogEntry).ToArray());
-
-    private static MinamoObject CatalogEntry(MinamoCommandCatalogEntry entry) => View(
-        new("Name", new MinamoString(entry.Name)),
-        new("Description", entry.Description is null ? MinamoNil.Instance : new MinamoString(entry.Description)),
-        new("Capability", entry.Capability is null ? MinamoNil.Instance : new MinamoString(entry.Capability)),
-        new("Parameters", new MinamoArray(entry.Parameters.Select(Parameter).ToArray())));
-
-    private static MinamoObject Parameter(MinamoCommandParameter parameter) => View(
-        new("Name", new MinamoString(parameter.Name)),
-        new("Type", new MinamoString(parameter.Type.Name)),
-        new("Optional", Bool(parameter.HasDefault)));
 
     private static MinamoObject Strings(IEnumerable<string> values) =>
         new MinamoArray(values.Select(value => (MinamoObject)new MinamoString(value)).ToArray());
@@ -581,8 +489,7 @@ public sealed class MinamoHostEnvironment : IDisposable
 
     private static MinamoObject IndexedView(
         Func<ExecutionContext, MinamoObject, MinamoObject> getter,
-        Action<ExecutionContext, MinamoObject, MinamoObject> setter,
-        params MinamoLabel[] labels) => new MinamoHostViewData(labels, getter, setter);
+        params MinamoLabel[] labels) => new MinamoHostViewData(labels, getter);
 
     private static string Key(MinamoObject value)
     {
@@ -635,9 +542,8 @@ internal sealed class MinamoHostViewData : MinamoTuple
 
     public MinamoHostViewData(
         MinamoObject[] values,
-        Func<ExecutionContext, MinamoObject, MinamoObject> getter,
-        Action<ExecutionContext, MinamoObject, MinamoObject> setter) : base(values) =>
-        (Getter, Setter) = (getter, setter);
+        Func<ExecutionContext, MinamoObject, MinamoObject> getter) : base(values) =>
+        Getter = getter;
 
     public Func<ExecutionContext, MinamoObject, MinamoObject>? Getter { get; }
     public Action<ExecutionContext, MinamoObject, MinamoObject>? Setter { get; }
@@ -753,7 +659,15 @@ internal sealed class HostApiFunction : MinamoForeignFunction
     {
         try
         {
-            return MinamoHostRootTypeInfo.Wrap(ctx, handler(ctx, args));
+            var value = MinamoHostRootTypeInfo.Wrap(ctx, handler(ctx, args));
+            return value is MinamoAwaitable awaitable
+                ? awaitable.Configure(
+                    static (completionContext, result) =>
+                        MinamoHostRootTypeInfo.Wrap(completionContext, result),
+                    (completionContext, exception) =>
+                        completionContext.ExternalFunctionFailure(this, exception.Message),
+                    static () => { })
+                : value;
         }
         catch (Exception ex)
         {

@@ -1,7 +1,7 @@
 # Order Workflow example
 
-This sample keeps most business behavior in Minamo source files. C# provides a small order
-ledger, registers three lifecycle signals, and explicitly chooses when queued events are delivered.
+This sample keeps most business behavior in Minamo source files. C# provides a small order ledger
+and supplies submitted orders and confirmed payments through the instance environment.
 
 The script entry point imports four modules:
 
@@ -10,13 +10,13 @@ The script entry point imports four modules:
 - `workflow/shipping.nami` chooses a delivery plan;
 - `workflow/notifications.nami` formats business-facing messages.
 
-`main.nami` installs handlers for `order.submitted`, `order.payment.confirmed`, and
-`order.shipment.requested`. The payment handler emits the shipment signal. Because signal delivery
-is explicit, the host calls `DispatchSignalsAsync()` a second time to deliver that newly queued request.
+`main.nami` processes the supplied orders, validates them, and directly advances accepted orders
+through payment and shipment processing.
 
 The sample accepts `ORD-1001`, rejects an invalid `ORD-1002`, then confirms payment for the accepted
-order. The final output shows host ledger entries alongside the Script-owned `submitted`, `paid`, and
-`shipped` counters.
+order. Host commands record the `submitted`, `paid`, and `shipped` counters in the instance
+registry. Minamo can read those values, while only C# can update them. The final output shows the
+registry counters alongside the host ledger entries.
 
 Run it from the repository root:
 

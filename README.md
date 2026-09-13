@@ -192,7 +192,7 @@ language test corpus remain authoritative for current behavior.
 
 - [Hosting API guide](Docs/Developers/HostingGuide.md)
 
-The Hosting guide covers host setup, commands, resources, state, signals, execution limits,
+The Hosting guide covers host setup, commands, resources, the instance registry, execution limits,
 observability, and security defaults.
 
 ### Tools and operations

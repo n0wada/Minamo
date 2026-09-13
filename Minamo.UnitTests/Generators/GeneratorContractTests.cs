@@ -98,11 +98,12 @@ public sealed class GeneratorContractTests
             sample.Count = 3
             assert(3, sample.Count)
             assert("sample", sample.Name)
-            assert("sample.Count", host.Commands.Describe("sample.Count").Name)
-            assert(nil, host.Commands.Describe("sample.set_Count"))
             """);
 
         Assert.True(result.Success, result.Failure?.Message);
+        Assert.Equal("sample.Count", session.Environment.Commands.Describe("sample.Count")!.Name);
+        Assert.Null(session.Environment.Commands.Describe("sample.set_Count"));
+        Assert.False(session.Execute("host.Commands").Success);
         var readOnly = session.Execute("""
             import sample
             sample.Name = "changed"

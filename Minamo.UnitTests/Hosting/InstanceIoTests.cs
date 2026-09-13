@@ -9,24 +9,24 @@ namespace Minamo.UnitTesting.Hosting;
 public sealed class InstanceIoTests
 {
     [Fact]
-    public async Task RoutesInputAndOutputThroughTheInstanceEnvironment()
+    public async Task RoutesHostInputAndTextOutputThroughTheInstanceEnvironment()
     {
         var output = new StringBuilder();
         using var instance = new MinamoHost()
             .AddStandardLibrary()
             .CreateInstance(
             new MinamoEnvironment()
-                .UseInputAsync(_ => ValueTask.FromResult<string?>("instance input"))
+                .UseInputAsync(_ => ValueTask.FromResult("instance input"))
                 .UseOutput(value => output.Append(value)));
 
-        var result = await instance.ExecuteAsync("import * from readline\nprint(readLine(), terminator: nil)");
+        var result = await instance.ExecuteAsync("print(host.Input(), terminator: nil)");
 
         Assert.True(result.Success, result.Failure?.Message);
         Assert.Equal("instance input", output.ToString());
     }
 
     [Fact]
-    public async Task ReadLineAwaitsTheConfiguredAsyncInput()
+    public async Task HostInputAwaitsTheConfiguredAsyncSource()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var completion = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -42,7 +42,7 @@ public sealed class InstanceIoTests
                     })
                     .UseOutput(value => output.Append(value)));
 
-        var execution = instance.ExecuteAsync("import * from readline\nprint(readLine(), terminator: nil)");
+        var execution = instance.ExecuteAsync("print(host.Input(), terminator: nil)");
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.False(execution.IsCompleted);
 
@@ -51,6 +51,56 @@ public sealed class InstanceIoTests
 
         Assert.True(result.Success, result.Failure?.Message);
         Assert.Equal("async input", output.ToString());
+    }
+
+    [Fact]
+    public async Task HostInputAcceptsArbitraryValues()
+    {
+        var input = new Dictionary<string, object?>
+        {
+            ["kind"] = "order",
+            ["id"] = 42
+        };
+        using var instance = new MinamoHost().CreateInstance(
+            new MinamoEnvironment().UseInputAsync(
+                _ => ValueTask.FromResult<object?>(input)));
+
+        var result = await instance.ExecuteAsync("""
+            let input = host.Input()
+            assert("order", input["kind"])
+            input["id"]
+            """);
+
+        Assert.True(result.Success, result.Failure?.Message);
+        Assert.Equal(42L, result.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task HostInputFailsWhenNoSourceIsConfigured()
+    {
+        using var instance = new MinamoHost().CreateInstance();
+
+        var result = await instance.ExecuteAsync("host.Input()");
+
+        Assert.False(result.Success);
+        Assert.Equal(MinamoFailureKind.Runtime, result.Failure?.Kind);
+    }
+
+    [Fact]
+    public async Task HostInputReportsAsyncSourceFailuresAsRuntimeFailures()
+    {
+        var completion = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var instance = new MinamoHost().CreateInstance(
+            new MinamoEnvironment().UseInputAsync(
+                _ => new ValueTask<object?>(completion.Task)));
+
+        var execution = instance.ExecuteAsync("host.Input()");
+        completion.SetException(new InvalidOperationException("input failed"));
+        var result = await execution;
+
+        Assert.False(result.Success);
+        Assert.Equal(MinamoFailureKind.Runtime, result.Failure?.Kind);
     }
 
     [Fact]
@@ -76,8 +126,8 @@ public sealed class InstanceIoTests
         using var second = host.CreateInstance(
             Environment("second", secondOutput, rendezvous));
 
-        var firstRun = first.ExecuteAsync("import * from readline\nprint(readLine(), terminator: nil)");
-        var secondRun = second.ExecuteAsync("import * from readline\nprint(readLine(), terminator: nil)");
+        var firstRun = first.ExecuteAsync("print(host.Input(), terminator: nil)");
+        var secondRun = second.ExecuteAsync("print(host.Input(), terminator: nil)");
         var results = await Task.WhenAll(firstRun, secondRun);
 
         Assert.All(results, result => Assert.True(result.Success, result.Failure?.Message));
@@ -93,7 +143,7 @@ public sealed class InstanceIoTests
             .UseInputAsync(_ =>
             {
                 Assert.True(rendezvous.SignalAndWait(TimeSpan.FromSeconds(5)));
-                return ValueTask.FromResult<string?>(input);
+                return ValueTask.FromResult(input);
             })
             .UseOutput(value => output.Append(value));
 }

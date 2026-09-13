@@ -23,9 +23,6 @@ internal static class HostingScenarios
                 CapabilityMode = (MinamoCapabilityMode)int.MaxValue
             }),
             "invalid capability mode");
-        AssertThrows<ArgumentException>(
-            () => new MinamoHost().AddSignal("player-hit"),
-            "invalid signal name");
         AssertThrows<InvalidOperationException>(
             () => new MinamoHost().AddResourceType<UnattributedResource>(),
             "resource attribute is required");
@@ -192,13 +189,13 @@ internal static class HostingScenarios
         AssertHasMethod<MinamoHost>("DisableFileImports", "explicit file import restriction");
         AssertNoMethod<MinamoHost>("OnLog", "logging moved to host options");
         AssertNoMethod<MinamoHost>("OnProgress", "removed progress registration");
-        AssertNoMethod<MinamoHost>("OnTrace", "tracing moved to host options");
+        AssertNoMethod<MinamoHost>("OnTrace", "removed tracing registration");
         AssertHasProperty<MinamoHostOptions>("Limits", "host execution limits");
-        AssertHasProperty<MinamoHostOptions>("Signals", "host signal queue options");
+        AssertNoProperty<MinamoHostOptions>("Signals", "removed host signal options");
         AssertHasProperty<MinamoHostOptions>("CapabilityMode", "host capability mode");
         AssertHasProperty<MinamoHostOptions>("Log", "host log handler");
+        AssertNoProperty<MinamoHostOptions>("Trace", "removed host tracing");
         AssertNoProperty<MinamoHostOptions>("Progress", "removed host progress handler");
-        AssertHasProperty<MinamoHostOptions>("Trace", "host trace handler");
         AssertHasProperty<MinamoHostOptions>("ExposeHostObject", "host object visibility");
         AssertNoMethod<MinamoCommandContext>("ReportProgress", "removed command progress reporting");
         AssertNoMethod<MinamoTelemetry>("Report", "removed telemetry progress reporting");
@@ -216,12 +213,24 @@ internal static class HostingScenarios
                 typeof(MinamoHost).Assembly.GetType(name) is null,
                 $"removed handler interface {name}");
         }
-        AssertHasMethod<MinamoHost>("AddSignal", "signal registration");
+        AssertNoMethod<MinamoHost>("AddSignal", "removed signal registration");
         AssertNoMethod<MinamoHost>("Signal", "old signal registration name");
         AssertNoMethod<MinamoHost>("ApplyTo", "removed low-level module injection");
         AssertNoMethod<MinamoHost>("LogTo", "old log registration name");
         AssertNoMethod<MinamoHost>("ProgressTo", "old progress registration name");
         AssertNoMethod<MinamoHost>("TraceTo", "old trace registration name");
+        AssertNoProperty<MinamoHostEnvironment>("Tracing", "removed instance tracing");
+        foreach (var name in new[]
+        {
+            "Minamo.Hosting.MinamoTraceEvent",
+            "Minamo.Hosting.MinamoTraceKind",
+            "Minamo.Hosting.MinamoTracing"
+        })
+        {
+            Assert(
+                typeof(MinamoHost).Assembly.GetType(name) is null,
+                $"removed tracing type {name}");
+        }
 
         AssertHasMethod<MinamoHost>("CreateInstance", "instance creation");
         AssertNoMethod<MinamoHost>("CreateSession", "removed session creation");
@@ -237,8 +246,8 @@ internal static class HostingScenarios
         AssertNoMethod<MinamoInstance>("OpenSelectSession", "synchronous advanced interactive select creation");
         AssertNoMethod<MinamoInstance>("OpenSelectSessionAsync", "internal select session creation");
         AssertNoMethod<MinamoInstance>("StartAsync", "removed script-initiated select execution");
-        AssertNoMethod<MinamoInstance>("DispatchSignals", "synchronous pending signal dispatch");
-        AssertHasMethod<MinamoInstance>("DispatchSignalsAsync", "asynchronous signal dispatch");
+        AssertNoMethod<MinamoInstance>("DispatchSignals", "removed synchronous signal dispatch");
+        AssertNoMethod<MinamoInstance>("DispatchSignalsAsync", "removed asynchronous signal dispatch");
         AssertNoMethod<MinamoSelect>("Select", "synchronous basic select choice");
         AssertNoMethod<MinamoSelect>("Send", "synchronous basic select host event delivery");
         AssertHasMethod<MinamoSelect>("SelectAsync", "asynchronous basic select choice");
@@ -270,33 +279,48 @@ internal static class HostingScenarios
         AssertHasMethod<MinamoExecutionResult>("TryGetValue", "optional typed execution result");
         AssertNoProperty<MinamoExecutionResult>("Value", "removed raw execution result");
         AssertHasProperty<MinamoExecutionResult>("Execution", "execution details");
-        AssertHasProperty<MinamoSignalDispatchResult>("Execution", "signal dispatch execution details");
         AssertHasProperty<MinamoProgram>("Diagnostics", "compiled program diagnostics");
         AssertHasMethod<MinamoEnvironment>("Expose", "environment name exposure");
         AssertHasMethod<MinamoEnvironment>("Set", "environment bindings");
         AssertNoMethod<MinamoEnvironment>("UseInput", "synchronous instance input setup");
         AssertHasMethod<MinamoEnvironment>("UseInputAsync", "asynchronous instance input setup");
+        Assert(
+            typeof(MinamoEnvironment).GetMethods().Any(method =>
+                method.Name == "UseInputAsync"
+                && method.IsGenericMethodDefinition),
+            "host input accepts arbitrary value types");
         AssertHasMethod<MinamoEnvironment>("UseOutput", "instance output setup");
         AssertNoMethod<MinamoEnvironment>("UseSelect", "synchronous select runner setup");
         AssertNoMethod<MinamoEnvironment>("UseSelectAsync", "removed script-initiated select runner");
 
         AssertHasProperty<MinamoExecutionLimits>("MaxExecutionTime", "operation time limit");
         AssertNoProperty<MinamoExecutionLimits>("MaxTime", "old time limit name");
+        AssertNoProperty<MinamoExecutionLimits>("MaxSignals", "removed signal limit");
 
-        AssertHasMethod<MinamoStateStore>("Set", "host-owned state setter");
-        AssertHasMethod<MinamoStateStore>("SetScript", "script-owned state setter");
-        AssertHasMethod<MinamoStateStore>("TryGet", "typed state lookup");
-        AssertHasMethod<MinamoStateStore>("GetOwner", "state ownership inspection");
-        AssertNoMethod<MinamoStateStore>("GetRaw", "internal raw state getter");
-        AssertNoMethod<MinamoStateStore>("SetRaw", "internal raw host state setter");
-        AssertNoMethod<MinamoStateStore>("SetScriptRaw", "internal raw script state setter");
-        AssertNoMethod<MinamoSignalDispatcher>("EmitRaw", "internal raw signal emission");
-        AssertHasMethod<MinamoSignalDispatcher>("TryEmit", "bounded signal emission");
-        AssertHasProperty<MinamoSignalDispatcher>("MaxPending", "pending signal limit");
-        AssertHasProperty<MinamoSignalDispatcher>("PendingCount", "pending signal count");
-        AssertHasMethod<MinamoSignal>("GetPayload", "typed signal payload");
-        AssertHasMethod<MinamoSignal>("TryGetPayload", "optional typed signal payload");
-        AssertNoProperty<MinamoSignal>("Payload", "removed raw signal payload");
+        AssertHasMethod<MinamoRegistry>("Set", "host registry setter");
+        AssertHasMethod<MinamoRegistry>("TryGet", "typed registry lookup");
+        AssertHasMethod<MinamoRegistry>("Remove", "host registry removal");
+        AssertHasProperty<MinamoRegistry>("Keys", "registry key snapshot");
+        AssertNoMethod<MinamoRegistry>("SetScript", "removed script-owned registry setter");
+        AssertNoMethod<MinamoRegistry>("GetOwner", "removed registry ownership inspection");
+        AssertNoMethod<MinamoRegistry>("GetRaw", "internal raw registry getter");
+        AssertNoMethod<MinamoRegistry>("SetRaw", "internal raw registry setter");
+        AssertHasProperty<MinamoHostEnvironment>("Registry", "instance registry");
+        AssertNoProperty<MinamoHostEnvironment>("State", "removed shared state name");
+        Assert(
+            typeof(MinamoHost).Assembly.GetType("Minamo.Hosting.MinamoStateOwner") is null,
+            "removed state ownership model");
+        AssertNoProperty<MinamoHostEnvironment>("Signals", "removed instance signals");
+        foreach (var name in new[]
+        {
+            "Minamo.Hosting.MinamoSignalOptions",
+            "Minamo.Hosting.MinamoSignal",
+            "Minamo.Hosting.MinamoSignalDispatchResult",
+            "Minamo.Hosting.MinamoSignalDispatcher"
+        })
+        {
+            Assert(typeof(MinamoHost).Assembly.GetType(name) is null, $"removed signal type {name}");
+        }
         AssertNoProperty<MinamoHostEnvironment>("Resources", "internal resource registry");
         Assert(
             typeof(MinamoHost).Assembly.GetType(
@@ -370,7 +394,7 @@ internal static class HostingScenarios
                 {
                     var callback = context.CallbackAction<string>("callback");
                     callback(context.Argument<string>("value"));
-                    return context.Environment.State.Get<string>("seen");
+                    return null;
                 },
                 MinamoCommandParameter.Required<string>("value"),
                 MinamoCommandParameter.Required<object>("callback"));
@@ -397,9 +421,9 @@ internal static class HostingScenarios
                 3,
                 4,
                 (first, second, third, fourth) => first + second + third + fourth))
-            assert("ready", callbacks.Notify(
-                "ready",
-                value => { host.State["seen"] = value; nil }))
+            mut seen = nil
+            callbacks.Notify("ready", value => { seen = value; nil })
+            assert("ready", seen)
             callbacks.Capture(value => value + 1)
             """);
         Assert(escapedCallback is not null, "callback is captured by the host command");
@@ -412,11 +436,15 @@ internal static class HostingScenarios
     internal static void ProgramBackedInstances()
     {
         var host = new MinamoHost()
-            .AddCapabilities("state.*");
+            .Module("counter", module => module.Command("Increment", context =>
+            {
+                var next = context.Environment.Registry.Get<long>("runs") + 1;
+                context.Environment.Registry.Set("runs", next);
+                return next;
+            }));
         var compiled = host.Compile("""
-            let current = if host.State["runs"] is nil { 0 } else { host.State["runs"] }
-            host.State["runs"] = current + 1
-            host.State["runs"]
+            import counter
+            counter.Increment()
             """);
 
         Assert(compiled.Success && compiled.Value is not null, "program compiles");
@@ -505,7 +533,7 @@ internal static class HostingScenarios
             ExposeHostObject = false
         });
 
-        var hidden = host.Compile("host.State[\"value\"]");
+        var hidden = host.Compile("host.Registry[\"value\"]");
         Assert(!hidden.Success, "hidden host object is not compiled");
         Assert(hidden.Errors.Any(error =>
                 error.Message.Contains("\"host\"", StringComparison.Ordinal)
@@ -658,9 +686,7 @@ internal static class HostingScenarios
             File.WriteAllText(validPath, "let answer = 42", Encoding.UTF8);
             File.WriteAllText(invalidPath, "let =", Encoding.UTF8);
 
-            using var session = new MinamoHost()
-                .AddSignal("tick")
-                .CreateInstance();
+            using var session = new MinamoHost().CreateInstance();
 
             IMinamoOperationResult execution = session.ExecuteFile(validPath);
             Assert(execution.Success, "file execution succeeds");
@@ -678,11 +704,6 @@ internal static class HostingScenarios
                         invalidPath,
                         StringComparison.OrdinalIgnoreCase)),
                 "file diagnostics preserve source path");
-
-            session.Environment.Signals.Emit("tick", 1);
-            IMinamoOperationResult dispatch = session.DispatchSignals();
-            Assert(dispatch.Success, "signal result uses common operation contract");
-            AssertEqual(0, dispatch.Failures.Count, "signal operation failures");
 
             var missing = session.ExecuteFile(Path.Combine(root, "missing.nami"));
             Assert(missing.Failure is
@@ -761,11 +782,16 @@ internal static class HostingScenarios
         Success(session, """
             import counter
             assert(5, counter.Value())
-            assert("math.Public", host.Commands.Describe("math.Public").Name)
-            assert(nil, host.Commands.Describe("math.Secret"))
-            assert(nil, host.Commands.Describe("counter.Increment"))
             """);
 
+        AssertEqual("math.Public", session.Environment.Commands.Describe("math.Public")!.Name,
+            "public command appears in host catalog");
+        Assert(session.Environment.Commands.Describe("math.Secret") is null,
+            "restricted command is hidden from host catalog");
+        Assert(session.Environment.Commands.Describe("counter.Increment") is null,
+            "unavailable command is hidden from host catalog");
+
+        Failure(session, "host.Commands");
         Failure(session, "host.Capabilities");
         Failure(session, "import counter\ncounter.Increment()");
     }
@@ -816,10 +842,13 @@ internal static class HostingScenarios
             let counter = factory.Create(4)
             assert(4, counter.Value())
             assert(4, counter.AsyncValue())
-            assert("resource.Counter.Value",
-                host.Commands.Describe("resource.Counter.Value").Name)
-            assert(nil, host.Commands.Describe("resource.Counter.Add"))
             """);
+        AssertEqual(
+            "resource.Counter.Value",
+            session.Environment.Commands.Describe("resource.Counter.Value")!.Name,
+            "resource command appears in host catalog");
+        Assert(session.Environment.Commands.Describe("resource.Counter.Add") is null,
+            "restricted resource command is hidden from host catalog");
         Failure(session, """
             import factory
             factory.Create(4).Add(1)
@@ -936,145 +965,54 @@ internal static class HostingScenarios
         AssertEqual(1, releases, "shared resource released once with session");
     }
 
-    internal static void SharedState()
+    internal static void Registry()
     {
         using var session = new MinamoHost()
-            .AddCapabilities("state.*")
+            .Module("registryTest", module => module.Command("SetScore", context =>
+            {
+                context.Environment.Registry.Set("score", 10);
+                return null;
+            }))
+            .AddCapabilities("registry.read")
             .CreateInstance();
 
         Success(session, """
-            host.State["score"] = 10
-            assert(10, host.State["score"])
-            assert(true, host.State.Has("score"))
+            import registryTest
+            registryTest.SetScore()
+            assert(10, host.Registry["score"])
+            assert(true, host.Registry.Has("score"))
             """);
 
-        AssertEqual(10L, session.Environment.State.Get<long>("score"), "shared state");
-        Assert(session.Environment.State.TryGet<long>("score", out var score) && score == 10,
-            "typed state lookup");
-        Assert(!session.Environment.State.TryGet<long>("missing", out var missing) && missing == 0,
-            "missing typed state lookup");
-        session.Environment.State.Set<object?>("nil", null);
-        Assert(session.Environment.State.TryGet<int>("nil", out var nil) && nil == 0,
+        AssertEqual(10L, session.Environment.Registry.Get<long>("score"), "shared registry");
+        Assert(session.Environment.Registry.TryGet<long>("score", out var score) && score == 10,
+            "typed registry lookup");
+        Assert(!session.Environment.Registry.TryGet<long>("missing", out var missing) && missing == 0,
+            "missing typed registry lookup");
+        session.Environment.Registry.Set<object?>("nil", null);
+        Assert(session.Environment.Registry.TryGet<int>("nil", out var nil) && nil == 0,
             "nil typed state lookup");
-        session.Environment.State.Set("list", new[] { 1, 2, 3 });
+        session.Environment.Registry.Set("list", new[] { 1, 2, 3 });
         Assert(
-            session.Environment.State.TryGet<int[]>("list", out var list)
+            session.Environment.Registry.TryGet<int[]>("list", out var list)
             && list is not null
             && list.SequenceEqual(new[] { 1, 2, 3 }),
-            "state uses common host type conversion");
+            "registry uses common host type conversion");
         AssertThrows<InvalidCastException>(
-            () => session.Environment.State.Get<DateTime>("score"),
-            "invalid state conversion");
-        Assert(!session.Environment.State.TryGet<DateTime>("score", out _),
-            "invalid optional state conversion");
+            () => session.Environment.Registry.Get<DateTime>("score"),
+            "invalid registry conversion");
+        Assert(!session.Environment.Registry.TryGet<DateTime>("score", out _),
+            "invalid optional registry conversion");
 
-        session.Environment.State.Set("fromHost", 42);
-        AssertEqual(MinamoStateOwner.Host, session.Environment.State.GetOwner("fromHost")!.Value,
-            "host-owned state owner");
-        session.Environment.State.SetScript("fromScriptHost", 11);
-        AssertEqual(MinamoStateOwner.Script, session.Environment.State.GetOwner("fromScriptHost")!.Value,
-            "script-owned state owner from C#");
+        session.Environment.Registry.Set("fromHost", 42);
         Success(session, """
-            assert(42, host.State["fromHost"])
-            assert("Host", host.State.Owner("fromHost"))
-            assert(false, host.State.Remove("fromHost"))
-            assert(42, host.State["fromHost"])
-
-            assert(11, host.State["fromScriptHost"])
-            host.State["fromScriptHost"] = 12
-            assert("Script", host.State.Owner("fromScriptHost"))
-            assert(12, host.State["fromScriptHost"])
-            assert(true, host.State.Remove("fromScriptHost"))
-            assert(nil, host.State["fromScriptHost"])
+            assert(42, host.Registry["fromHost"])
             """);
-        Failure(session, "host.State[\"fromHost\"] = 43");
-        Success(session, """
-            host.State["scriptOnly"] = 1
-            host.State.Clear()
-            assert(nil, host.State["scriptOnly"])
-            assert(42, host.State["fromHost"])
-            """);
+        Failure(session, "host.Registry[\"fromHost\"] = 43");
+        Assert(session.Environment.Registry.Remove("fromHost"), "host removes registry value");
+        Assert(!session.Environment.Registry.Contains("fromHost"), "removed registry value is absent");
 
         session.Reset();
-        Assert(!session.Environment.State.Contains("score"), "state reset");
-    }
-
-    internal static void Signals()
-    {
-        using var session = new MinamoHost()
-            .AddCapabilities("state.*", "player.*")
-            .AddSignal(
-                "player.hit",
-                listenCapability: "player.listen",
-                emitCapability: "player.emit")
-            .CreateInstance();
-
-        var hostDeliveries = new List<long>();
-        var hostSubscription = session.Environment.Signals.Subscribe(
-            "player.hit",
-            signal =>
-            {
-                Assert(signal.TryGetPayload<long>(out var payload), "typed signal payload");
-                AssertEqual(payload, signal.GetPayload<long>(), "required signal payload");
-                Assert(!signal.TryGetPayload<DateTime>(out _), "invalid signal payload conversion");
-                AssertThrows<InvalidCastException>(
-                    () => signal.GetPayload<DateTime>(),
-                    "required invalid signal payload conversion");
-                hostDeliveries.Add(payload);
-            });
-
-        Success(session, """
-            func receive(value) {
-                host.State["last"] = value
-                host.State["count"] = host.State["count"] + 1
-            }
-
-            func receiveOnce(value) {
-                host.State["once"] = value
-            }
-
-            func canceled(value) {
-                host.State["canceled"] = value
-            }
-
-            host.State["count"] = 0
-            host.Signals.On("player.hit", receive)
-            host.Signals.Once("player.hit", receiveOnce)
-            let canceledSubscription = host.Signals.On("player.hit", canceled)
-            assert(true, host.Signals.Off(canceledSubscription))
-            """);
-        Success(session, $"assert(false, host.Signals.Off({hostSubscription}))");
-        Failure(session, """
-            host.Signals.On("player.hit", receive)
-            throw Exception<Error>("rollback subscription")
-            """);
-
-        session.Environment.Signals.Emit("player.hit", 5);
-        var first = session.DispatchSignals();
-        Assert(first.Success && first.Delivered == 1,
-            "first signal delivery: " + string.Join("; ", first.Failures.Select(error => error.Message)));
-        Success(session, """
-            assert(5, host.State["last"])
-            assert(5, host.State["once"])
-            assert(1, host.State["count"])
-            assert(nil, host.State["canceled"])
-            """);
-
-        Success(session, "host.Signals.Emit(\"player.hit\", 8)");
-        var second = session.DispatchSignals();
-        Assert(second.Success && second.Delivered == 1, "second signal delivery");
-        Success(session, """
-            assert(8, host.State["last"])
-            assert(5, host.State["once"])
-            assert(2, host.State["count"])
-            """);
-        Assert(hostDeliveries.SequenceEqual(new long[] { 5, 8 }), "host signal subscribers");
-
-        session.Reset();
-        session.Environment.Signals.Emit("player.hit", 9);
-        Assert(session.DispatchSignals().Success, "signal delivery after reset");
-        AssertEqual(3, hostDeliveries.Count, "host subscriptions survive reset");
-        Assert(!session.Environment.State.Contains("last"), "script subscriptions are cleared by reset");
+        Assert(!session.Environment.Registry.Contains("score"), "registry reset");
     }
 
     internal static void ConfigurationAndOwnership()
@@ -1101,22 +1039,28 @@ internal static class HostingScenarios
 
         AssertEqual(2, initialLogs.Count, "shared initial handler");
 
-        var state = first.Environment.State;
+        var registry = first.Environment.Registry;
         first.Dispose();
-        AssertThrows<ObjectDisposedException>(() => state.Contains("key"),
-            "session-owned state disposal");
+        AssertThrows<ObjectDisposedException>(() => registry.Contains("key"),
+            "session-owned registry disposal");
         Assert(!context.Disposed, "borrowed host context ownership");
     }
 
-    internal static void StateCapabilities()
+    internal static void RegistryCapabilities()
     {
         using var session = new MinamoHost()
-            .AddCapabilities("state.read")
+            .AddCapabilities("registry.read")
             .CreateInstance();
 
-        session.Environment.State.Set("value", 3);
-        Success(session, "assert(3, host.State[\"value\"])");
-        Failure(session, "host.State[\"value\"] = 4");
+        session.Environment.Registry.Set("value", 3);
+        Success(session, "assert(3, host.Registry[\"value\"])");
+        Failure(session, "host.Registry[\"value\"] = 4");
+
+        using var denied = new MinamoHost()
+            .AddCapabilities("log.write")
+            .CreateInstance();
+        denied.Environment.Registry.Set("value", 3);
+        Failure(denied, "host.Registry[\"value\"]");
     }
 
     internal static void Logs()
@@ -1131,8 +1075,7 @@ internal static class HostingScenarios
                 handledLogs.Add(entry);
             }
         })
-            .AddCapabilities("log.write", "signal.listen")
-            .AddSignal("tick", listenCapability: "signal.listen")
+            .AddCapabilities("log.write")
             .Module("work", module => module.Command("Run", context =>
             {
                 context.Log(
@@ -1159,19 +1102,6 @@ internal static class HostingScenarios
             "structured log property");
         AssertEqual("Run", logs.Single(log => log.Message == "host command").Command!,
             "command log name");
-
-        Success(session, """
-            func onTick(value) {
-                host.Log.Info("signal", (value: value))
-            }
-            host.Signals.On("tick", onTick)
-            """);
-        session.Environment.Signals.Emit("tick", 3);
-        var dispatch = session.DispatchSignals();
-        Assert(dispatch.Success, "telemetry signal dispatch");
-        var signalLog = logs.Single(log => log.Message == "signal");
-        AssertEqual(dispatch.ExecutionId, signalLog.ExecutionId, "signal correlation ID");
-        Assert(signalLog.Command is null, "signal log command name");
 
         using var denied = new MinamoHost(new()
         {
@@ -1313,24 +1243,6 @@ internal static class HostingScenarios
             Assert(result.Success, "host command cancellation token");
         }
 
-        using (var session = new MinamoHost(new()
-        {
-            Limits = new() { MaxSignals = 1 }
-        })
-            .AddSignal("tick")
-            .CreateInstance())
-        {
-            session.Environment.Signals.Emit("tick", 1);
-            session.Environment.Signals.Emit("tick", 2);
-            var first = session.DispatchSignals();
-            AssertEqual(1, first.Delivered, "limited signal delivery");
-            Assert(first.Failures.Single() is
-                { Kind: MinamoFailureKind.Limit, Limit: MinamoExecutionLimitKind.Signals },
-                "signal limit error");
-            AssertEqual(1, first.Metrics.Signals, "signal metrics");
-            AssertEqual(1, session.DispatchSignals().Delivered, "remaining signal delivery");
-        }
-
         using (var removedEval = new MinamoHost().CreateInstance())
         {
             Failure(removedEval, "eval(\"1 + 1\")");
@@ -1418,108 +1330,6 @@ internal static class HostingScenarios
             + $"{host.Failure?.Exception?.GetType().FullName ?? "<null>"})");
         Success(hostFailureSession, "1 + 1");
 
-        using var signalSession = new MinamoHost().AddSignal("failed").CreateInstance();
-        var subscription = signalSession.Environment.Signals.Subscribe(
-            "failed",
-            _ => throw new InvalidOperationException("host signal failure"));
-        signalSession.Environment.Signals.Emit("failed", 1);
-        var dispatch = signalSession.DispatchSignals();
-        Assert(dispatch.Failures.Single().Kind == MinamoFailureKind.Host,
-            "host signal failure kind");
-        Assert(signalSession.Environment.Signals.Unsubscribe(subscription),
-            "host signal subscription cleanup");
-    }
-
-    internal static void Tracing()
-    {
-        var traces = new List<MinamoTraceEvent>();
-        var handledTraces = new List<MinamoTraceEvent>();
-        using var session = new MinamoHost(new()
-        {
-            Trace = trace =>
-            {
-                traces.Add(trace);
-                handledTraces.Add(trace);
-            }
-        })
-            .AddCapabilities("use")
-            .AddResourceType<TracingCounterResource>()
-            .AddSignal("tick")
-            .Module("observe", module =>
-            {
-                module.Command("Create", context =>
-                    context.Resource(new TracingCounterResource(1)));
-                module.Command("Secret", null, "secret", _ => null);
-            })
-            .CreateInstance();
-
-        var execution = session.Execute("""
-            import observe
-            let counter = observe.Create()
-            counter.Value()
-            counter.Release()
-            """);
-        Assert(execution.Success, "traced execution");
-        Assert(execution.Metrics.Instructions > 0, "traced instruction metrics");
-        Assert(execution.Metrics.HostCommands >= 2, "traced host command metrics");
-        AssertEqual(traces.Count, handledTraces.Count, "multiple trace handlers");
-        Assert(traces.Any(trace => trace.Kind == MinamoTraceKind.ExecutionStarted),
-            "execution started trace");
-        Assert(traces.Any(trace => trace.Kind == MinamoTraceKind.ExecutionCompleted),
-            "execution completed trace");
-        Assert(traces.Any(trace => trace.Kind == MinamoTraceKind.Compilation), "compilation trace");
-        Assert(traces.Any(trace => trace.Kind == MinamoTraceKind.VmExecution), "VM trace");
-        Assert(traces.Any(trace => trace.Kind == MinamoTraceKind.HostCommand
-            && trace.Name == "Create" && trace.Duration is not null), "host command trace");
-        Assert(traces.Any(trace => trace.Kind == MinamoTraceKind.ResourceCreated),
-            "resource creation trace");
-        Assert(traces.Any(trace => trace.Kind == MinamoTraceKind.ResourceReleased),
-            "resource release trace");
-
-        Failure(session, "observe.Secret()");
-        Assert(traces.Any(trace => trace.Kind == MinamoTraceKind.CapabilityDenied
-            && trace.Name == "secret"), "capability denial trace");
-
-        session.Environment.Signals.Emit("tick", 1);
-        var dispatch = session.DispatchSignals();
-        Assert(dispatch.Success, "traced signal dispatch");
-        Assert(traces.Any(trace => trace.Kind == MinamoTraceKind.SignalEmitted
-            && trace.Name == "tick"), "signal emitted trace");
-        Assert(traces.Any(trace => trace.Kind == MinamoTraceKind.SignalDelivered
-            && trace.ExecutionId == dispatch.ExecutionId), "signal delivered trace");
-        var dispatchCompleted = traces.Single(trace =>
-            trace.Kind == MinamoTraceKind.ExecutionCompleted
-            && trace.ExecutionId == dispatch.ExecutionId);
-        Assert(Equals(dispatchCompleted.Data["success"], true),
-            "signal dispatch completion success");
-        AssertEqual(dispatch.Delivered, (int)dispatchCompleted.Data["delivered"]!,
-            "signal dispatch completion delivered count");
-
-        var failedSubscription = session.Environment.Signals.Subscribe(
-            "tick",
-            _ => throw new InvalidOperationException("traced host signal failure"));
-        session.Environment.Signals.Emit("tick", 2);
-        var failedDispatch = session.DispatchSignals();
-        Assert(!failedDispatch.Success, "failed traced signal dispatch");
-        var failedDispatchCompleted = traces.Single(trace =>
-            trace.Kind == MinamoTraceKind.ExecutionCompleted
-            && trace.ExecutionId == failedDispatch.ExecutionId);
-        Assert(Equals(failedDispatchCompleted.Data["success"], false),
-            "failed signal dispatch completion success");
-        Assert(session.Environment.Signals.Unsubscribe(failedSubscription),
-            "failed traced signal subscription cleanup");
-
-        var tracesAfterFailure = new List<MinamoTraceEvent>();
-        Action<MinamoTraceEvent> traceHandlers =
-            _ => throw new InvalidOperationException("ignored trace failure");
-        traceHandlers += tracesAfterFailure.Add;
-        using var ignoredTraceFailure = new MinamoHost(new()
-        {
-            Trace = traceHandlers
-        })
-            .CreateInstance();
-        Success(ignoredTraceFailure, "1 + 1");
-        Assert(tracesAfterFailure.Count > 0, "trace handler continues after failure");
     }
 
     private static void Success(MinamoInstance session, string source)
@@ -1705,13 +1515,6 @@ internal static class HostingScenarios
 
         [MinamoCommand]
         public int Add(int amount) => current += amount;
-    }
-
-    [MinamoResource("Counter", Lifetime = MinamoResourceLifetime.Transient)]
-    private sealed class TracingCounterResource(int value) : MinamoResource
-    {
-        [MinamoCommand]
-        public int Value() => value;
     }
 
     [MinamoResource("ReleaseProbe", Lifetime = MinamoResourceLifetime.Transient)]

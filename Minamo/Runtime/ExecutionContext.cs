@@ -179,7 +179,6 @@ public enum MinamoExecutionLimitKind
     Instructions,
     Time,
     HostCommands,
-    Signals,
     CallDepth
 }
 
@@ -197,7 +196,6 @@ internal sealed class ExecutionControl : IDisposable
     private readonly long? maxInstructions;
     private readonly TimeSpan? maxTime;
     private readonly int? maxHostCommands;
-    private readonly int? maxSignals;
     private readonly TimeProvider timeProvider;
     private readonly CancellationToken cancellationToken;
     private readonly CancellationTokenSource? timeoutSource;
@@ -207,7 +205,6 @@ internal sealed class ExecutionControl : IDisposable
         long? maxInstructions,
         TimeSpan? maxTime,
         int? maxHostCommands,
-        int? maxSignals,
         int? maxCallDepth,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -217,7 +214,6 @@ internal sealed class ExecutionControl : IDisposable
         this.maxInstructions = maxInstructions;
         this.maxTime = maxTime;
         this.maxHostCommands = maxHostCommands;
-        this.maxSignals = maxSignals;
         if (maxTime is not null)
         {
             timeoutSource = new CancellationTokenSource(maxTime.Value, timeProvider);
@@ -238,7 +234,6 @@ internal sealed class ExecutionControl : IDisposable
 
     public long Instructions { get; private set; }
     public int HostCommands { get; private set; }
-    public int Signals { get; private set; }
     public int? MaxCallDepth { get; }
     public CancellationToken CancellationToken => cancellationToken;
 
@@ -269,19 +264,6 @@ internal sealed class ExecutionControl : IDisposable
         }
 
         HostCommands++;
-        Checkpoint();
-    }
-
-    public void OnSignal()
-    {
-        if (maxSignals is not null && Signals >= maxSignals.Value)
-        {
-            throw new MinamoExecutionLimitException(
-                MinamoExecutionLimitKind.Signals,
-                $"Signal delivery limit of {maxSignals.Value} was exceeded.");
-        }
-
-        Signals++;
         Checkpoint();
     }
 
