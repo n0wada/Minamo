@@ -83,8 +83,8 @@ public sealed class ConsoleEndToEndTests
             await File.WriteAllTextAsync(source, """
                 select counter {
                     mut count = 0
-                    case "add" when count == 0 ["text": "Add one"] => { count += 1 }
-                    case "finish" when count == 1 ["text": "Finish counting"] => {
+                    action "add" when count == 0 ["text": "Add one"] => { count += 1 }
+                    action "finish" when count == 1 ["text": "Finish counting"] => {
                         print(fmt("Count: {0}", count))
                         exit count
                     }
@@ -92,8 +92,8 @@ public sealed class ConsoleEndToEndTests
                 """, Encoding.UTF8);
 
             var result = useRepl
-                ? await RunWithInputAsync("do counter\nadd\nfinish\n#exit\n", source, "-i", "-nologo")
-                : await RunWithInputAsync("add\nfinish\n", source, "--do", "counter", "-nologo");
+                ? await RunWithInputAsync("open counter\nadd\nfinish\n#exit\n", source, "-i", "-nologo")
+                : await RunWithInputAsync("add\nfinish\n", source, "--open", "counter", "-nologo");
 
             Assert.Equal(0, result.ExitCode);
             Assert.Contains("Add one", result.StandardOutput, StringComparison.Ordinal);
@@ -116,7 +116,7 @@ public sealed class ConsoleEndToEndTests
             var source = Path.Combine(root, "request.nami");
             await File.WriteAllTextAsync(source, """
                 select profile {
-                    case "rename" => {
+                    action "rename" => {
                         let name = request("text", ["prompt": "Name"])
                         print(fmt("Hello, {0}", name))
                         exit name
@@ -124,7 +124,7 @@ public sealed class ConsoleEndToEndTests
                 }
                 """, Encoding.UTF8);
 
-            var result = await RunWithInputAsync("rename\nMinamo\n", source, "--do", "profile", "-nologo");
+            var result = await RunWithInputAsync("rename\nMinamo\n", source, "--open", "profile", "-nologo");
 
             Assert.Equal(0, result.ExitCode);
             Assert.Contains("request[text]>", result.StandardOutput, StringComparison.Ordinal);

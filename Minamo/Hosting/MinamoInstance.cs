@@ -71,6 +71,11 @@ public sealed partial class MinamoInstance : IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
+        if (TryParseOpenSelectCommand(source, out var selectName))
+        {
+            return ExecuteOpenSelectCommandAsync(selectName, cancellationToken);
+        }
+
         return ExecuteCoreAsync(
             () => linker.Make(SourceBuffer.FromString(
                 source,
@@ -78,6 +83,136 @@ public sealed partial class MinamoInstance : IDisposable
             "Execute",
             cancellationToken);
     }
+
+    private async Task<MinamoExecutionResult> ExecuteOpenSelectCommandAsync(
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var started = Stopwatch.GetTimestamp();
+        var executionId = Guid.NewGuid();
+        MinamoSelect? select = null;
+        ExecutionControl? control = null;
+        var gateAcquired = false;
+        var operationStarted = false;
+        var telemetryStarted = false;
+        var vmDuration = TimeSpan.Zero;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await EnsureSelectRuntimeInitializedAsync(cancellationToken).ConfigureAwait(false);
+            if (operationScope.Value)
+            {
+                throw new InvalidOperationException("A host instance cannot be entered recursively.");
+            }
+
+            await operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            gateAcquired = true;
+            operationScope.Value = true;
+            ObjectDisposedException.ThrowIf(disposed, this);
+            BeginOperation();
+            operationStarted = true;
+            Environment.Telemetry.BeginExecution(executionId);
+            telemetryStarted = true;
+            control = CreateControl(cancellationToken, collectMetrics: true);
+            control?.Checkpoint();
+
+            var vmStarted = Stopwatch.GetTimestamp();
+            try
+            {
+                var session = await OpenSelectSessionUnderGateAsync(
+                    name,
+                    control,
+                    cancellationToken).ConfigureAwait(false);
+                select = new MinamoSelect(session);
+            }
+            finally
+            {
+                vmDuration = Stopwatch.GetElapsedTime(vmStarted);
+            }
+
+            control?.Checkpoint();
+            return new(
+                null,
+                Array.Empty<BuildMessage>(),
+                null,
+                "OpenSelect",
+                executionId,
+                Metrics(started, TimeSpan.Zero, vmDuration, control),
+                select);
+        }
+        catch (Exception ex)
+        {
+            select?.Dispose();
+            return new(
+                null,
+                Array.Empty<BuildMessage>(),
+                MinamoFailure.From(ex, MinamoFailureKind.Input),
+                "OpenSelect",
+                executionId,
+                Metrics(started, TimeSpan.Zero, vmDuration, control));
+        }
+        finally
+        {
+            control?.Dispose();
+            if (telemetryStarted)
+            {
+                Environment.Telemetry.EndExecution();
+            }
+            if (operationStarted)
+            {
+                active = false;
+            }
+            if (gateAcquired)
+            {
+                operationScope.Value = false;
+                operationGate.Release();
+            }
+        }
+    }
+
+    private static bool TryParseOpenSelectCommand(string source, out string name)
+    {
+        name = string.Empty;
+        var lexer = new Lexer(SourceBuffer.FromString(source));
+        var open = lexer.Next();
+        if (open.Kind != TokenKind.LowerIdentifier
+            || !open.TextSpan.SequenceEqual("open".AsSpan()))
+        {
+            return false;
+        }
+
+        var identifier = lexer.Next();
+        if (identifier.AfterEol || !IsIdentifier(identifier.Kind))
+        {
+            return false;
+        }
+
+        name = identifier.Text;
+        var token = lexer.Next();
+        while (token.Kind == TokenKind.Dot && !token.AfterEol)
+        {
+            identifier = lexer.Next();
+            if (identifier.AfterEol || !IsIdentifier(identifier.Kind))
+            {
+                name = string.Empty;
+                return false;
+            }
+
+            name += "." + identifier.Text;
+            token = lexer.Next();
+        }
+
+        if (token.Kind == TokenKind.EndOfFile)
+        {
+            return true;
+        }
+
+        name = string.Empty;
+        return false;
+    }
+
+    private static bool IsIdentifier(TokenKind kind) =>
+        kind is TokenKind.LowerIdentifier or TokenKind.UpperIdentifier;
 
     internal Task<MinamoExecutionResult> ExecuteAsync(
         MinamoCodeModel model,
@@ -115,7 +250,21 @@ public sealed partial class MinamoInstance : IDisposable
             throw new InvalidOperationException("A host instance cannot be entered recursively.");
         }
 
-        await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        var queuedAt = Stopwatch.GetTimestamp();
+        try
+        {
+            await operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex)
+        {
+            return new(
+                null,
+                Array.Empty<BuildMessage>(),
+                MinamoFailure.From(ex, fallbackFailureKind),
+                operationName,
+                Guid.NewGuid(),
+                Metrics(queuedAt, TimeSpan.Zero, TimeSpan.Zero, control: null));
+        }
 
         operationScope.Value = true;
         try
@@ -327,10 +476,14 @@ public sealed partial class MinamoInstance : IDisposable
         }
     }
 
-    private ExecutionControl? CreateControl(CancellationToken cancellationToken)
+    private ExecutionControl? CreateControl(
+        CancellationToken cancellationToken,
+        bool collectMetrics = false)
     {
         var limits = Environment.Limits;
-        if (!limits.RequiresControl && !cancellationToken.CanBeCanceled)
+        if (!collectMetrics
+            && !limits.RequiresControl
+            && !cancellationToken.CanBeCanceled)
         {
             return null;
         }
@@ -349,7 +502,7 @@ public sealed partial class MinamoInstance : IDisposable
         bool stopAtSelectRequest = false)
     {
         while (result.Reason is TerminationReason.Suspended
-            && result.Continuation is not null
+            && result.Continuation is { } continuation
             && result.Suspension?.Awaitable is { } awaitable)
         {
             if (stopAtSelectRequest && awaitable is MinamoSelectRequestAwaitable)
@@ -357,9 +510,19 @@ public sealed partial class MinamoInstance : IDisposable
                 break;
             }
 
-            await awaitable.WaitAsync().ConfigureAwait(false);
-
-            result = MinamoMachine.Resume(result.Continuation, awaitable);
+            try
+            {
+                await awaitable.WaitAsync(
+                    result.Context.Control?.CancellationToken ?? default).ConfigureAwait(false);
+                result = MinamoMachine.Resume(continuation, awaitable);
+            }
+            catch
+            {
+                awaitable.Abandon();
+                continuation.Complete();
+                result.Context.Control?.Checkpoint();
+                throw;
+            }
         }
 
         return result;

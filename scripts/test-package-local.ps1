@@ -80,7 +80,7 @@ using Minamo.Hosting;
 var commands = new SampleCommands();
 var host = new MinamoHost().AddModule(commands);
 using var instance = host.CreateInstance(commands);
-var result = instance.Execute("import sample\nsample.Add(20, 22)");
+var result = await instance.ExecuteAsync("import sample\nsample.Add(20, 22)");
 return result.Success && result.GetValue<long>() == 42 ? 0 : 1;
 
 [MinamoModule("sample")]

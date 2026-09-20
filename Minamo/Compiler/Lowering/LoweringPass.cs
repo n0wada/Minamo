@@ -115,19 +115,19 @@ internal sealed class LoweringPass
                 LowerNode(property.Expression, new CompilerContext()));
         }
 
-        var choices = new LoweredSelectChoice[node.Choices.Count];
-        for (var i = 0; i < node.Choices.Count; i++)
+        var actions = new LoweredSelectAction[node.Actions.Count];
+        for (var i = 0; i < node.Actions.Count; i++)
         {
-            var choice = node.Choices[i];
-            choices[i] = new(
-                choice.Location,
-                choice.Name,
-                LowerParameters(choice.Parameters),
-                choice.Metadata is null
+            var action = node.Actions[i];
+            actions[i] = new(
+                action.Location,
+                action.Name,
+                LowerParameters(action.Parameters),
+                action.Metadata is null
                     ? null
-                    : Lower(choice.Metadata, new CompilerContext()),
-                choice.Guard is null ? null : LowerNode(choice.Guard, new CompilerContext()),
-                LowerNode(choice.Body, new CompilerContext()));
+                    : Lower(action.Metadata, new CompilerContext()),
+                action.Guard is null ? null : LowerNode(action.Guard, new CompilerContext()),
+                LowerNode(action.Body, new CompilerContext()));
         }
 
         var events = new LoweredSelectEvent[node.Events.Count];
@@ -147,7 +147,7 @@ internal sealed class LoweringPass
             description,
             locals,
             properties,
-            choices,
+            actions,
             events);
     }
 

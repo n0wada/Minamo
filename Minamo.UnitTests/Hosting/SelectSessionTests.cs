@@ -1,4 +1,5 @@
 using Minamo.Hosting;
+using System.Diagnostics;
 using System.Text;
 using Xunit;
 
@@ -7,12 +8,152 @@ namespace Minamo.UnitTesting;
 public sealed class SelectSessionTests
 {
     [Fact]
-    public async Task InteractiveSelectProvidesTheBasicChoiceApi()
+    public async Task ExecuteAsyncOpensANamedSelectCommand()
+    {
+        using var instance = new MinamoHost().CreateInstance();
+        var initialization = await instance.ExecuteAsync("""
+            select Player {
+                action "finish" => exit 42
+            }
+            """);
+        Assert.True(initialization.Success, initialization.Failure?.Message);
+        Assert.Null(initialization.Select);
+
+        var opened = await instance.ExecuteAsync("open Player");
+
+        Assert.True(opened.Success, opened.Failure?.Message);
+        using var select = Assert.IsType<MinamoSelect>(opened.Select);
+        await select.SelectAsync(Action(select, "finish"));
+        Assert.Equal(42L, select.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsyncOpensARegisteredDottedSelectAlias()
+    {
+        using var instance = new MinamoHost().CreateInstance();
+        var initialization = await instance.ExecuteAsync("""
+            select Player {
+                action "finish" => exit
+            }
+
+            alias(Player, "media.player")
+            """);
+        Assert.True(initialization.Success, initialization.Failure?.Message);
+
+        var opened = await instance.ExecuteAsync("open media.player");
+
+        Assert.True(opened.Success, opened.Failure?.Message);
+        using var select = Assert.IsType<MinamoSelect>(opened.Select);
+        Assert.Equal("finish", Assert.Single(select.Actions).Id);
+    }
+
+    [Fact]
+    public async Task ExecuteAsyncTreatsOtherInputAsScript()
+    {
+        using var instance = new MinamoHost().CreateInstance();
+
+        var result = await instance.ExecuteAsync("""
+            let open = 40
+            open + 2
+            """);
+
+        Assert.True(result.Success, result.Failure?.Message);
+        Assert.Null(result.Select);
+        Assert.Equal(42L, result.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsyncReportsAnUnknownOpenSelectAsInputFailure()
+    {
+        using var instance = new MinamoHost().CreateInstance();
+        var initialization = await instance.ExecuteAsync("let value = 42");
+        Assert.True(initialization.Success, initialization.Failure?.Message);
+
+        var result = await instance.ExecuteAsync("open Missing");
+
+        Assert.False(result.Success);
+        Assert.Null(result.Select);
+        Assert.Equal(MinamoFailureKind.Input, result.Failure?.Kind);
+        Assert.Contains("No select named 'Missing'", result.Failure?.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OpenSelectCommandReportsMetricsAndTelemetry()
+    {
+        var logs = new List<MinamoLogEntry>();
+        using var instance = new MinamoHost(new() { Log = logs.Add })
+            .Module("work", module => module.Command("Value", context =>
+            {
+                context.Log(MinamoLogLevel.Info, "select property");
+                return 42;
+            }))
+            .CreateInstance();
+        var initialization = await instance.ExecuteAsync("""
+            import work
+
+            select Player {
+                prop value => work.Value()
+                action "finish" => exit
+            }
+            """);
+        Assert.True(initialization.Success, initialization.Failure?.Message);
+
+        var opened = await instance.ExecuteAsync("open Player");
+
+        Assert.True(opened.Success, opened.Failure?.Message);
+        using var select = Assert.IsType<MinamoSelect>(opened.Select);
+        Assert.True(opened.Metrics.Instructions > 0);
+        Assert.True(opened.Metrics.HostCommands > 0);
+        Assert.True(opened.Metrics.VmDuration > TimeSpan.Zero);
+        var log = Assert.Single(logs, entry => entry.Message == "select property");
+        Assert.Equal(opened.ExecutionId, log.ExecutionId);
+        Assert.Equal("Value", log.Command);
+    }
+
+    [Fact]
+    public async Task OpenSelectCommandPropagatesCancellationDuringInitialization()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var instance = new MinamoHost()
+            .Module("work", module => module.AsyncCommand(
+                "Wait",
+                async context =>
+                {
+                    entered.SetResult();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, context.CancellationToken);
+                    return "unreachable";
+                }))
+            .CreateInstance();
+        var initialization = await instance.ExecuteAsync("""
+            import work
+
+            select Player {
+                desc ["title": work.Wait()]
+                action "finish" => exit
+            }
+            """);
+        Assert.True(initialization.Success, initialization.Failure?.Message);
+        using var cancellation = new CancellationTokenSource();
+
+        var opening = instance.ExecuteAsync("open Player", cancellation.Token);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
+        var cancelled = await opening.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(cancelled.Success);
+        Assert.Equal(MinamoFailureKind.Cancelled, cancelled.Failure?.Kind);
+        var next = await instance.ExecuteAsync("40 + 2");
+        Assert.True(next.Success, next.Failure?.Message);
+        Assert.Equal(42L, next.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task InteractiveSelectProvidesTheBasicActionApi()
     {
         using var instance = new MinamoHost().CreateInstance();
         var initialization = await instance.ExecuteAsync("""
             select flow {
-                case "finish" (value) => exit value
+                action "finish" (value) => exit value
             }
             """);
         Assert.True(initialization.Success, initialization.Failure?.Message);
@@ -21,12 +162,12 @@ public sealed class SelectSessionTests
         Assert.False(select.IsCompleted);
         Assert.False(select.TryGetValue<long>(out _));
         Assert.Throws<InvalidOperationException>(() => select.GetValue<long>());
-        Assert.Equal("finish", Assert.Single(select.Choices).Id);
+        Assert.Equal("finish", Assert.Single(select.Actions).Id);
 
-        await select.SelectAsync(Choice(select, "finish"), 42);
+        await select.SelectAsync(Action(select, "finish"), 42);
 
         Assert.True(select.IsCompleted);
-        Assert.Empty(select.Choices);
+        Assert.Empty(select.Actions);
         Assert.Equal(42L, select.GetValue<long>());
         Assert.True(select.TryGetValue<long>(out var value));
         Assert.Equal(42L, value);
@@ -39,7 +180,7 @@ public sealed class SelectSessionTests
         var initialization = await instance.ExecuteAsync("""
             select Flow {
                 prop Status => "ready"
-                case "finish" (Value) => exit Value
+                action "finish" (Value) => exit Value
             }
             """);
         Assert.True(initialization.Success, initialization.Failure?.Message);
@@ -47,37 +188,37 @@ public sealed class SelectSessionTests
         using var select = await instance.OpenSelectAsync("Flow");
         Assert.Equal("ready", Property(select, "Status").GetValue<string>());
 
-        await select.SelectAsync(Choice(select, "finish"), 42);
+        await select.SelectAsync(Action(select, "finish"), 42);
 
         Assert.True(select.IsCompleted);
         Assert.Equal(42L, select.GetValue<long>());
     }
 
     [Fact]
-    public async Task SelectRepublishesChoicesUntilExit()
+    public async Task SelectRepublishesActionsUntilExit()
     {
         using var instance = new MinamoHost().CreateInstance();
         var initialized = instance.Execute("""
             select flow {
                 mut count = 0
 
-                case "add" when count == 0 => {
+                action "add" when count == 0 => {
                     count += 1
                 }
 
-                case "finish" when count == 1 => exit count
+                action "finish" when count == 1 => exit count
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var select = instance.OpenSelectSession("flow");
-        Assert.Equal("add", Assert.Single(select.Snapshot.Choices).Id);
+        Assert.Equal("add", Assert.Single(select.Snapshot.Actions).Id);
 
-        await select.SelectAsync(Choice(select, "add"));
+        await select.SelectAsync(Action(select, "add"));
         Assert.False(select.IsCompleted);
-        Assert.Equal("finish", Assert.Single(select.Choices).Id);
+        Assert.Equal("finish", Assert.Single(select.Actions).Id);
 
-        await select.SelectAsync(Choice(select, "finish"));
+        await select.SelectAsync(Action(select, "finish"));
         Assert.True(select.IsCompleted);
         Assert.Equal(1L, select.GetValue<long>());
     }
@@ -97,7 +238,7 @@ public sealed class SelectSessionTests
 
                 prop "status-text" => fmt("Count: {0}", count)
 
-                case "add" when count < 2 [
+                action "add" when count < 2 [
                     "text": count == 0 ? "Start" : "Add again",
                     "control": "button",
                     "shape": "round"
@@ -105,7 +246,7 @@ public sealed class SelectSessionTests
                     count += 1
                 }
 
-                case "finish" when count == 2 => exit count
+                action "finish" when count == 2 => exit count
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
@@ -119,9 +260,9 @@ public sealed class SelectSessionTests
         Assert.Equal("Count: 0", Property(select, "status-text").GetValue<string>());
         Assert.Equal(
             "Start",
-            Choice(select, "add").Metadata?.GetValue<Dictionary<string, object?>>()?["text"]);
+            Action(select, "add").Metadata?.GetValue<Dictionary<string, object?>>()?["text"]);
 
-        await select.SelectAsync(Choice(select, "add"));
+        await select.SelectAsync(Action(select, "add"));
 
         Assert.Equal(1L, Property(select, "count").GetValue<long>());
         Assert.Equal(
@@ -130,11 +271,11 @@ public sealed class SelectSessionTests
         Assert.Equal("Count: 1", Property(select, "status-text").GetValue<string>());
         Assert.Equal(
             "Add again",
-            Choice(select, "add").Metadata?.GetValue<Dictionary<string, object?>>()?["text"]);
+            Action(select, "add").Metadata?.GetValue<Dictionary<string, object?>>()?["text"]);
         Assert.Equal(0L, initialCount.GetValue<long>());
 
-        await select.SelectAsync(Choice(select, "add"));
-        await select.SelectAsync(Choice(select, "finish"));
+        await select.SelectAsync(Action(select, "add"));
+        await select.SelectAsync(Action(select, "finish"));
 
         Assert.Equal(2L, select.GetValue<long>());
     }
@@ -150,7 +291,7 @@ public sealed class SelectSessionTests
             """);
         var label = host.Compile("""
             select flow {
-                case "finish" label "Finish" => exit
+                action "finish" label "Finish" => exit
             }
             """);
 
@@ -166,18 +307,18 @@ public sealed class SelectSessionTests
             select flow {
                 prop value => 1
                 prop value => 2
-                case "finish" => exit
+                action "finish" => exit
             }
             """);
         var propertyMetadata = host.Compile("""
             select flow {
                 prop value ["number"] => 1
-                case "finish" => exit
+                action "finish" => exit
             }
             """);
         var caseMetadata = host.Compile("""
             select flow {
-                case "finish" [control: "button"] => exit
+                action "finish" [control: "button"] => exit
             }
             """);
 
@@ -195,12 +336,12 @@ public sealed class SelectSessionTests
         var expectedOrder = host.Compile("""
             select flow {
                 let flags = ["ready": true]
-                case "finish" when flags["ready"] ["text": "Finish"] => exit
+                action "finish" when flags["ready"] ["text": "Finish"] => exit
             }
             """);
         var reversedOrder = host.Compile("""
             select flow {
-                case "finish" ["text": "Finish"] when true => exit
+                action "finish" ["text": "Finish"] when true => exit
             }
             """);
 
@@ -214,7 +355,7 @@ public sealed class SelectSessionTests
         var state = new MinamoHost().Compile("""
             select flow {
                 initial state ready {
-                    case "finish" => exit
+                    action "finish" => exit
                 }
             }
             """);
@@ -229,41 +370,41 @@ public sealed class SelectSessionTests
         var initialized = await instance.ExecuteAsync("""
             select child {
                 desc ["title": "Child"]
-                case "return" => return
+                action "return" => return
             }
 
             select root {
                 desc ["title": "Root"]
                 mut opened = false
 
-                case "open" when !opened => {
+                action "open" when !opened => {
                     opened = true
                     goto child
                 }
 
-                case "finish" when opened => exit "done"
+                action "finish" when opened => exit "done"
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var select = await instance.OpenSelectAsync("root");
-        var staleRootChoice = Choice(select, "open");
+        var staleRootAction = Action(select, "open");
         Assert.Equal("Root", select.Description?
             .GetValue<Dictionary<string, object?>>()?["title"]);
 
-        await select.SelectAsync(staleRootChoice);
+        await select.SelectAsync(staleRootAction);
 
         Assert.Equal("child", select.Name);
         Assert.Equal("Child", select.Description?
             .GetValue<Dictionary<string, object?>>()?["title"]);
-        await Assert.ThrowsAsync<ArgumentException>(() => select.SelectAsync(staleRootChoice));
-        await select.SelectAsync(Choice(select, "return"));
+        await Assert.ThrowsAsync<ArgumentException>(() => select.SelectAsync(staleRootAction));
+        await select.SelectAsync(Action(select, "return"));
 
         Assert.Equal("root", select.Name);
         Assert.Equal("Root", select.Description?
             .GetValue<Dictionary<string, object?>>()?["title"]);
-        Assert.Equal("finish", Assert.Single(select.Choices).Id);
-        await select.SelectAsync(Choice(select, "finish"));
+        Assert.Equal("finish", Assert.Single(select.Actions).Id);
+        await select.SelectAsync(Action(select, "finish"));
 
         Assert.True(select.IsCompleted);
         Assert.Equal("done", select.GetValue<string>());
@@ -275,39 +416,39 @@ public sealed class SelectSessionTests
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             select leaf {
-                case "up" => return
+                action "up" => return
             }
 
             select middle {
                 mut visited = false
-                case "down" when !visited => {
+                action "down" when !visited => {
                     visited = true
                     goto leaf
                 }
-                case "up" when visited => return
+                action "up" when visited => return
             }
 
             select root {
                 mut visited = false
-                case "down" when !visited => {
+                action "down" when !visited => {
                     visited = true
                     goto middle
                 }
-                case "finish" when visited => exit 42
+                action "finish" when visited => exit 42
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var select = await instance.OpenSelectAsync("root");
-        await select.SelectAsync(Choice(select, "down"));
+        await select.SelectAsync(Action(select, "down"));
         Assert.Equal("middle", select.Name);
-        await select.SelectAsync(Choice(select, "down"));
+        await select.SelectAsync(Action(select, "down"));
         Assert.Equal("leaf", select.Name);
-        await select.SelectAsync(Choice(select, "up"));
+        await select.SelectAsync(Action(select, "up"));
         Assert.Equal("middle", select.Name);
-        await select.SelectAsync(Choice(select, "up"));
+        await select.SelectAsync(Action(select, "up"));
         Assert.Equal("root", select.Name);
-        await select.SelectAsync(Choice(select, "finish"));
+        await select.SelectAsync(Action(select, "finish"));
         Assert.Equal(42L, select.GetValue<long>());
     }
 
@@ -317,18 +458,18 @@ public sealed class SelectSessionTests
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             select child {
-                case "finish" => exit 42
+                action "finish" => exit 42
             }
 
             select root {
-                case "open" => goto child
+                action "open" => goto child
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var select = await instance.OpenSelectAsync("root");
-        await select.SelectAsync(Choice(select, "open"));
-        await select.SelectAsync(Choice(select, "finish"));
+        await select.SelectAsync(Action(select, "open"));
+        await select.SelectAsync(Action(select, "finish"));
 
         Assert.True(select.IsCompleted);
         Assert.Equal(42L, select.GetValue<long>());
@@ -367,20 +508,20 @@ public sealed class SelectSessionTests
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             select root {
-                case "invalid" => goto 42
+                action "invalid" => goto 42
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var select = await instance.OpenSelectAsync("root");
-        var published = Assert.Single(select.Choices);
+        var published = Assert.Single(select.Actions);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => select.SelectAsync(published));
 
         Assert.False(select.IsCompleted);
         Assert.Equal("root", select.Name);
-        Assert.Same(published, Assert.Single(select.Choices));
+        Assert.Same(published, Assert.Single(select.Actions));
     }
 
     [Fact]
@@ -391,28 +532,28 @@ public sealed class SelectSessionTests
             func createChild(title) {
                 select {
                     desc ["title": title]
-                    case "up" => return
+                    action "up" => return
                 }
             }
 
             select root {
                 mut returned = false
-                case "open" when !returned => {
+                action "open" when !returned => {
                     returned = true
                     goto createChild("Generated")
                 }
-                case "finish" when returned => exit
+                action "finish" when returned => exit
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var select = await instance.OpenSelectAsync("root");
-        await select.SelectAsync(Choice(select, "open"));
+        await select.SelectAsync(Action(select, "open"));
 
         Assert.Equal("<anonymous>", select.Name);
         Assert.Equal("Generated", select.Description?
             .GetValue<Dictionary<string, object?>>()?["title"]);
-        await select.SelectAsync(Choice(select, "up"));
+        await select.SelectAsync(Action(select, "up"));
         Assert.Equal("root", select.Name);
     }
 
@@ -425,20 +566,20 @@ public sealed class SelectSessionTests
 
             select root {
                 mut returned = false
-                case "open" when !returned => {
+                action "open" when !returned => {
                     returned = true
                     goto empty
                 }
-                case "finish" when returned => exit
+                action "finish" when returned => exit
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var select = await instance.OpenSelectAsync("root");
-        await select.SelectAsync(Choice(select, "open"));
+        await select.SelectAsync(Action(select, "open"));
 
         Assert.Equal("root", select.Name);
-        Assert.Equal("finish", Assert.Single(select.Choices).Id);
+        Assert.Equal("finish", Assert.Single(select.Actions).Id);
     }
 
     [Fact]
@@ -447,13 +588,13 @@ public sealed class SelectSessionTests
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             select root {
-                case "return" => return
+                action "return" => return
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var select = await instance.OpenSelectAsync("root");
-        await select.SelectAsync(Choice(select, "return"));
+        await select.SelectAsync(Action(select, "return"));
 
         Assert.True(select.IsCompleted);
         Assert.Null(select.GetValue<object?>());
@@ -464,7 +605,7 @@ public sealed class SelectSessionTests
     {
         var compiled = new MinamoHost().Compile("""
             select root {
-                case "invalid" => return 42
+                action "invalid" => return 42
             }
             """);
 
@@ -477,7 +618,7 @@ public sealed class SelectSessionTests
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             select root {
-                case "finish" => {
+                action "finish" => {
                     func value() { return 42 }
                     exit value()
                 }
@@ -486,7 +627,7 @@ public sealed class SelectSessionTests
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var select = await instance.OpenSelectAsync("root");
-        await select.SelectAsync(Choice(select, "finish"));
+        await select.SelectAsync(Action(select, "finish"));
 
         Assert.Equal(42L, select.GetValue<long>());
     }
@@ -498,20 +639,20 @@ public sealed class SelectSessionTests
         var nonDictionary = host.Compile("""
             select flow {
                 desc ["title"]
-                case "finish" => exit
+                action "finish" => exit
             }
             """);
         var nonStringKey = host.Compile("""
             select flow {
                 desc [title: "Ready"]
-                case "finish" => exit
+                action "finish" => exit
             }
             """);
         var stateDescription = host.Compile("""
             select flow {
                 initial state ready {
                     desc ["title": "Ready"]
-                    case "finish" => exit
+                    action "finish" => exit
                 }
             }
             """);
@@ -522,15 +663,15 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void ChildChoiceSpreadSyntaxIsRejected()
+    public void ChildActionSpreadSyntaxIsRejected()
     {
         var compiled = new MinamoHost().Compile("""
             select child {
-                case "finish" => exit
+                action "finish" => exit
             }
 
             select parent {
-                case ...child
+                action ...child
             }
             """);
 
@@ -538,26 +679,26 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public async Task PublishedChoicesRejectInputAfterAnAction()
+    public async Task PublishedActionsRejectInputAfterAnAction()
     {
         using var instance = new MinamoHost().CreateInstance();
         var initialization = await instance.ExecuteAsync("""
             select flow {
-                case "advance" => { }
-                case "finish" => exit 42
+                action "advance" => { }
+                action "finish" => exit 42
             }
             """);
         Assert.True(initialization.Success, initialization.Failure?.Message);
 
         using var select = await instance.OpenSelectAsync("flow");
-        var staleChoice = Choice(select, "finish");
+        var staleAction = Action(select, "finish");
 
-        await select.SelectAsync(Choice(select, "advance"));
+        await select.SelectAsync(Action(select, "advance"));
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => select.SelectAsync(staleChoice));
+            () => select.SelectAsync(staleAction));
 
-        await select.SelectAsync(Choice(select, "finish"));
+        await select.SelectAsync(Action(select, "finish"));
         Assert.True(select.IsCompleted);
         Assert.Equal(42L, select.GetValue<long>());
     }
@@ -589,7 +730,7 @@ public sealed class SelectSessionTests
                 desc ["title": catalog.Description()]
 
                 on "changed" => { }
-                case "old" when catalog.Available() => exit "old"
+                action "old" when catalog.Available() => exit "old"
             }
             """);
         Assert.True(initialization.Success, initialization.Failure?.Message);
@@ -598,30 +739,30 @@ public sealed class SelectSessionTests
         Assert.Equal("Description 1", select.Description?
             .GetValue<Dictionary<string, object?>>()?["title"]);
         Assert.Equal(1, descriptionCalls);
-        var oldChoice = Assert.Single(select.Choices);
-        Assert.Equal("old", oldChoice.Id);
+        var oldAction = Assert.Single(select.Actions);
+        Assert.Equal("old", oldAction.Id);
 
         failAvailability = true;
         await Assert.ThrowsAnyAsync<Exception>(() => select.SendAsync("changed"));
 
         Assert.Equal(1, descriptionCalls);
-        Assert.Same(oldChoice, Assert.Single(select.Choices));
+        Assert.Same(oldAction, Assert.Single(select.Actions));
         failAvailability = false;
-        await select.SelectAsync(oldChoice);
+        await select.SelectAsync(oldAction);
         Assert.True(select.IsCompleted);
         Assert.Equal("old", select.GetValue<string>());
     }
 
     [Fact]
-    public async Task SelectKeepsItsFinalPublishedStateAndRejectsStaleChoices()
+    public async Task SelectKeepsItsFinalPublishedStateAndRejectsStaleActions()
     {
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             let flow = select {
                 desc ["title": "Ready"]
 
-                case "continue" => { }
-                case "finish" => exit 42
+                action "continue" => { }
+                action "finish" => exit 42
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
@@ -630,13 +771,13 @@ public sealed class SelectSessionTests
         Assert.False(select.IsCompleted);
         Assert.Equal("Ready", select.Description?
             .GetValue<Dictionary<string, object?>>()?["title"]);
-        var staleChoice = Choice(select, "finish");
+        var staleAction = Action(select, "finish");
 
-        await select.SelectAsync(Choice(select, "continue"));
+        await select.SelectAsync(Action(select, "continue"));
         await Assert.ThrowsAsync<ArgumentException>(
-            () => select.SelectAsync(staleChoice));
+            () => select.SelectAsync(staleAction));
 
-        await select.SelectAsync(Choice(select, "finish"));
+        await select.SelectAsync(Action(select, "finish"));
         Assert.True(select.IsCompleted);
         Assert.Equal(42L, select.GetValue<long>());
     }
@@ -653,7 +794,7 @@ public sealed class SelectSessionTests
         Assert.True(initialization.Success, initialization.Failure?.Message);
 
         using var select = await instance.OpenSelectAsync("flow");
-        Assert.Empty(select.Choices);
+        Assert.Empty(select.Actions);
 
         await select.SendAsync("complete", "done");
 
@@ -679,13 +820,13 @@ public sealed class SelectSessionTests
             import work
 
             let flow = select {
-                case "finish" => exit work.Value()
+                action "finish" => exit work.Value()
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
         using var select = await instance.OpenSelectSessionAsync("flow");
 
-        var selection = select.SelectAsync(Choice(select, "finish"));
+        var selection = select.SelectAsync(Action(select, "finish"));
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.False(selection.IsCompleted);
 
@@ -696,12 +837,51 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
+    public async Task DisposingSelectCancelsAnInFlightActionWithoutBlocking()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var instance = new MinamoHost()
+            .Module("work", module => module.AsyncCommand(
+                "Value",
+                async _ =>
+                {
+                    entered.SetResult();
+                    return await completion.Task.ConfigureAwait(false);
+                }))
+            .CreateInstance();
+        var initialized = await instance.ExecuteAsync("""
+            import work
+
+            select flow {
+                action "finish" => exit work.Value()
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+        var select = await instance.OpenSelectAsync("flow");
+        var selection = select.SelectAsync(Action(select, "finish"));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var started = Stopwatch.GetTimestamp();
+        select.Dispose();
+        var disposeDuration = Stopwatch.GetElapsedTime(started);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => selection.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(disposeDuration < TimeSpan.FromSeconds(1));
+        var next = await instance.ExecuteAsync("40 + 2");
+        Assert.True(next.Success, next.Failure?.Message);
+        Assert.Equal(42L, next.GetValue<long>());
+        completion.TrySetResult(42);
+    }
+
+    [Fact]
     public async Task SelectActionYieldsARequestAndResumesWithAResponse()
     {
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             select flow {
-                case "ask" => {
+                action "ask" => {
                     let name = request("text", ["prompt": "Name"])
                     exit fmt("Hello, {0}", name)
                 }
@@ -710,14 +890,14 @@ public sealed class SelectSessionTests
         Assert.True(initialized.Success, initialized.Failure?.Message);
         using var select = await instance.OpenSelectAsync("flow");
 
-        var requestChoice = Choice(select, "ask");
-        await select.SelectAsync(requestChoice);
+        var requestAction = Action(select, "ask");
+        await select.SelectAsync(requestAction);
 
-        Assert.Empty(select.Choices);
+        Assert.Empty(select.Actions);
         var request = Assert.IsType<MinamoSelectRequest>(select.Request);
         Assert.Equal("text", request.Kind);
         Assert.Equal("Name", request.GetPayload<Dictionary<string, object?>>()?["prompt"]);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => select.SelectAsync(requestChoice));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => select.SelectAsync(requestAction));
 
         await select.RespondAsync(request, "Minamo");
 
@@ -734,7 +914,7 @@ public sealed class SelectSessionTests
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             select flow {
-                case "sum" => {
+                action "sum" => {
                     let first = request("number")
                     let second = request("number", ["previous": first])
                     exit first + second
@@ -744,7 +924,7 @@ public sealed class SelectSessionTests
         Assert.True(initialized.Success, initialized.Failure?.Message);
         using var select = await instance.OpenSelectAsync("flow");
 
-        await select.SelectAsync(Choice(select, "sum"));
+        await select.SelectAsync(Action(select, "sum"));
         var first = Assert.IsType<MinamoSelectRequest>(select.Request);
         Assert.Equal("number", first.Kind);
         Assert.Null(first.GetPayload<object?>());
@@ -766,12 +946,12 @@ public sealed class SelectSessionTests
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             select flow {
-                case "ask" => exit request("text")
+                action "ask" => exit request("text")
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
         var select = await instance.OpenSelectAsync("flow");
-        await select.SelectAsync(Choice(select, "ask"));
+        await select.SelectAsync(Action(select, "ask"));
         var request = Assert.IsType<MinamoSelectRequest>(select.Request);
 
         select.Dispose();
@@ -825,24 +1005,24 @@ public sealed class SelectSessionTests
         using var instance = new MinamoHost().CreateInstance();
         var initialization = await instance.ExecuteAsync("""
             select flow {
-                case "finish" => exit 42
+                action "finish" => exit 42
             }
             """);
         Assert.True(initialization.Success, initialization.Failure?.Message);
 
         using var session = await instance.OpenSelectSessionAsync("flow");
-        await session.SelectAsync(Choice(session, "finish"));
+        await session.SelectAsync(Action(session, "finish"));
         Assert.True(session.IsCompleted);
     }
 
     [Fact]
-    public void SelectRejectsStateSyntaxAndDuplicateChoices()
+    public void SelectRejectsStateSyntaxAndDuplicateActions()
     {
         var host = new MinamoHost();
         var stringState = host.Compile("""
             select player {
                 initial state "stopped" {
-                    case "play" => { }
+                    action "play" => { }
                 }
             }
             """);
@@ -851,29 +1031,29 @@ public sealed class SelectSessionTests
         var missingInitial = host.Compile("""
             select player {
                 state stopped {
-                    case "play" => { }
+                    action "play" => { }
                 }
             }
             """);
         Assert.False(missingInitial.Success);
 
-        var duplicateChoice = host.Compile("""
+        var duplicateAction = host.Compile("""
             select player {
-                case "play" => { }
-                case "play" => { }
+                action "play" => { }
+                action "play" => { }
             }
             """);
-        Assert.False(duplicateChoice.Success);
-        Assert.Contains(duplicateChoice.Errors, error =>
-            error.Code == (int)Minamo.Compiler.CompilerError.SelectDuplicateChoice);
+        Assert.False(duplicateAction.Success);
+        Assert.Contains(duplicateAction.Errors, error =>
+            error.Code == (int)Minamo.Compiler.CompilerError.SelectDuplicateAction);
     }
 
     [Fact]
-    public void SelectDoesNotSupportChoiceDescriptions()
+    public void SelectDoesNotSupportActionDescriptions()
     {
         var compiled = new MinamoHost().Compile("""
             select flow {
-                case "finish" description "Legacy display text" => exit
+                action "finish" description "Legacy display text" => exit
             }
             """);
 
@@ -909,31 +1089,31 @@ public sealed class SelectSessionTests
             select player {
                 mut mode = "stopped"
 
-                case "play" when mode == "stopped" => {
+                action "play" when mode == "stopped" => {
                     music.Play()
                     mode = "playing"
                 }
 
-                case "set-volume" (value) when mode == "stopped" => {
+                action "set-volume" (value) when mode == "stopped" => {
                     music.SetVolume(value)
                 }
 
-                case "move" (x, y) when mode == "stopped" => {
+                action "move" (x, y) when mode == "stopped" => {
                     music.Move(x, y)
                 }
 
-                case "status" when mode == "stopped" ["text": "Show status"] => {
+                action "status" when mode == "stopped" ["text": "Show status"] => {
                 }
 
-                case "hidden" when false ["text": "Hidden command"] => {
+                action "hidden" when false ["text": "Hidden command"] => {
                 }
 
-                case "pause" when mode == "playing" => {
+                action "pause" when mode == "playing" => {
                     music.Pause()
                     mode = "paused"
                 }
 
-                case "exit" when mode == "paused" => exit "done"
+                action "exit" when mode == "paused" => exit "done"
             }
 
             alias(player, "music.player")
@@ -942,36 +1122,36 @@ public sealed class SelectSessionTests
         using var instance = host.CreateInstance(program);
         using var session = instance.OpenSelectSession("music.player");
 
-        Assert.Collection(session.Choices,
-            choice => Assert.Equal("play", choice.Id),
-            choice => Assert.Equal("set-volume", choice.Id),
-            choice => Assert.Equal("move", choice.Id),
-            choice =>
+        Assert.Collection(session.Actions,
+            action => Assert.Equal("play", action.Id),
+            action => Assert.Equal("set-volume", action.Id),
+            action => Assert.Equal("move", action.Id),
+            action =>
             {
-                Assert.Equal("status", choice.Id);
+                Assert.Equal("status", action.Id);
                 Assert.Equal(
                     "Show status",
-                    choice.Metadata?.GetValue<Dictionary<string, object?>>()?["text"]);
+                    action.Metadata?.GetValue<Dictionary<string, object?>>()?["text"]);
             });
-        var unknown = new MinamoChoice("hidden", 0);
+        var unknown = new MinamoSelectAction("hidden", 0);
         await Assert.ThrowsAsync<ArgumentException>(() => session.SelectAsync(unknown));
 
-        await session.SelectAsync(Choice(session, "set-volume"), 80);
+        await session.SelectAsync(Action(session, "set-volume"), 80);
         Assert.False(session.IsCompleted);
         Assert.Equal(80, volume);
 
-        await session.SelectAsync(Choice(session, "move"), (12, 34));
+        await session.SelectAsync(Action(session, "move"), (12, 34));
         Assert.Equal((12L, 34L), position);
 
-        await session.SelectAsync(Choice(session, "play"));
-        Assert.Single(session.Choices);
-        Assert.Equal("pause", session.Choices[0].Id);
+        await session.SelectAsync(Action(session, "play"));
+        Assert.Single(session.Actions);
+        Assert.Equal("pause", session.Actions[0].Id);
 
-        await session.SelectAsync(Choice(session, "pause"));
-        Assert.Single(session.Choices);
-        Assert.Equal("exit", session.Choices[0].Id);
+        await session.SelectAsync(Action(session, "pause"));
+        Assert.Single(session.Actions);
+        Assert.Equal("exit", session.Actions[0].Id);
 
-        await session.SelectAsync(Choice(session, "exit"));
+        await session.SelectAsync(Action(session, "exit"));
         Assert.True(session.IsCompleted);
         Assert.Equal("done", session.GetValue<string>());
     }
@@ -985,11 +1165,11 @@ public sealed class SelectSessionTests
                 desc ["title": "Flow", "step": 1]
                 mut advanced = false
 
-                case "next" when !advanced => {
+                action "next" when !advanced => {
                     advanced = true
                 }
 
-                case "exit" when advanced => exit "Done"
+                action "exit" when advanced => exit "Done"
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
@@ -1003,7 +1183,7 @@ public sealed class SelectSessionTests
         Assert.Equal("Flow", initialDescription["title"]);
         Assert.Equal(1, initialDescription["step"]);
 
-        await session.SelectAsync(Choice(session, "next"));
+        await session.SelectAsync(Action(session, "next"));
         var next = session.Snapshot;
         var nextDescription = next.Description?
             .GetValue<Dictionary<string, object?>>()
@@ -1011,14 +1191,14 @@ public sealed class SelectSessionTests
         Assert.Same(initial.Description, next.Description);
         Assert.Equal("Flow", nextDescription["title"]);
 
-        await session.SelectAsync(Choice(session, "exit"));
+        await session.SelectAsync(Action(session, "exit"));
 
         Assert.True(session.IsCompleted);
         Assert.Equal("Done", session.GetValue<string>());
     }
 
     [Fact]
-    public async Task HostEventReevaluatesTheSnapshotAndRejectsPreviouslyPublishedChoices()
+    public async Task HostEventReevaluatesTheSnapshotAndRejectsPreviouslyPublishedActions()
     {
         var available = true;
         using var instance = new MinamoHost()
@@ -1029,7 +1209,7 @@ public sealed class SelectSessionTests
 
             select flow {
                 on "inventory-changed" => { }
-                case "finish"
+                action "finish"
                     when inventory.IsAvailable()
                     => exit "done"
             }
@@ -1038,38 +1218,38 @@ public sealed class SelectSessionTests
 
         using var session = instance.OpenSelectSession("flow");
         var initial = session.Snapshot;
-        var staleChoice = Assert.Single(initial.Choices);
+        var staleAction = Assert.Single(initial.Actions);
         available = false;
         await session.SendAsync("inventory-changed");
 
-        Assert.Empty(session.Choices);
-        await Assert.ThrowsAsync<ArgumentException>(() => session.SelectAsync(staleChoice));
+        Assert.Empty(session.Actions);
+        await Assert.ThrowsAsync<ArgumentException>(() => session.SelectAsync(staleAction));
         available = true;
         await session.SendAsync("inventory-changed");
-        Assert.Single(session.Choices);
+        Assert.Single(session.Actions);
 
-        await session.SelectAsync(Assert.Single(session.Choices));
+        await session.SelectAsync(Assert.Single(session.Actions));
 
         Assert.True(session.IsCompleted);
         Assert.Equal("done", session.GetValue<string>());
     }
 
     [Fact]
-    public async Task HostEventPublishesNewChoiceObjects()
+    public async Task HostEventPublishesNewActionObjects()
     {
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             select flow {
                 on "republish" => { }
-                case "finish" => exit
+                action "finish" => exit
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var session = await instance.OpenSelectSessionAsync("flow");
-        var initial = Assert.Single(session.Choices);
+        var initial = Assert.Single(session.Actions);
         await session.SendAsync("republish");
-        var refreshed = Assert.Single(session.Choices);
+        var refreshed = Assert.Single(session.Actions);
 
         Assert.NotSame(initial, refreshed);
         await Assert.ThrowsAsync<ArgumentException>(() => session.SelectAsync(initial));
@@ -1101,11 +1281,11 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void DynamicChoiceSyntaxIsRejected()
+    public void DynamicActionSyntaxIsRejected()
     {
         var compiled = new MinamoHost().Compile("""
             select shop {
-                case item.id
+                action item.id
                     label item.name
                     for item in [
                     (id: "apple", name: "Apple", enabled: true, price: 3),
@@ -1120,12 +1300,12 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public void LegacyDynamicChoiceGroupSyntaxIsRejected()
+    public void LegacyDynamicActionGroupSyntaxIsRejected()
     {
         var compiled = new MinamoHost().Compile("""
             select flow {
                 for item in ["only"] {
-                    case item => exit
+                    action item => exit
                 }
             }
             """);
@@ -1139,7 +1319,7 @@ public sealed class SelectSessionTests
         var compiled = new MinamoHost().Compile("""
             select flow {
                 view => ["style": "primary"]
-                case "continue" => exit
+                action "continue" => exit
             }
             """);
 
@@ -1158,16 +1338,29 @@ public sealed class SelectSessionTests
         Assert.False(compiled.Success);
     }
 
+    [Fact]
+    public void LegacyCaseKeywordIsRejected()
+    {
+        var compiled = new MinamoHost().Compile("""
+            select flow {
+                case "finish" => exit
+            }
+            """);
+
+        Assert.False(compiled.Success);
+    }
+
     [Theory]
+    [InlineData("open flow")]
     [InlineData("do flow")]
     [InlineData("do \"flow\"")]
     [InlineData("let result = do flow")]
     [InlineData("func invoke() => do flow")]
-    [InlineData("select parent { case \"open\" => { do flow } }")]
+    [InlineData("select parent { action \"open\" => { do flow } }")]
     public void ScriptSelectInvocationIsRejected(string invocation)
     {
         var compiled = new MinamoHost().Compile(
-            "select flow { case \"finish\" => exit }\n" + invocation);
+            "select flow { action \"finish\" => exit }\n" + invocation);
 
         Assert.False(compiled.Success);
     }
@@ -1197,7 +1390,7 @@ public sealed class SelectSessionTests
         var result = instance.Execute("""
             func createPlayer(volume) {
                 select {
-                    case "louder" => {
+                    action "louder" => {
                         print(volume)
                     }
                 }
@@ -1218,11 +1411,11 @@ public sealed class SelectSessionTests
                 mut known = false
 
                 select {
-                    case "learn" when !known => {
+                    action "learn" when !known => {
                         known = true
                     }
 
-                    case "continue" when known => exit
+                    action "continue" when known => exit
                 }
             }
 
@@ -1231,11 +1424,11 @@ public sealed class SelectSessionTests
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var first = instance.OpenSelectSession("quest.town");
-        Assert.Equal("learn", Assert.Single(first.Choices).Id);
-        await first.SelectAsync(Choice(first, "learn"));
+        Assert.Equal("learn", Assert.Single(first.Actions).Id);
+        await first.SelectAsync(Action(first, "learn"));
 
         using var second = instance.OpenSelectSession("quest.town");
-        Assert.Equal("continue", Assert.Single(second.Choices).Id);
+        Assert.Equal("continue", Assert.Single(second.Actions).Id);
     }
 
     [Fact]
@@ -1246,11 +1439,11 @@ public sealed class SelectSessionTests
             select player {
                 mut playing = false
 
-                case "play" when !playing => {
+                action "play" when !playing => {
                     playing = true
                 }
 
-                case "exit" when playing => exit
+                action "exit" when playing => exit
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
@@ -1258,10 +1451,10 @@ public sealed class SelectSessionTests
         using var first = instance.OpenSelectSession("player");
         using var second = instance.OpenSelectSession("player");
 
-        await first.SelectAsync(Choice(first, "play"));
+        await first.SelectAsync(Action(first, "play"));
 
-        Assert.Equal("exit", first.Choices.Single().Id);
-        Assert.Equal("play", second.Choices.Single().Id);
+        Assert.Equal("exit", first.Actions.Single().Id);
+        Assert.Equal("play", second.Actions.Single().Id);
     }
 
     [Fact]
@@ -1272,22 +1465,22 @@ public sealed class SelectSessionTests
             select player {
                 mut ready = false
 
-                case "ready" when !ready => {
+                action "ready" when !ready => {
                     ready = true
                 }
 
-                case "exit" when ready => exit
+                action "exit" when ready => exit
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
 
         using var first = instance.OpenSelectSession("player");
-        Assert.Equal("ready", Assert.Single(first.Choices).Id);
-        await first.SelectAsync(Choice(first, "ready"));
-        Assert.Equal("exit", Assert.Single(first.Choices).Id);
+        Assert.Equal("ready", Assert.Single(first.Actions).Id);
+        await first.SelectAsync(Action(first, "ready"));
+        Assert.Equal("exit", Assert.Single(first.Actions).Id);
 
         using var second = instance.OpenSelectSession("player");
-        Assert.Equal("ready", Assert.Single(second.Choices).Id);
+        Assert.Equal("ready", Assert.Single(second.Actions).Id);
     }
 
     [Fact]
@@ -1299,7 +1492,7 @@ public sealed class SelectSessionTests
         var initialized = await instance.ExecuteAsync("""
             func createShop(name) {
                 select {
-                    case "leave" => {
+                    action "leave" => {
                         print(name, terminator: nil)
                         exit
                     }
@@ -1312,9 +1505,9 @@ public sealed class SelectSessionTests
         using var select = await instance.OpenSelectSessionAsync("shop");
 
         Assert.False(select.IsCompleted);
-        Assert.Equal("leave", Assert.Single(select.Choices).Id);
+        Assert.Equal("leave", Assert.Single(select.Actions).Id);
 
-        await select.SelectAsync(Choice(select, "leave"));
+        await select.SelectAsync(Action(select, "leave"));
 
         Assert.True(select.IsCompleted);
         Assert.Equal("weapons", output.ToString());
@@ -1326,14 +1519,14 @@ public sealed class SelectSessionTests
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             let player = select {
-                case "exit" => exit
+                action "exit" => exit
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
         using var select = await instance.OpenSelectSessionAsync("player");
 
         Assert.False(select.IsCompleted);
-        await select.SelectAsync(Choice(select, "exit"));
+        await select.SelectAsync(Action(select, "exit"));
         Assert.True(select.IsCompleted);
     }
 
@@ -1345,20 +1538,20 @@ public sealed class SelectSessionTests
             let player = select {
                 mut ready = false
 
-                case "ready" when !ready => {
+                action "ready" when !ready => {
                     ready = true
                 }
 
-                case "exit" when ready => exit
+                action "exit" when ready => exit
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
         using var select = await instance.OpenSelectSessionAsync("player");
 
-        Assert.Equal("ready", Assert.Single(select.Choices).Id);
-        await select.SelectAsync(Choice(select, "ready"));
-        Assert.Equal("exit", Assert.Single(select.Choices).Id);
-        await select.SelectAsync(Choice(select, "exit"));
+        Assert.Equal("ready", Assert.Single(select.Actions).Id);
+        await select.SelectAsync(Action(select, "ready"));
+        Assert.Equal("exit", Assert.Single(select.Actions).Id);
+        await select.SelectAsync(Action(select, "exit"));
         Assert.True(select.IsCompleted);
     }
 
@@ -1369,14 +1562,14 @@ public sealed class SelectSessionTests
         var initialized = await instance.ExecuteAsync("""
             let available = true
             let player = select {
-                case "exit" when available => exit
+                action "exit" when available => exit
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
         using var select = await instance.OpenSelectSessionAsync("player");
 
         Assert.False(select.IsCompleted);
-        Assert.Equal("exit", Assert.Single(select.Choices).Id);
+        Assert.Equal("exit", Assert.Single(select.Actions).Id);
     }
 
     [Fact]
@@ -1393,18 +1586,18 @@ public sealed class SelectSessionTests
         using var select = await instance.OpenSelectSessionAsync("empty");
 
         Assert.True(select.IsCompleted);
-        Assert.Empty(select.Choices);
+        Assert.Empty(select.Actions);
         Assert.Empty(output.ToString());
     }
 
     [Fact]
-    public async Task ASelectWithoutAvailableChoicesCompletesWithNil()
+    public async Task ASelectWithoutAvailableActionsCompletesWithNil()
     {
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             let available = false
             let flow = select {
-                case "finish" when available => exit "choice"
+                action "finish" when available => exit "choice"
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
@@ -1415,29 +1608,29 @@ public sealed class SelectSessionTests
     }
 
     [Fact]
-    public async Task SelectCompletesAfterTheLastChoiceBecomesUnavailable()
+    public async Task SelectCompletesAfterTheLastActionBecomesUnavailable()
     {
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
             let flow = select {
                 mut available = true
 
-                case "disable" when available => { available = false }
-                case "finish" when available => exit "choice"
+                action "disable" when available => { available = false }
+                action "finish" when available => exit "choice"
             }
             """);
         Assert.True(initialized.Success, initialized.Failure?.Message);
         using var select = await instance.OpenSelectSessionAsync("flow");
 
-        Assert.Equal(new[] { "disable", "finish" }, select.Choices.Select(choice => choice.Id));
-        await select.SelectAsync(Choice(select, "disable"));
+        Assert.Equal(new[] { "disable", "finish" }, select.Actions.Select(action => action.Id));
+        await select.SelectAsync(Action(select, "disable"));
 
         Assert.True(select.IsCompleted);
         Assert.Null(select.GetValue<object?>());
     }
 
     [Fact]
-    public async Task HostEventsKeepASelectWithoutChoicesActive()
+    public async Task HostEventsKeepASelectWithoutActionsActive()
     {
         using var instance = new MinamoHost().CreateInstance();
         var initialized = await instance.ExecuteAsync("""
@@ -1449,7 +1642,7 @@ public sealed class SelectSessionTests
         using var select = await instance.OpenSelectSessionAsync("flow");
 
         Assert.False(select.IsCompleted);
-        Assert.Empty(select.Choices);
+        Assert.Empty(select.Actions);
         await select.SendAsync("completed");
         Assert.Equal("event", select.GetValue<string>());
     }
@@ -1463,12 +1656,12 @@ public sealed class SelectSessionTests
                 mut value = 0
                 mut started = false
 
-                case "begin" when !started => {
+                action "begin" when !started => {
                     value = 10
                     started = true
                 }
 
-                case "add" (delta: Integer) when started && value < 20 => {
+                action "add" (delta: Integer) when started && value < 20 => {
                     value += delta
                     exit value
                 }
@@ -1477,13 +1670,13 @@ public sealed class SelectSessionTests
         Assert.True(initialized.Success, initialized.Failure?.Message);
         using var select = await instance.OpenSelectSessionAsync("flow");
 
-        Assert.Equal("begin", Assert.Single(select.Choices).Id);
-        await select.SelectAsync(Choice(select, "begin"));
-        var add = Assert.Single(select.Choices);
+        Assert.Equal("begin", Assert.Single(select.Actions).Id);
+        await select.SelectAsync(Action(select, "begin"));
+        var add = Assert.Single(select.Actions);
         Assert.Equal(1, add.ParameterCount);
         Assert.Equal("delta", Assert.Single(add.Parameters).Name);
 
-        await select.SelectAsync(Choice(select, "add"), 10);
+        await select.SelectAsync(Action(select, "add"), 10);
 
         Assert.True(select.IsCompleted);
         Assert.Equal(20L, select.GetValue<long>());
@@ -1495,13 +1688,13 @@ public sealed class SelectSessionTests
         var enter = new MinamoHost().Compile("""
             select flow {
                 enter => { }
-                case "finish" => exit
+                action "finish" => exit
             }
             """);
         var leave = new MinamoHost().Compile("""
             select flow {
                 leave => { }
-                case "finish" => exit
+                action "finish" => exit
             }
             """);
 
@@ -1516,7 +1709,7 @@ public sealed class SelectSessionTests
         var initialized = await instance.ExecuteAsync("""
             let ui = (
                 currentShop: select {
-                    case "leave" => exit "closed"
+                    action "leave" => exit "closed"
                 }
             )
 
@@ -1525,29 +1718,29 @@ public sealed class SelectSessionTests
         Assert.True(initialized.Success, initialized.Failure?.Message);
         using var select = await instance.OpenSelectSessionAsync("shop");
 
-        Assert.Equal("leave", Assert.Single(select.Choices).Id);
-        await select.SelectAsync(Choice(select, "leave"));
+        Assert.Equal("leave", Assert.Single(select.Actions).Id);
+        await select.SelectAsync(Action(select, "leave"));
         Assert.True(select.IsCompleted);
         Assert.Equal("closed", select.GetValue<string>());
     }
 
     [Fact]
-    public void ChoiceParametersExposeTheirNamesAndTypes()
+    public void ActionParametersExposeTheirNamesAndTypes()
     {
         using var instance = new MinamoHost().CreateInstance();
         var initialized = instance.Execute("""
             select flow {
-                case "move" (x: Integer, name: String) => exit
+                action "move" (x: Integer, name: String) => exit
             }
             """);
 
         Assert.True(initialized.Success, initialized.Failure?.Message);
         using var session = instance.OpenSelectSession("flow");
 
-        var choice = Assert.Single(session.Choices);
-        Assert.Equal(2, choice.ParameterCount);
+        var action = Assert.Single(session.Actions);
+        Assert.Equal(2, action.ParameterCount);
         Assert.Collection(
-            choice.Parameters,
+            action.Parameters,
             parameter =>
             {
                 Assert.Equal("x", parameter.Name);
@@ -1569,20 +1762,20 @@ public sealed class SelectSessionTests
                 mut value = 0
                 mut ready = false
 
-                case "begin" when !ready => {
+                action "begin" when !ready => {
                     value = 7
                     ready = true
                 }
 
-                case "finish" when ready => exit value
+                action "finish" when ready => exit value
             }
             """);
 
         Assert.True(initialized.Success, initialized.Failure?.Message);
         using var session = await instance.OpenSelectSessionAsync("flow");
 
-        await session.SelectAsync(Choice(session, "begin"));
-        await session.SelectAsync(Choice(session, "finish"));
+        await session.SelectAsync(Action(session, "begin"));
+        await session.SelectAsync(Action(session, "finish"));
 
         Assert.True(session.IsCompleted);
         Assert.Equal(7L, session.GetValue<long>());
@@ -1601,7 +1794,7 @@ public sealed class SelectSessionTests
         using var select = await instance.OpenSelectSessionAsync("flow");
 
         Assert.False(select.IsCompleted);
-        Assert.Empty(select.Choices);
+        Assert.Empty(select.Actions);
 
         await select.SendAsync("completed", 42);
 
@@ -1622,7 +1815,7 @@ public sealed class SelectSessionTests
 
         using var session = instance.OpenSelectSession("flow");
 
-        Assert.Empty(session.Choices);
+        Assert.Empty(session.Actions);
         await session.SendAsync("completed", 42);
         Assert.True(session.IsCompleted);
         Assert.Equal(42L, session.GetValue<long>());
@@ -1643,16 +1836,16 @@ public sealed class SelectSessionTests
             error.Code == (int)Minamo.Compiler.CompilerError.SelectDuplicateEvent);
     }
 
-    private static MinamoChoice Choice(MinamoSelect select, string id) =>
-        Choice(select.Choices, id);
+    private static MinamoSelectAction Action(MinamoSelect select, string id) =>
+        Action(select.Actions, id);
 
     private static MinamoSelectProperty Property(MinamoSelect select, string name) =>
         Assert.Single(select.Properties, property =>
             string.Equals(property.Name, name, StringComparison.Ordinal));
 
-    private static MinamoChoice Choice(MinamoSelectSession select, string id) =>
-        Choice(select.Choices, id);
+    private static MinamoSelectAction Action(MinamoSelectSession select, string id) =>
+        Action(select.Actions, id);
 
-    private static MinamoChoice Choice(IReadOnlyList<MinamoChoice> choices, string id) =>
-        Assert.Single(choices, choice => string.Equals(choice.Id, id, StringComparison.Ordinal));
+    private static MinamoSelectAction Action(IReadOnlyList<MinamoSelectAction> actions, string id) =>
+        Assert.Single(actions, action => string.Equals(action.Id, id, StringComparison.Ordinal));
 }

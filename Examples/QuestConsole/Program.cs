@@ -23,7 +23,14 @@ internal static class Program
             return 1;
         }
 
-        using var town = await instance.OpenSelectAsync("quest.town");
+        var opened = await instance.ExecuteAsync("open quest.town");
+        if (!opened.Success || opened.Select is null)
+        {
+            Console.Error.WriteLine(opened.Failure?.Message ?? "The town select was not opened.");
+            return 1;
+        }
+
+        using var town = opened.Select;
         await RunSelect(town);
         if (!town.IsCompleted)
         {
@@ -39,13 +46,13 @@ internal static class Program
     {
         while (!select.IsCompleted)
         {
-            var choices = select.Choices;
+            var actions = select.Actions;
             Console.WriteLine();
             Console.WriteLine("[town]");
-            for (var i = 0; i < choices.Count; i++)
+            for (var i = 0; i < actions.Count; i++)
             {
-                var choice = choices[i];
-                Console.WriteLine($"  {i + 1}. {DisplayText(choice)}");
+                var action = actions[i];
+                Console.WriteLine($"  {i + 1}. {DisplayText(action)}");
             }
 
             Console.Write("Select a number or ID (or 'quit'): ");
@@ -55,30 +62,30 @@ internal static class Program
                 return;
             }
 
-            var selectedChoice = int.TryParse(input, out var index) && index is > 0 and <= int.MaxValue
-                && index <= choices.Count
-                ? choices[index - 1]
-                : choices.FirstOrDefault(candidate => string.Equals(
+            var selectedAction = int.TryParse(input, out var index) && index is > 0 and <= int.MaxValue
+                && index <= actions.Count
+                ? actions[index - 1]
+                : actions.FirstOrDefault(candidate => string.Equals(
                     candidate.Id,
                     input,
                     StringComparison.Ordinal));
-            if (selectedChoice is null)
+            if (selectedAction is null)
             {
-                Console.WriteLine($"Choice '{input}' is not available.");
+                Console.WriteLine($"Action '{input}' is not available.");
                 continue;
             }
 
-            await select.SelectAsync(selectedChoice);
+            await select.SelectAsync(selectedAction);
         }
     }
 
-    private static string DisplayText(MinamoChoice choice)
+    private static string DisplayText(MinamoSelectAction action)
     {
-        var metadata = choice.Metadata?.GetValue<Dictionary<string, object?>>();
+        var metadata = action.Metadata?.GetValue<Dictionary<string, object?>>();
         return metadata is not null
             && metadata.TryGetValue("text", out var text)
             && text is string value
                 ? value
-                : choice.Id;
+                : action.Id;
     }
 }

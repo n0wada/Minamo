@@ -1,13 +1,13 @@
 select details {
     desc ["title": "Details"]
 
-    case "close" => return
-    case "quit" => exit "closed from details"
+    action "close" => return
+    action "quit" => exit "closed from details"
 }
 
 select menu {
     desc ["title": "Menu"]
 
-    case "details" => goto details
-    case "quit" => exit "closed"
+    action "details" => goto details
+    action "quit" => exit "closed"
 }

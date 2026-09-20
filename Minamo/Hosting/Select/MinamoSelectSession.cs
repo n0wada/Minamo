@@ -3,6 +3,7 @@ using Minamo.Runtime;
 using Minamo.Runtime.Types;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Minamo.Hosting;
@@ -10,14 +11,16 @@ namespace Minamo.Hosting;
 internal sealed partial class MinamoSelectSession : IDisposable
 {
     private readonly System.Threading.SemaphoreSlim actionGate = new(1, 1);
+    private readonly CancellationTokenSource sessionCancellation = new();
     private readonly MinamoInstance instance;
     private readonly Stack<SelectNavigationFrame> navigationStack = new();
     private SelectInstance selectInstance;
     private MinamoSelectSnapshot snapshot;
     private MinamoSelectDescription? description;
-    private IReadOnlyList<ResolvedSelectChoice> availableChoices = Array.Empty<ResolvedSelectChoice>();
+    private IReadOnlyList<ResolvedSelectAction> availableActions = Array.Empty<ResolvedSelectAction>();
     private ExecutionResult? pendingExecution;
-    private bool disposed;
+    private int disposeRequested;
+    private bool cleanupComplete;
 
     private sealed record SelectNavigationFrame(
         SelectInstance Instance,
@@ -32,13 +35,17 @@ internal sealed partial class MinamoSelectSession : IDisposable
         snapshot = CreateInitialSnapshot();
     }
 
-    internal async Task InitializeAsync()
+    internal async Task InitializeAsync(
+        ExecutionControl? control = null,
+        CancellationToken cancellationToken = default)
     {
         description = await CreateDescriptionAsync(
             selectInstance.Description(),
-            Array.Empty<MinamoObject>()).ConfigureAwait(false);
+            Array.Empty<MinamoObject>(),
+            cancellationToken,
+            control).ConfigureAwait(false);
 
-        await PublishSnapshotAsync().ConfigureAwait(false);
+        await PublishSnapshotAsync(cancellationToken, control).ConfigureAwait(false);
     }
 
     internal string Name => CurrentSnapshot.Name;
@@ -49,7 +56,7 @@ internal sealed partial class MinamoSelectSession : IDisposable
 
     internal IReadOnlyList<MinamoSelectProperty> Properties => CurrentSnapshot.Properties;
 
-    internal IReadOnlyList<MinamoChoice> Choices => CurrentSnapshot.Choices;
+    internal IReadOnlyList<MinamoSelectAction> Actions => CurrentSnapshot.Actions;
 
     internal bool IsCompleted => CurrentSnapshot.IsCompleted;
 
@@ -80,35 +87,35 @@ internal sealed partial class MinamoSelectSession : IDisposable
         selectInstance.Name,
         description,
         Array.Empty<MinamoSelectProperty>(),
-        Array.Empty<MinamoChoice>(),
+        Array.Empty<MinamoSelectAction>(),
         selectInstance.IsCompleted);
 
     private void PublishCompletedSnapshot()
     {
-        availableChoices = Array.Empty<ResolvedSelectChoice>();
+        availableActions = Array.Empty<ResolvedSelectAction>();
         snapshot = new(
             selectInstance.Name,
             description,
             CurrentSnapshot.Properties,
-            Array.Empty<MinamoChoice>(),
+            Array.Empty<MinamoSelectAction>(),
             isCompleted: true);
     }
 
     private MinamoSelectSnapshot CreateSnapshot(
         IReadOnlyList<MinamoSelectProperty> properties,
-        IReadOnlyList<MinamoChoice> choices) =>
+        IReadOnlyList<MinamoSelectAction> actions) =>
         new(
             selectInstance.Name,
             description,
             properties,
-            choices,
+            actions,
             selectInstance.IsCompleted);
 
-    internal Task SelectAsync(MinamoChoice choice) =>
-        SelectCoreAsync(choice.Id, null, hasArgument: false, expectedChoice: choice);
+    internal Task SelectAsync(MinamoSelectAction action) =>
+        SelectCoreAsync(action.Id, null, hasArgument: false, expectedAction: action);
 
-    internal Task SelectAsync(MinamoChoice choice, object? argument) =>
-        SelectCoreAsync(choice.Id, argument, hasArgument: true, expectedChoice: choice);
+    internal Task SelectAsync(MinamoSelectAction action, object? argument) =>
+        SelectCoreAsync(action.Id, argument, hasArgument: true, expectedAction: action);
 
     internal Task SendAsync(string eventId) =>
         SendCoreAsync(eventId, null, hasArgument: false);
@@ -123,17 +130,20 @@ internal sealed partial class MinamoSelectSession : IDisposable
 
     public void Dispose()
     {
-        actionGate.Wait();
+        if (Interlocked.Exchange(ref disposeRequested, 1) != 0)
+        {
+            return;
+        }
+
+        sessionCancellation.Cancel();
+        if (!actionGate.Wait(0))
+        {
+            return;
+        }
+
         try
         {
-            if (disposed)
-            {
-                return;
-            }
-
-            AbandonPendingRequest();
-            CancelAllSelects();
-            disposed = true;
+            CompleteDisposal();
         }
         finally
         {
@@ -142,41 +152,43 @@ internal sealed partial class MinamoSelectSession : IDisposable
     }
 
     private async Task SelectCoreAsync(
-        string choiceId,
+        string actionId,
         object? argument,
         bool hasArgument,
-        MinamoChoice? expectedChoice)
+        MinamoSelectAction? expectedAction)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(choiceId);
-        await actionGate.WaitAsync().ConfigureAwait(false);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
+        await EnterActionGateAsync().ConfigureAwait(false);
         try
         {
-            ThrowIfDisposed();
             EnsureNotWaitingForResponse();
-            EnsureCurrentChoice(expectedChoice);
+            EnsureCurrentAction(expectedAction);
             if (selectInstance.IsCompleted)
             {
                 throw new InvalidOperationException($"Select session '{Name}' has already completed.");
             }
 
-            var choice = availableChoices.SingleOrDefault(candidate =>
-                string.Equals(candidate.Id, choiceId, StringComparison.Ordinal));
-            if (choice is null)
+            var action = availableActions.SingleOrDefault(candidate =>
+                string.Equals(candidate.Id, actionId, StringComparison.Ordinal));
+            if (action is null)
             {
                 throw new ArgumentException(
-                    $"Choice '{choiceId}' is not currently available in select '{Name}'.",
-                    nameof(choiceId));
+                    $"Action '{actionId}' is not currently available in select '{Name}'.",
+                    nameof(actionId));
             }
 
-            var arguments = ConvertArguments(choice, argument, hasArgument);
+            var arguments = ConvertArguments(action, argument, hasArgument);
             var result = await instance.InvokeSelectActionAsync(
-                choice.Action ?? throw new InvalidOperationException("The select choice action is unavailable."),
+                action.Handler ?? throw new InvalidOperationException("The select action handler is unavailable."),
                 arguments,
-                allowRequests: true).ConfigureAwait(false);
-            await ApplyActionExecutionAsync(result).ConfigureAwait(false);
+                allowRequests: true,
+                cancellationToken: sessionCancellation.Token).ConfigureAwait(false);
+            sessionCancellation.Token.ThrowIfCancellationRequested();
+            await ApplyActionExecutionAsync(result, sessionCancellation.Token).ConfigureAwait(false);
         }
         finally
         {
+            CompleteDisposalIfRequested();
             actionGate.Release();
         }
     }
@@ -187,10 +199,9 @@ internal sealed partial class MinamoSelectSession : IDisposable
         bool hasArgument)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
-        await actionGate.WaitAsync().ConfigureAwait(false);
+        await EnterActionGateAsync().ConfigureAwait(false);
         try
         {
-            ThrowIfDisposed();
             EnsureNotWaitingForResponse();
             if (selectInstance.IsCompleted)
             {
@@ -216,8 +227,10 @@ internal sealed partial class MinamoSelectSession : IDisposable
                     hasArgument);
                 var result = await instance.InvokeSelectActionAsync(
                     eventOwner.Event(handler),
-                    arguments).ConfigureAwait(false);
-                await ApplyActionExecutionAsync(result).ConfigureAwait(false);
+                    arguments,
+                    cancellationToken: sessionCancellation.Token).ConfigureAwait(false);
+                sessionCancellation.Token.ThrowIfCancellationRequested();
+                await ApplyActionExecutionAsync(result, sessionCancellation.Token).ConfigureAwait(false);
                 if (eventOwner.IsCompleted
                     || !ReferenceEquals(selectInstance, eventOwner))
                 {
@@ -227,12 +240,16 @@ internal sealed partial class MinamoSelectSession : IDisposable
         }
         finally
         {
+            CompleteDisposalIfRequested();
             actionGate.Release();
         }
     }
 
-    private async Task ApplyActionExecutionAsync(ExecutionResult result)
+    private async Task ApplyActionExecutionAsync(
+        ExecutionResult result,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (result.Reason is TerminationReason.Suspended
             && result.Suspension?.Awaitable is MinamoSelectRequestAwaitable request)
         {
@@ -248,14 +265,14 @@ internal sealed partial class MinamoSelectSession : IDisposable
         switch (outcome.Kind)
         {
             case SelectActionOutcomeKind.Continue:
-                await PublishSnapshotAsync().ConfigureAwait(false);
+                await PublishSnapshotAsync(cancellationToken).ConfigureAwait(false);
                 break;
             case SelectActionOutcomeKind.Goto:
-                await NavigateAsync(outcome.Target!).ConfigureAwait(false);
+                await NavigateAsync(outcome.Target!, cancellationToken).ConfigureAwait(false);
                 break;
             case SelectActionOutcomeKind.Return:
                 ReturnFromCurrentSelect();
-                await PublishSnapshotAsync().ConfigureAwait(false);
+                await PublishSnapshotAsync(cancellationToken).ConfigureAwait(false);
                 break;
             case SelectActionOutcomeKind.Exit:
                 ExitAllSelects(outcome.Value ?? MinamoNil.Instance);
@@ -266,12 +283,16 @@ internal sealed partial class MinamoSelectSession : IDisposable
         }
     }
 
-    private async Task NavigateAsync(MinamoSelectFactory target)
+    private async Task NavigateAsync(
+        MinamoSelectFactory target,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var next = instance.CreateSelectInstance(target);
         var nextDescription = await CreateDescriptionAsync(
             next.Description(),
-            Array.Empty<MinamoObject>()).ConfigureAwait(false);
+            Array.Empty<MinamoObject>(),
+            cancellationToken).ConfigureAwait(false);
 
         var previous = new SelectNavigationFrame(selectInstance, description);
         navigationStack.Push(previous);
@@ -280,7 +301,7 @@ internal sealed partial class MinamoSelectSession : IDisposable
 
         try
         {
-            await PublishSnapshotAsync().ConfigureAwait(false);
+            await PublishSnapshotAsync(cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -340,12 +361,12 @@ internal sealed partial class MinamoSelectSession : IDisposable
 
         var request = new MinamoSelectRequest(awaitable);
         pendingExecution = execution;
-        availableChoices = Array.Empty<ResolvedSelectChoice>();
+        availableActions = Array.Empty<ResolvedSelectAction>();
         snapshot = new(
             selectInstance.Name,
             description,
             CurrentSnapshot.Properties,
-            Array.Empty<MinamoChoice>(),
+            Array.Empty<MinamoSelectAction>(),
             isCompleted: false,
             request);
     }
@@ -354,10 +375,9 @@ internal sealed partial class MinamoSelectSession : IDisposable
         MinamoSelectRequest request,
         object? response)
     {
-        await actionGate.WaitAsync().ConfigureAwait(false);
+        await EnterActionGateAsync().ConfigureAwait(false);
         try
         {
-            ThrowIfDisposed();
             if (pendingExecution is not { } execution
                 || CurrentSnapshot.Request is not { } current
                 || !ReferenceEquals(current, request)
@@ -373,8 +393,10 @@ internal sealed partial class MinamoSelectSession : IDisposable
                 var result = await instance.ResumeSelectActionAsync(
                     execution,
                     current.Awaitable,
-                    value).ConfigureAwait(false);
-                await ApplyActionExecutionAsync(result).ConfigureAwait(false);
+                    value,
+                    sessionCancellation.Token).ConfigureAwait(false);
+                sessionCancellation.Token.ThrowIfCancellationRequested();
+                await ApplyActionExecutionAsync(result, sessionCancellation.Token).ConfigureAwait(false);
             }
             catch
             {
@@ -385,21 +407,22 @@ internal sealed partial class MinamoSelectSession : IDisposable
         }
         finally
         {
+            CompleteDisposalIfRequested();
             actionGate.Release();
         }
     }
 
-    private void EnsureCurrentChoice(MinamoChoice? expectedChoice)
+    private void EnsureCurrentAction(MinamoSelectAction? expectedAction)
     {
-        if (expectedChoice is null
-            || CurrentSnapshot.Choices.Any(choice => ReferenceEquals(choice, expectedChoice)))
+        if (expectedAction is null
+            || CurrentSnapshot.Actions.Any(action => ReferenceEquals(action, expectedAction)))
         {
             return;
         }
 
         throw new ArgumentException(
-            $"Choice '{expectedChoice.Id}' is not currently available in select '{Name}'.",
-            nameof(expectedChoice));
+            $"Action '{expectedAction.Id}' is not currently available in select '{Name}'.",
+            nameof(expectedAction));
     }
 
     private void EnsureNotWaitingForResponse()
@@ -421,12 +444,60 @@ internal sealed partial class MinamoSelectSession : IDisposable
 
     private void AbandonPendingRequest()
     {
+        pendingExecution?.Suspension?.Awaitable?.Abandon();
         pendingExecution?.Continuation?.Complete();
         pendingExecution = null;
     }
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(disposed, this);
+        ObjectDisposedException.ThrowIf(
+            Volatile.Read(ref disposeRequested) != 0,
+            this);
+    }
+
+    private async Task EnterActionGateAsync()
+    {
+        ThrowIfDisposed();
+        try
+        {
+            await actionGate.WaitAsync(sessionCancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (Volatile.Read(ref disposeRequested) != 0)
+        {
+            ThrowIfDisposed();
+            throw;
+        }
+
+        try
+        {
+            ThrowIfDisposed();
+        }
+        catch
+        {
+            actionGate.Release();
+            throw;
+        }
+    }
+
+    private void CompleteDisposalIfRequested()
+    {
+        if (Volatile.Read(ref disposeRequested) != 0)
+        {
+            CompleteDisposal();
+        }
+    }
+
+    private void CompleteDisposal()
+    {
+        if (cleanupComplete)
+        {
+            return;
+        }
+
+        AbandonPendingRequest();
+        CancelAllSelects();
+        cleanupComplete = true;
+        sessionCancellation.Dispose();
     }
 }

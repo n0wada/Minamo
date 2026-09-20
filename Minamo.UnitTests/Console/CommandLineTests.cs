@@ -50,7 +50,7 @@ public sealed class CommandLineTests
     [Fact]
     public void RecognizesSelectStartupOption()
     {
-        var options = CommandLine.Read(new[] { "Player.nami", "--do", "music.player" });
+        var options = CommandLine.Read(new[] { "Player.nami", "--open", "music.player" });
 
         Assert.Equal("music.player", options.SelectName);
         Assert.Equal(new[] { "Player.nami" }, options.FileNames);

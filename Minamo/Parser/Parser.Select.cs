@@ -72,12 +72,12 @@ internal sealed partial class HandwrittenParser
                 continue;
             }
 
-            if (IsContextualKeyword("case"))
+            if (IsContextualKeyword("action"))
             {
-                var choice = ParseSelectChoice();
-                if (choice is not null)
+                var action = ParseSelectAction();
+                if (action is not null)
                 {
-                    declaration.Choices.Add(choice);
+                    declaration.Actions.Add(action);
                 }
                 else
                 {
@@ -106,9 +106,9 @@ internal sealed partial class HandwrittenParser
         }
     }
 
-    private SelectChoiceSyntax? ParseSelectChoice()
+    private SelectActionSyntax? ParseSelectAction()
     {
-        if (!IsContextualKeyword("case"))
+        if (!IsContextualKeyword("action"))
         {
             return null;
         }
@@ -121,16 +121,16 @@ internal sealed partial class HandwrittenParser
         }
 
         var name = (StringLiteralSyntax)ParseString();
-        var choice = new SelectChoiceSyntax(name.Location)
+        var action = new SelectActionSyntax(name.Location)
         {
             Name = name.Value ?? string.Empty
         };
-        ParseSelectParameters(choice.Parameters);
+        ParseSelectParameters(action.Parameters);
 
         if (Match(TokenKind.When))
         {
-            choice.Guard = ParseSelectGuardExpression();
-            if (choice.Guard is null)
+            action.Guard = ParseSelectGuardExpression();
+            if (action.Guard is null)
             {
                 return null;
             }
@@ -138,8 +138,8 @@ internal sealed partial class HandwrittenParser
 
         if (Check(TokenKind.LeftBracket))
         {
-            choice.Metadata = ParseSelectDictionary();
-            if (choice.Metadata is null)
+            action.Metadata = ParseSelectDictionary();
+            if (action.Metadata is null)
             {
                 return null;
             }
@@ -151,8 +151,8 @@ internal sealed partial class HandwrittenParser
             return null;
         }
 
-        choice.Body = body;
-        return choice;
+        action.Body = body;
+        return action;
     }
 
     private SyntaxNode? ParseSelectGuardExpression()

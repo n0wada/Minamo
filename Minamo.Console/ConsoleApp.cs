@@ -64,7 +64,7 @@ internal static class ConsoleApp
 
         if (options.SelectName is not null)
         {
-            return session.RunSelect(options.SelectName);
+            return session.Eval($"open {options.SelectName}");
         }
 
         if (files.Length == 0 || options.StayInteractive)

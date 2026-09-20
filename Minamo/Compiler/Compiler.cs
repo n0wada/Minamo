@@ -198,7 +198,7 @@ public enum CompilerError
 
     AmbiguousEnumConstructor = 278,
 
-    SelectDuplicateChoice = 289,
+    SelectDuplicateAction = 289,
 
     SelectOnlyGlobalScope = 290,
 

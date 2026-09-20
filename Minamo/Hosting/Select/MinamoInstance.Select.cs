@@ -9,52 +9,99 @@ namespace Minamo.Hosting;
 
 public sealed partial class MinamoInstance
 {
-    /// <summary>Asynchronously opens a named select through its basic choice-oriented API.</summary>
+    /// <summary>Asynchronously opens a named select through its basic action-oriented API.</summary>
     public async Task<MinamoSelect> OpenSelectAsync(string name) =>
         new(await OpenSelectSessionAsync(name).ConfigureAwait(false));
 
-    internal async Task<MinamoSelectSession> OpenSelectSessionAsync(string name)
+    internal Task<MinamoSelectSession> OpenSelectSessionAsync(string name) =>
+        OpenSelectSessionAsync(name, CancellationToken.None);
+
+    internal async Task<MinamoSelectSession> OpenSelectSessionAsync(
+        string name,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (runtimeContext is null)
-        {
-            if (program is null)
-            {
-                throw new InvalidOperationException(
-                    "Execute source containing the select before opening a select session.");
-            }
-
-            var initialization = await ExecuteAsync().ConfigureAwait(false);
-            if (!initialization.Success)
-            {
-                throw new InvalidOperationException(
-                    "The select program could not be initialized.", initialization.Failure?.Exception);
-            }
-        }
+        await EnsureSelectRuntimeInitializedAsync(cancellationToken).ConfigureAwait(false);
 
         if (operationScope.Value)
         {
             throw new InvalidOperationException("A host instance cannot be entered recursively.");
         }
 
-        await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        await operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         operationScope.Value = true;
+        var executionId = Guid.NewGuid();
+        var operationStarted = false;
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
-            var factory = ResolveSelectFactory(name)
-                ?? throw new ArgumentException($"No select named '{name}' is available.", nameof(name));
-            return await CreateSelectSessionAsync(
-                CreateSelectInstance(factory)).ConfigureAwait(false);
+            BeginOperation();
+            operationStarted = true;
+            Environment.Telemetry.BeginExecution(executionId);
+            using var control = CreateControl(cancellationToken);
+            control?.Checkpoint();
+            return await OpenSelectSessionUnderGateAsync(
+                name,
+                control,
+                cancellationToken).ConfigureAwait(false);
         }
         finally
         {
+            if (operationStarted)
+            {
+                Environment.Telemetry.EndExecution();
+                active = false;
+            }
             operationScope.Value = false;
             operationGate.Release();
         }
     }
 
-    internal SelectInstance CreateSelectInstance(MinamoSelectFactory factory)
+    private async Task EnsureSelectRuntimeInitializedAsync(CancellationToken cancellationToken)
+    {
+        if (runtimeContext is not null)
+        {
+            return;
+        }
+        if (program is null)
+        {
+            throw new InvalidOperationException(
+                "Execute source containing the select before opening a select session.");
+        }
+
+        var initialization = await ExecuteAsync(cancellationToken).ConfigureAwait(false);
+        if (!initialization.Success)
+        {
+            if (initialization.Failure is
+                { Kind: MinamoFailureKind.Cancelled or MinamoFailureKind.Limit, Exception: { } failure })
+            {
+                throw failure;
+            }
+
+            throw new InvalidOperationException(
+                "The select program could not be initialized.", initialization.Failure?.Exception);
+        }
+    }
+
+    private async Task<MinamoSelectSession> OpenSelectSessionUnderGateAsync(
+        string name,
+        ExecutionControl? control,
+        CancellationToken cancellationToken)
+    {
+        control?.Checkpoint();
+        var factory = ResolveSelectFactory(name)
+            ?? throw new ArgumentException($"No select named '{name}' is available.", nameof(name));
+        var session = await CreateSelectSessionAsync(
+            CreateSelectInstance(factory, control),
+            control,
+            cancellationToken).ConfigureAwait(false);
+        control?.Checkpoint();
+        return session;
+    }
+
+    internal SelectInstance CreateSelectInstance(
+        MinamoSelectFactory factory,
+        ExecutionControl? control = null)
     {
         var nested = active;
         if (!nested)
@@ -64,7 +111,7 @@ public sealed partial class MinamoInstance
 
         try
         {
-            var context = CreateExecutionContext(runtimeContext!, control: null);
+            var context = CreateExecutionContext(runtimeContext!, control);
             var select = factory.Create(context);
             context.ThrowIf();
             return select;
@@ -117,26 +164,39 @@ public sealed partial class MinamoInstance
     }
 
     internal async Task<MinamoSelectSession> CreateSelectSessionAsync(
-        SelectInstance select)
+        SelectInstance select,
+        ExecutionControl? control = null,
+        CancellationToken cancellationToken = default)
     {
         var session = new MinamoSelectSession(this, select);
-        await session.InitializeAsync().ConfigureAwait(false);
-        return session;
+        try
+        {
+            await session.InitializeAsync(control, cancellationToken).ConfigureAwait(false);
+            return session;
+        }
+        catch
+        {
+            session.Dispose();
+            throw;
+        }
     }
 
     internal async Task<ExecutionResult> InvokeSelectActionAsync(
         MinamoFunction action,
         MinamoObject[] arguments,
-        bool allowRequests = false)
+        bool allowRequests = false,
+        CancellationToken cancellationToken = default)
     {
         var ownsGate = !operationScope.Value;
         if (ownsGate)
         {
-            await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            await operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             operationScope.Value = true;
         }
 
         var nested = false;
+        var telemetryStarted = false;
+        ExecutionControl? control = null;
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
@@ -144,9 +204,13 @@ public sealed partial class MinamoInstance
             if (!nested)
             {
                 BeginOperation();
+                Environment.Telemetry.BeginExecution(Guid.NewGuid());
+                telemetryStarted = true;
             }
 
-            var context = CreateExecutionContext(runtimeContext!, control: null);
+            control = CreateControl(cancellationToken);
+            control?.Checkpoint();
+            var context = CreateExecutionContext(runtimeContext!, control);
             context.SelectRequestsAllowed = allowRequests;
             if (action is not MinamoNativeFunction function)
             {
@@ -156,12 +220,19 @@ public sealed partial class MinamoInstance
             var result = await Task.Run(
                 () => MinamoMachine.ExecuteWithArguments(function, arguments, context),
                 CancellationToken.None).ConfigureAwait(false);
-            return await CompleteAwaitablesAsync(
+            result = await CompleteAwaitablesAsync(
                 result,
                 stopAtSelectRequest: allowRequests).ConfigureAwait(false);
+            control?.Checkpoint();
+            return result;
         }
         finally
         {
+            control?.Dispose();
+            if (telemetryStarted)
+            {
+                Environment.Telemetry.EndExecution();
+            }
             if (!nested)
             {
                 active = false;
@@ -177,7 +248,8 @@ public sealed partial class MinamoInstance
     internal async Task<ExecutionResult> ResumeSelectActionAsync(
         ExecutionResult suspended,
         MinamoSelectRequestAwaitable request,
-        MinamoObject response)
+        MinamoObject response,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(suspended);
         ArgumentNullException.ThrowIfNull(request);
@@ -192,11 +264,13 @@ public sealed partial class MinamoInstance
         var ownsGate = !operationScope.Value;
         if (ownsGate)
         {
-            await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            await operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             operationScope.Value = true;
         }
 
         var nested = false;
+        var telemetryStarted = false;
+        ExecutionControl? control = null;
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
@@ -204,18 +278,30 @@ public sealed partial class MinamoInstance
             if (!nested)
             {
                 BeginOperation();
+                Environment.Telemetry.BeginExecution(Guid.NewGuid());
+                telemetryStarted = true;
             }
 
+            control = CreateControl(cancellationToken);
+            control?.Checkpoint();
+            suspended.Context.Control = control;
             request.Respond(response);
             var result = await Task.Run(
                 () => MinamoMachine.Resume(suspended.Continuation, request),
                 CancellationToken.None).ConfigureAwait(false);
-            return await CompleteAwaitablesAsync(
+            result = await CompleteAwaitablesAsync(
                 result,
                 stopAtSelectRequest: true).ConfigureAwait(false);
+            control?.Checkpoint();
+            return result;
         }
         finally
         {
+            control?.Dispose();
+            if (telemetryStarted)
+            {
+                Environment.Telemetry.EndExecution();
+            }
             if (!nested)
             {
                 active = false;
@@ -230,43 +316,78 @@ public sealed partial class MinamoInstance
 
     internal async Task<bool> EvaluateSelectGuardAsync(
         MinamoFunction guard,
-        MinamoObject[] arguments) =>
-        (await EvaluateSelectValueAsync(guard, arguments, "guard").ConfigureAwait(false)).IsTrue();
+        MinamoObject[] arguments,
+        CancellationToken cancellationToken = default,
+        ExecutionControl? control = null) =>
+        (await EvaluateSelectValueAsync(
+            guard,
+            arguments,
+            "guard",
+            cancellationToken,
+            control).ConfigureAwait(false)).IsTrue();
 
     internal Task<MinamoObject> EvaluateSelectDescriptionAsync(
         MinamoFunction description,
-        MinamoObject[] arguments) =>
-        EvaluateSelectValueAsync(description, arguments, "description");
+        MinamoObject[] arguments,
+        CancellationToken cancellationToken = default,
+        ExecutionControl? control = null) =>
+        EvaluateSelectValueAsync(description, arguments, "description", cancellationToken, control);
 
-    internal Task<MinamoObject> EvaluateSelectPropertyAsync(MinamoFunction property) =>
-        EvaluateSelectValueAsync(property, Array.Empty<MinamoObject>(), "property");
+    internal Task<MinamoObject> EvaluateSelectPropertyAsync(
+        MinamoFunction property,
+        CancellationToken cancellationToken = default,
+        ExecutionControl? control = null) =>
+        EvaluateSelectValueAsync(
+            property,
+            Array.Empty<MinamoObject>(),
+            "property",
+            cancellationToken,
+            control);
 
-    internal Task<MinamoObject> EvaluateSelectMetadataAsync(MinamoFunction metadata) =>
-        EvaluateSelectValueAsync(metadata, Array.Empty<MinamoObject>(), "metadata");
+    internal Task<MinamoObject> EvaluateSelectMetadataAsync(
+        MinamoFunction metadata,
+        CancellationToken cancellationToken = default,
+        ExecutionControl? control = null) =>
+        EvaluateSelectValueAsync(
+            metadata,
+            Array.Empty<MinamoObject>(),
+            "metadata",
+            cancellationToken,
+            control);
 
     private async Task<MinamoObject> EvaluateSelectValueAsync(
         MinamoFunction function,
         MinamoObject[] arguments,
-        string kind)
+        string kind,
+        CancellationToken cancellationToken,
+        ExecutionControl? control)
     {
         var ownsGate = !operationScope.Value;
         if (ownsGate)
         {
-            await operationGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            await operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             operationScope.Value = true;
         }
 
+        var ownsControl = control is null;
+        var effectiveControl = control;
+        var nested = false;
+        var telemetryStarted = false;
         try
         {
+            effectiveControl ??= CreateControl(cancellationToken);
             ObjectDisposedException.ThrowIf(disposed, this);
-            var nested = active;
+            nested = active;
             if (!nested)
             {
                 BeginOperation();
+                Environment.Telemetry.BeginExecution(Guid.NewGuid());
+                telemetryStarted = true;
             }
             try
             {
-                var context = CreateExecutionContext(runtimeContext!, control: null);
+                effectiveControl?.Checkpoint();
+                var context = CreateExecutionContext(runtimeContext!, effectiveControl);
                 MinamoObject value;
                 if (function is MinamoNativeFunction nativeFunction)
                 {
@@ -285,10 +406,15 @@ public sealed partial class MinamoInstance
                     value = function.Call(context, arguments);
                 }
                 context.ThrowIf();
+                effectiveControl?.Checkpoint();
                 return value;
             }
             finally
             {
+                if (telemetryStarted)
+                {
+                    Environment.Telemetry.EndExecution();
+                }
                 if (!nested)
                 {
                     active = false;
@@ -297,6 +423,10 @@ public sealed partial class MinamoInstance
         }
         finally
         {
+            if (ownsControl)
+            {
+                effectiveControl?.Dispose();
+            }
             if (ownsGate)
             {
                 operationScope.Value = false;

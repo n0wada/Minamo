@@ -57,7 +57,7 @@ let match mut nil not or private return set static throw true try type
 use when while with yield
 ```
 
-`const`, `struct`, `enum`, `trait`, `impl`, `guard`, `finally`, `select`, `prop`, `case`, `on`,
+`const`, `struct`, `enum`, `trait`, `impl`, `guard`, `finally`, `select`, `prop`, `action`, `on`,
 `desc`, `goto`, and `exit` are
 contextual keywords.
 
@@ -215,16 +215,17 @@ The final expression of a block is its value.
 
 ## Interactive selects
 
-An interactive select publishes properties and cases to the host and executes the selected case
-action. A host opens it through `MinamoInstance.OpenSelectAsync`. The C# API exposes language cases
-as `MinamoChoice` objects in `MinamoSelect.Choices`. See
+An interactive select publishes properties and actions to the host and executes the selected
+action. A host can submit the host execution command `open identifier` to
+`MinamoInstance.ExecuteAsync` or open it directly through `MinamoInstance.OpenSelectAsync`. The C#
+API exposes language actions as `MinamoSelectAction` objects in `MinamoSelect.Actions`. See
 [Interactive selects](../Developers/InteractiveSelect.md) for publication, the C# protocol,
 requests, and nested interactions.
 
 ```text
 select-declaration
     ::= "select" [ identifier ] "{" [ select-description ] { select-local }
-        { select-property | case-declaration | event-declaration } "}"
+        { select-property | action-declaration | event-declaration } "}"
 
 select-description
     ::= "desc" string-key-dictionary-literal
@@ -238,8 +239,8 @@ select-local
 select-property
     ::= "prop" ( identifier | string ) [ select-metadata ] "=>" expression
 
-case-declaration
-    ::= "case" string [ select-parameters ]
+action-declaration
+    ::= "action" string [ select-parameters ]
         [ "when" expression ] [ select-metadata ]
         "=>" select-action-body
 
@@ -274,38 +275,40 @@ exit-statement
 ```
 
 Named select declarations are permitted only at global (module) scope. Select locals are created
-for each interaction instance and must appear before properties, cases, or events. A `prop`
+for each interaction instance and must appear before properties, actions, or events. A `prop`
 declaration publishes a read-only value to the host. Its name may be an identifier or string.
 Properties and their optional metadata dictionaries are reevaluated for every successful
 publication. After an ordinary action finishes, the current select republishes its properties and
-choices. `goto expression` evaluates an expression
+actions. `goto expression` evaluates an expression
 that must produce a select factory, creates a fresh instance from it, pushes the current instance
 onto the interaction's navigation stack, and publishes the new instance. `return` completes the
 current instance with `nil` and restores the preceding instance. At the root it completes the
 interaction with `nil`. `exit` completes the whole interaction, discarding every stacked instance,
 and may supply the interaction's result. There is no `back` keyword.
-Property names, case IDs, and event names are unique within their respective channels. Cases and
+Property names, action IDs, and event names are unique within their respective channels. Actions and
 events receive either no
 argument, one value, or a tuple whose
-elements bind to their parameters. `case` declarations are visible through `Choices`; `on`
+elements bind to their parameters. `action` declarations are visible through `Actions`; `on`
 declarations are hidden and delivered through `MinamoSelect.SendAsync`. `when` controls whether a
-case is currently available. A case's optional metadata dictionary is evaluated only when that case
-is available. Select metadata is free-form UI guidance; Minamo requires string keys but does not
-assign meanings to them.
-When no choice is available and the select has no host events, the interaction completes with
+action is currently available. An action's optional metadata dictionary is evaluated only when
+that action is available. Select metadata is free-form UI guidance; Minamo requires string keys but
+does not assign meanings to them.
+When no action is available and the select has no host events, the interaction completes with
 `nil`; when the current select was reached by `goto`, this behaves like `return` and restores its
 caller. Select-local values are available to all actions in their select instance and remain intact
 while that instance is on the navigation stack.
-Selects are opened and driven by the host; scripts cannot invoke them with `do expression`.
-A case action may call `request(kind, payload?)` to yield an application-defined input request to
+Selects are opened and driven by the host. `open identifier` is recognized only when it is the
+entire string passed to the Hosting API's `ExecuteAsync`; it is not part of this grammar and is not
+accepted in script files. The host command also accepts a registered dotted alias.
+An action handler may call `request(kind, payload?)` to yield an application-defined input request to
 the host. The host responds through `MinamoSelect.RespondAsync`, and the response becomes the return
 value of `request`. Requests are not valid in host events, guards, or descriptions.
-The select control statements are valid in case and event action bodies. They do not change the
+The select control statements are valid in action and event handler bodies. They do not change the
 meaning of `return` inside a function declared within an action: there it remains an ordinary
 function return and may carry a value. A select-level `return` cannot carry a value.
 `desc` is an optional free-form select description. It must be a dictionary literal whose keys are
 strings, and is evaluated once when an interaction instance opens. A host may use it as explanatory
-text, an AI prompt, or broad layout guidance. Metadata dictionaries on properties and cases provide
+text, an AI prompt, or broad layout guidance. Metadata dictionaries on properties and actions provide
 more local UI hints and are reevaluated with the published state.
 The `request(...)` and `alias(...)` calls are ordinary built-in function calls rather than select
 syntax.
@@ -316,7 +319,7 @@ select player {
 
     prop playing => playing
 
-    case "play" when !playing && music.HasSelectedTrack() [
+    action "play" when !playing && music.HasSelectedTrack() [
         "text": "Play",
         "control": "button"
     ] => {
@@ -324,12 +327,12 @@ select player {
         playing = true
     }
 
-    case "stop" when playing => {
+    action "stop" when playing => {
         music.Stop()
         playing = false
     }
 
-    case "exit" => exit "done"
+    action "exit" => exit "done"
 }
 
 alias(player, "music.player")
@@ -339,12 +342,12 @@ Select navigation uses factory expressions rather than names encoded as strings:
 
 ```swift
 select details {
-    case "close" => return
+    action "close" => return
 }
 
 select menu {
-    case "details" => goto details
-    case "quit" => exit "done"
+    action "details" => goto details
+    action "quit" => exit "done"
 }
 ```
 

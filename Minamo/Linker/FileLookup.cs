@@ -213,7 +213,7 @@ public sealed class FileLookup
             return Array.Empty<string>();
         }
 
-        return var.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+        return var.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
     }
 
     private void WriteToLog(string str)

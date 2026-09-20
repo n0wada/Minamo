@@ -165,31 +165,32 @@ let shop = select {
 
     prop visits ["format": "number"] => visits
 
-    case "browse" ["text": "Browse", "control": "button"] => {
+    action "browse" ["text": "Browse", "control": "button"] => {
         visits += 1
         print("You browse the shelves.")
     }
 
-    case "leave" => exit "closed"
+    action "leave" => exit "closed"
 }
 ```
 
 Save the script as `shop.nami`, then start its named select from the console:
 
 ```powershell
-minamo.exe shop.nami --do shop
+minamo.exe shop.nami --open shop
 ```
 
-The console presents the cases after it executes the file. The C# API calls these published items
-`Choices`. Selecting `"browse"` runs its case body and republishes the same interaction; selecting
-`"leave"` exits it. `desc` is a free-form dictionary evaluated once for each select instance.
-`prop` publishes read-only values, and the optional dictionaries after `prop` and `case` provide
+The console presents the actions after it executes the file. In the REPL, `open shop` starts the
+same interaction. The C# API calls these published items `Actions`. Selecting `"browse"` runs its
+action body and republishes the same interaction; selecting `"leave"` exits it. `desc` is a
+free-form dictionary evaluated once for each select instance.
+`prop` publishes read-only values, and the optional dictionaries after `prop` and `action` provide
 free-form UI hints; properties and member metadata are reevaluated whenever the interaction is
 published. Minamo assigns no built-in meaning to metadata keys.
 
 Hidden host events may be declared with `on` and delivered from C# with `SendAsync`. An interaction
-with no available cases or host events completes with `nil`. Select-local values and `when` guards
-let earlier actions change which cases are presented next. A case action can call
+with no available actions or host events completes with `nil`. Select-local values and `when` guards
+let earlier actions change which actions are presented next. An action handler can call
 `request(kind, payload?)` to yield an input request to the host and continue with its response.
 Named selects can also be opened from C#.
 An action can use `goto select-expression` to create and enter another select while preserving the

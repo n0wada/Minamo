@@ -4,13 +4,13 @@ func questGame() {
         mut courierQuestAccepted = false
         mut screen = "square"
 
-        case "guard" when screen == "square" [
+        action "guard" when screen == "square" [
             "text": "Talk to the guard"
         ] => {
             screen = "guard"
         }
 
-        case "board" when screen == "square" [
+        action "board" when screen == "square" [
             "text": "Check the quest board"
         ] => {
             if courierQuestAccepted {
@@ -20,24 +20,24 @@ func questGame() {
             }
         }
 
-        case "active-quest" when screen == "square" && courierQuestAccepted [
+        action "active-quest" when screen == "square" && courierQuestAccepted [
             "text": "Review your active quest"
         ] => {
             print("\nActive quest: Find the missing courier.")
         }
 
-        case "leave" when screen == "square" [
+        action "leave" when screen == "square" [
             "text": "Leave the town square"
         ] => exit
 
-        case "ask" when screen == "guard" && !courierQuestKnown [
+        action "ask" when screen == "guard" && !courierQuestKnown [
             "text": "Ask about the missing courier"
         ] => {
             courierQuestKnown = true
             print("\nGuard: A courier vanished near the old bridge.")
         }
 
-        case "accept" when screen == "guard" && courierQuestKnown && !courierQuestAccepted [
+        action "accept" when screen == "guard" && courierQuestKnown && !courierQuestAccepted [
             "text": "Accept the courier quest"
         ] => {
             courierQuestAccepted = true
@@ -45,7 +45,7 @@ func questGame() {
             print("\nQuest accepted: Find the missing courier.")
         }
 
-        case "back" when screen == "guard" [
+        action "back" when screen == "guard" [
             "text": "Return to the town square"
         ] => {
             screen = "square"

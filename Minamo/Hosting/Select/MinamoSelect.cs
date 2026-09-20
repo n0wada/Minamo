@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 namespace Minamo.Hosting;
 
 /// <summary>
-/// Provides the choice-oriented API for an interactive select.
-/// The current choices are published asynchronously and remain safe to read until the
+/// Provides the action-oriented API for an interactive select.
+/// The current actions are published asynchronously and remain safe to read until the
 /// next action.
 /// </summary>
 public sealed class MinamoSelect : IDisposable
@@ -24,8 +24,8 @@ public sealed class MinamoSelect : IDisposable
     /// <summary>Gets the read-only properties published by the currently active select.</summary>
     public IReadOnlyList<MinamoSelectProperty> Properties => session.Properties;
 
-    /// <summary>Gets the choices currently available to the host.</summary>
-    public IReadOnlyList<MinamoChoice> Choices => session.Choices;
+    /// <summary>Gets the actions currently available to the host.</summary>
+    public IReadOnlyList<MinamoSelectAction> Actions => session.Actions;
 
     /// <summary>Gets whether the whole select interaction has completed.</summary>
     public bool IsCompleted => session.IsCompleted;
@@ -33,18 +33,18 @@ public sealed class MinamoSelect : IDisposable
     /// <summary>Gets the input request currently waiting for a host response.</summary>
     public MinamoSelectRequest? Request => session.Request;
 
-    /// <summary>Executes a choice from the currently published screen.</summary>
-    public Task SelectAsync(MinamoChoice choice)
+    /// <summary>Executes an action from the currently published screen.</summary>
+    public Task SelectAsync(MinamoSelectAction action)
     {
-        ArgumentNullException.ThrowIfNull(choice);
-        return session.SelectAsync(choice);
+        ArgumentNullException.ThrowIfNull(action);
+        return session.SelectAsync(action);
     }
 
-    /// <summary>Executes a choice with its host-supplied argument from the published screen.</summary>
-    public Task SelectAsync(MinamoChoice choice, object? argument)
+    /// <summary>Executes an action with its host-supplied argument from the published screen.</summary>
+    public Task SelectAsync(MinamoSelectAction action, object? argument)
     {
-        ArgumentNullException.ThrowIfNull(choice);
-        return session.SelectAsync(choice, argument);
+        ArgumentNullException.ThrowIfNull(action);
+        return session.SelectAsync(action, argument);
     }
 
     /// <summary>Asynchronously sends a host event that does not accept an argument.</summary>

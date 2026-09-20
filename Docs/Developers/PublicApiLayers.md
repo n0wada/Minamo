@@ -28,11 +28,13 @@ evaluation stack. Typed result, registry, and command helpers keep ordinary host
 the runtime object model. `MinamoEnvironment.UseInputAsync` supplies arbitrary values through
 `host.Input()`, while `UseOutput` routes text written by `print`.
 
-Interactive UIs use `MinamoInstance.OpenSelectAsync` and the live `MinamoSelect` application
-surface. `MinamoSelectProperty` publishes script-defined read-only values, while
+When the entire source passed to `ExecuteAsync` is `open name`, the result's `Select` property
+contains a live `MinamoSelect`; all other source follows the ordinary script execution path.
+Interactive UIs may also use `MinamoInstance.OpenSelectAsync` when they want a direct opening API.
+`MinamoSelectProperty` publishes script-defined read-only values, while
 `MinamoSelectDescription` and `MinamoSelectMetadata` expose free-form string-key dictionaries
-through typed host conversion. Language-level `case` declarations appear as `MinamoChoice`
-objects in `MinamoSelect.Choices`; hosts select the published object rather than parsing or
+through typed host conversion. Language-level `action` declarations appear as `MinamoSelectAction`
+objects in `MinamoSelect.Actions`; hosts select the published object rather than parsing or
 invoking script syntax directly.
 
 Compiler and parser results expose a fixed `Messages` snapshot together with filtered `Errors` and

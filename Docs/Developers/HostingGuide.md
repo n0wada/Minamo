@@ -90,6 +90,13 @@ failure.
 `Success`, `Failures`, `ExecutionId`, and `Metrics` members while operation-specific code can still
 inspect diagnostics or the returned value.
 
+When the complete string passed to `ExecuteAsync` is `open name`, Minamo opens the named Select
+instead of compiling the string as language source. A successful result exposes the live interaction
+through `MinamoExecutionResult.Select`; the caller owns that `MinamoSelect` and must dispose it after
+driving it to completion or abandoning it. All other strings, and every file passed to
+`ExecuteFileAsync`, follow the ordinary script path. The command accepts a Select identifier or a
+registered dotted alias and is not Minamo language syntax.
+
 `Metrics` contains total, compilation, and VM durations plus instruction and host-command counts.
 The counters are collected when execution controls are active; otherwise they remain zero.
 

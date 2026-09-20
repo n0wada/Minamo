@@ -144,6 +144,37 @@ public sealed class LifecycleAndConcurrencyTests
     }
 
     [Fact]
+    public async Task CancelsAnOperationWhileItWaitsForTheInstance()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var instance = new MinamoHost()
+            .Module("work", module => module.AsyncCommand(
+                "Wait",
+                async _ =>
+                {
+                    entered.SetResult();
+                    return await completion.Task.ConfigureAwait(false);
+                }))
+            .CreateInstance();
+
+        var first = instance.ExecuteAsync("import work\nwork.Wait()");
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource();
+        var queued = instance.ExecuteAsync("40 + 2", cancellation.Token);
+
+        cancellation.Cancel();
+        var cancelled = await queued.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(cancelled.Success);
+        Assert.Equal(MinamoFailureKind.Cancelled, cancelled.Failure?.Kind);
+        Assert.False(first.IsCompleted);
+
+        completion.SetResult(42);
+        Assert.True((await first).Success);
+    }
+
+    [Fact]
     public async Task PreservesAsyncHostFailuresAtTheVmCallSite()
     {
         using var instance = new MinamoHost()

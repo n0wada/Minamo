@@ -65,7 +65,7 @@ public enum NodeType
     Function,
     Select,
     SelectProperty,
-    SelectChoice,
+    SelectAction,
     Tuple,
     Array,
     Comprehension,

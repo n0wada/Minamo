@@ -6,12 +6,12 @@ the interaction.
 
 It demonstrates:
 
-- `select`, `case`, and `exit`;
-- free-form case metadata for host-facing presentation;
+- `select`, `action`, and `exit`;
+- free-form action metadata for host-facing presentation;
 - `when` guards that read Script-owned, per-session quest flags;
 - a `questGame` function that returns a select factory with select-local values;
 - `alias(questGame(), "quest.town")` to expose that factory to the host;
-- a small C# terminal adapter that opens `quest.town`, displays `MinamoSelect.Choices`,
+- a small C# terminal adapter that submits `open quest.town`, displays `MinamoSelect.Actions`,
   and calls `SelectAsync`.
 
 Run it from the repository root:
@@ -20,10 +20,11 @@ Run it from the repository root:
 dotnet run --project .\Examples\QuestConsole\QuestConsole.csproj
 ```
 
-Talk to the guard, ask about the courier, accept the quest, return to the square, and leave. Choice
+Talk to the guard, ask about the courier, accept the quest, return to the square, and leave. Action
 guards use a select-local `screen` value to determine which actions are currently visible.
 
 During initialization, `alias(questGame(), "quest.town")` calls `questGame` once and registers its
-factory. Each `await instance.OpenSelectAsync("quest.town")` creates fresh cells for the select-local
-quest values, then binds the choice and guard closures to those cells. `Program.cs` drives the
-resulting `MinamoSelect` by calling `SelectAsync`, the same API used to test selects from C#.
+factory. `await instance.ExecuteAsync("open quest.town")` creates fresh cells for the select-local
+quest values, binds the action and guard closures to those cells, and returns the resulting
+`MinamoSelect` in `MinamoExecutionResult.Select`. `Program.cs` drives that Select by calling
+`SelectAsync`, the same API used to test selects from C#.

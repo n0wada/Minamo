@@ -48,7 +48,7 @@
     <message id="StaticOnlyMethods">Function "{0}" cannot be declared as static. Only methods can be static.</message>
     <message id="VarArgNoDefaultValue">Default values are not allowed for the argument lists.</message>
     <message id="VarArgOnlyOne">Only one parameter of type argument list is allowed.</message>
-      <message id="SelectDuplicateChoice">The case '{0}' is already declared in this select.</message>
+      <message id="SelectDuplicateAction">The action '{0}' is already declared in this select.</message>
       <message id="SelectOnlyGlobalScope">Select declarations are permitted only at global (module) scope.</message>
       <message id="SelectDuplicateEvent">The event '{0}' is already declared in this select.</message>
       <message id="SelectDuplicateProperty">The property '{0}' is already declared in this select.</message>

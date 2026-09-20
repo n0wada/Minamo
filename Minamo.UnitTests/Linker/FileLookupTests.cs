@@ -50,6 +50,30 @@ public sealed class FileLookupTests
         Assert.True(after.Find(null, "late.nami", out _));
     }
 
+    [Fact]
+    public void UsesPlatformPathSeparatorForEnvironmentPaths()
+    {
+        using var paths = new LookupPaths();
+        paths.Write(paths.Second, "environment.nami", "let answer = 42");
+        var previous = Environment.GetEnvironmentVariable("MINAMO_LIBS");
+        try
+        {
+            Environment.SetEnvironmentVariable(
+                "MINAMO_LIBS",
+                string.Join(Path.PathSeparator, paths.First, paths.Second));
+            var lookup = FileLookup.Create(BuilderOptions.Default(), paths.First);
+
+            Assert.True(lookup.Find(null, "environment.nami", out var resolved));
+            Assert.Equal(
+                Path.GetFullPath(Path.Combine(paths.Second, "environment.nami")),
+                resolved);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("MINAMO_LIBS", previous);
+        }
+    }
+
     private sealed class LookupPaths : IDisposable
     {
         private readonly string root = Path.Combine(

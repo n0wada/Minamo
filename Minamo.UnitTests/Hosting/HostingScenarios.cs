@@ -248,19 +248,21 @@ internal static class HostingScenarios
         AssertNoMethod<MinamoInstance>("StartAsync", "removed script-initiated select execution");
         AssertNoMethod<MinamoInstance>("DispatchSignals", "removed synchronous signal dispatch");
         AssertNoMethod<MinamoInstance>("DispatchSignalsAsync", "removed asynchronous signal dispatch");
-        AssertNoMethod<MinamoSelect>("Select", "synchronous basic select choice");
+        AssertNoMethod<MinamoSelect>("Select", "synchronous basic select action");
         AssertNoMethod<MinamoSelect>("Send", "synchronous basic select host event delivery");
-        AssertHasMethod<MinamoSelect>("SelectAsync", "asynchronous basic select choice");
+        AssertHasMethod<MinamoSelect>("SelectAsync", "asynchronous basic select action");
         AssertHasMethod<MinamoSelect>("SendAsync", "asynchronous basic select host event delivery");
         AssertNoMethod<MinamoSelect>("RefreshAsync", "removed select refresh");
         AssertNoMethod<MinamoSelect>("Cancel", "removed select cancellation");
         AssertNoMethod<MinamoSelect>("InvalidateAsync", "removed select invalidation");
-        AssertNoMethod<MinamoSelect>("SelectAtRevisionAsync", "removed revision-aware select choice");
+        AssertNoMethod<MinamoSelect>("SelectAtRevisionAsync", "removed revision-aware select action");
         AssertNoMethod<MinamoSelect>("SendAtRevisionAsync", "removed revision-aware select host event delivery");
         AssertHasMethod<MinamoSelect>("RespondAsync", "select request response");
         AssertNoProperty<MinamoSelect>("State", "removed select state");
         AssertNoProperty<MinamoSelect>("Revision", "removed select revision");
         AssertHasProperty<MinamoSelect>("Description", "select description");
+        AssertHasProperty<MinamoSelect>("Actions", "published select actions");
+        AssertNoProperty<MinamoSelect>("Choices", "removed select choices");
         AssertHasProperty<MinamoSelect>("Request", "current select request");
         AssertNoProperty<MinamoSelect>("IsWaitingForResponse", "removed select request wait state");
         AssertHasMethod<MinamoSelect>("GetValue", "typed completed select value");
@@ -268,16 +270,21 @@ internal static class HostingScenarios
         Assert(!typeof(MinamoSelect).GetMethods().Any(method =>
                 method.Name == "SelectAsync"
                 && method.GetParameters().FirstOrDefault()?.ParameterType == typeof(string)),
-            "removed string select choice overload");
+            "removed string select action overload");
+        Assert(typeof(MinamoSelect).GetMethods().Any(method =>
+                method.Name == "SelectAsync"
+                && method.GetParameters().FirstOrDefault()?.ParameterType == typeof(MinamoSelectAction)),
+            "select action object overload");
         AssertHasMethod<MinamoSelectRequest>("GetPayload", "typed select request payload");
         AssertHasMethod<MinamoSelectRequest>("TryGetPayload", "optional select request payload");
         AssertNoProperty<MinamoSelectRequest>("Revision", "removed select request revision");
-        AssertNoProperty<MinamoChoice>("Revision", "removed choice revision");
+        AssertNoProperty<MinamoSelectAction>("Revision", "removed action revision");
         Assert(!typeof(MinamoSelectSession).IsPublic, "select session stays internal");
         Assert(!typeof(MinamoSelectSnapshot).IsPublic, "select snapshot stays internal");
         AssertHasMethod<MinamoExecutionResult>("GetValue", "typed execution result");
         AssertHasMethod<MinamoExecutionResult>("TryGetValue", "optional typed execution result");
         AssertNoProperty<MinamoExecutionResult>("Value", "removed raw execution result");
+        AssertHasProperty<MinamoExecutionResult>("Select", "select opened by an execution command");
         AssertHasProperty<MinamoExecutionResult>("Execution", "execution details");
         AssertHasProperty<MinamoProgram>("Diagnostics", "compiled program diagnostics");
         AssertHasMethod<MinamoEnvironment>("Expose", "environment name exposure");

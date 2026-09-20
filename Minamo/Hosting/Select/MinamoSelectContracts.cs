@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace Minamo.Hosting;
 
-public sealed record MinamoChoiceParameter(string Name, string? TypeName);
+public sealed record MinamoSelectActionParameter(string Name, string? TypeName);
 
 /// <summary>Free-form dictionary description declared for a select.</summary>
 public sealed class MinamoSelectDescription
@@ -96,14 +96,14 @@ internal sealed class MinamoSelectSnapshot
         string name,
         MinamoSelectDescription? description,
         IReadOnlyList<MinamoSelectProperty> properties,
-        IReadOnlyList<MinamoChoice> choices,
+        IReadOnlyList<MinamoSelectAction> actions,
         bool isCompleted,
         MinamoSelectRequest? request = null)
     {
         Name = name;
         Description = description;
         Properties = properties;
-        Choices = choices;
+        Actions = actions;
         IsCompleted = isCompleted;
         Request = request;
     }
@@ -114,27 +114,27 @@ internal sealed class MinamoSelectSnapshot
 
     public IReadOnlyList<MinamoSelectProperty> Properties { get; }
 
-    public IReadOnlyList<MinamoChoice> Choices { get; }
+    public IReadOnlyList<MinamoSelectAction> Actions { get; }
 
     public bool IsCompleted { get; }
 
     public MinamoSelectRequest? Request { get; }
 }
 
-public sealed record MinamoChoice
+public sealed record MinamoSelectAction
 {
-    public MinamoChoice(
+    public MinamoSelectAction(
         string id,
         int parameterCount)
     {
         Id = id;
         ParameterCount = parameterCount;
-        Parameters = Array.Empty<MinamoChoiceParameter>();
+        Parameters = Array.Empty<MinamoSelectActionParameter>();
     }
 
-    internal MinamoChoice(
+    internal MinamoSelectAction(
         string id,
-        IReadOnlyList<MinamoChoiceParameter> parameters,
+        IReadOnlyList<MinamoSelectActionParameter> parameters,
         MinamoSelectMetadata? metadata)
     {
         Id = id;
@@ -149,6 +149,6 @@ public sealed record MinamoChoice
 
     public int ParameterCount { get; }
 
-    public IReadOnlyList<MinamoChoiceParameter> Parameters { get; }
+    public IReadOnlyList<MinamoSelectActionParameter> Parameters { get; }
 
 }

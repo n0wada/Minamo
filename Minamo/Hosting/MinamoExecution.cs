@@ -92,9 +92,11 @@ public sealed class MinamoExecutionResult : IMinamoOperationResult
         MinamoFailure? failure,
         string operation,
         Guid executionId,
-        MinamoExecutionMetrics metrics)
+        MinamoExecutionMetrics metrics,
+        MinamoSelect? select = null)
     {
         this.value = value;
+        Select = select;
         Diagnostics = messages.Select(MinamoDiagnostic.From).ToArray();
         Failure = failure ?? (messages.Any(message => message.Type == BuildMessageType.Error)
             ? MinamoFailure.Compilation(Diagnostics)
@@ -116,6 +118,9 @@ public sealed class MinamoExecutionResult : IMinamoOperationResult
     public IReadOnlyList<MinamoDiagnostic> Diagnostics { get; }
 
     public MinamoFailure? Failure { get; }
+
+    /// <summary>The interactive select opened by an <c>open name</c> execution command.</summary>
+    public MinamoSelect? Select { get; }
 
     public IReadOnlyList<MinamoFailure> Failures { get; }
 

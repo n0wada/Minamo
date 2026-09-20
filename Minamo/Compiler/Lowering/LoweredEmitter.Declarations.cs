@@ -633,28 +633,28 @@ internal sealed partial class LoweredEmitter
         }
 
         var names = new HashSet<string>(StringComparer.Ordinal);
-        var choices = new List<SelectChoiceDefinition>(node.Choices.Count);
-        for (var i = 0; i < node.Choices.Count; i++)
+        var actions = new List<SelectActionDefinition>(node.Actions.Count);
+        for (var i = 0; i < node.Actions.Count; i++)
         {
-            var choice = node.Choices[i];
-            if (!names.Add(choice.Name))
+            var action = node.Actions[i];
+            if (!names.Add(action.Name))
             {
-                target.AddError(CompilerError.SelectDuplicateChoice, choice.Location, choice.Name);
+                target.AddError(CompilerError.SelectDuplicateAction, action.Location, action.Name);
             }
 
             var metadataSlot = EmitSelectHook(
-                choice.Metadata,
+                action.Metadata,
                 $"$select-case-metadata:{node.Name ?? "anonymous"}:{i}",
                 Array.Empty<LoweredParameter>(),
                 ctx,
                 ref closureCount);
             var hiddenName = $"$select:{node.Name ?? "anonymous"}:{i}";
             int? guardSlot = null;
-            if (choice.Guard is not null)
+            if (action.Guard is not null)
             {
                 var hiddenGuardName = $"$select-guard:{node.Name}:{i}";
                 var guard = new LoweredFunctionDeclaration(
-                    choice.Location,
+                    action.Location,
                     TypeName: null,
                     TargetTypeName: null,
                     Name: hiddenGuardName,
@@ -667,7 +667,7 @@ internal sealed partial class LoweredEmitter
                     IsImplInitializer: false,
                     IsPrivate: true,
                     Parameters: Array.Empty<LoweredParameter>(),
-                    Body: choice.Guard,
+                    Body: action.Guard,
                     NeedsValue: false,
                     IteratorBody: false,
                     IsStdCall: !target.NoOptimizations);
@@ -676,7 +676,7 @@ internal sealed partial class LoweredEmitter
             }
 
             var function = new LoweredFunctionDeclaration(
-                choice.Location,
+                action.Location,
                 TypeName: null,
                 TargetTypeName: null,
                 Name: hiddenName,
@@ -688,19 +688,19 @@ internal sealed partial class LoweredEmitter
                 IsIterator: false,
                 IsImplInitializer: false,
                 IsPrivate: true,
-                Parameters: choice.Parameters,
-                Body: choice.Body,
+                Parameters: action.Parameters,
+                Body: action.Body,
                 NeedsValue: false,
                 IteratorBody: false,
                 IsStdCall: !target.NoOptimizations);
             EmitFunctionBody(-1, function, ctx, iteratorBody: false);
             var functionSlot = closureCount++;
-            choices.Add(new(
-                choice.Name,
+            actions.Add(new(
+                action.Name,
                 functionSlot,
                 guardSlot,
                 metadataSlot,
-                SelectParameters(choice.Parameters)));
+                SelectParameters(action.Parameters)));
         }
 
         var eventNames = new HashSet<string>(StringComparer.Ordinal);
@@ -740,7 +740,7 @@ internal sealed partial class LoweredEmitter
                 node.Name,
                 descriptionSlot,
                 properties,
-                choices,
+                actions,
                 events),
             closureCount), closureCount);
         if (node.Name is not null && !node.IsInstanceFactory)

@@ -66,7 +66,7 @@ $recipes = @(
         File = "12-select-navigation.nami"
         Title = "Select navigation"
         Description = 'Uses `goto` to push a select instance, `return` to restore its caller, and `exit` to finish the entire interaction.'
-        Arguments = "--do menu"
+        Arguments = "--open menu"
     }
 )
 

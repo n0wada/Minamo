@@ -120,11 +120,11 @@ internal sealed record LoweredSelectDeclaration(
     LoweredArray? Description,
     IReadOnlyList<LoweredBinding> Locals,
     IReadOnlyList<LoweredSelectProperty> Properties,
-    IReadOnlyList<LoweredSelectChoice> Choices,
+    IReadOnlyList<LoweredSelectAction> Actions,
     IReadOnlyList<LoweredSelectEvent> Events,
     bool IsInstanceFactory = false) : LoweredNode(Location);
 
-internal sealed record LoweredSelectChoice(
+internal sealed record LoweredSelectAction(
     Location Location,
     string Name,
     IReadOnlyList<LoweredParameter> Parameters,

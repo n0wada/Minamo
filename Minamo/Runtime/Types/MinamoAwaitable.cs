@@ -1,4 +1,5 @@
 using System.Runtime.ExceptionServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Minamo.Runtime.Types;
@@ -49,17 +50,24 @@ internal class MinamoAwaitable : MinamoObject
         }
     }
 
-    internal async ValueTask WaitAsync()
+    internal async ValueTask WaitAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            await task.ConfigureAwait(false);
+            await task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {
             // The VM observes the exception at the suspended call site.
         }
     }
+
+    internal void Abandon() =>
+        Interlocked.Exchange(ref completed, null)?.Invoke();
 
     internal MinamoObject Complete(ExecutionContext context)
     {
@@ -80,7 +88,7 @@ internal class MinamoAwaitable : MinamoObject
         }
         finally
         {
-            completed?.Invoke();
+            Interlocked.Exchange(ref completed, null)?.Invoke();
         }
     }
 }

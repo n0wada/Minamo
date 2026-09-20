@@ -64,13 +64,13 @@ internal sealed class MinamoSelectFactory : MinamoObject
 
     internal string Name => name;
 
-    internal MinamoFunction Choice(SelectChoiceDefinition choice) => closures![choice.FunctionSlot];
+    internal MinamoFunction Handler(SelectActionDefinition action) => closures![action.FunctionSlot];
 
-    internal MinamoFunction? ChoiceMetadata(SelectChoiceDefinition choice) =>
-        choice.MetadataFunctionSlot is int slot ? closures![slot] : null;
+    internal MinamoFunction? ActionMetadata(SelectActionDefinition action) =>
+        action.MetadataFunctionSlot is int slot ? closures![slot] : null;
 
-    internal MinamoFunction? Guard(SelectChoiceDefinition choice) =>
-        choice.GuardFunctionSlot is int slot ? closures![slot] : null;
+    internal MinamoFunction? Guard(SelectActionDefinition action) =>
+        action.GuardFunctionSlot is int slot ? closures![slot] : null;
 
     internal MinamoFunction Property(SelectPropertyDefinition property) => closures![property.FunctionSlot];
 
@@ -101,7 +101,7 @@ internal sealed class SelectInstance
 
     internal SelectDefinition Definition => factory.Definition!;
 
-    internal IReadOnlyList<SelectChoiceDefinition> Choices => Definition.Choices;
+    internal IReadOnlyList<SelectActionDefinition> Actions => Definition.Actions;
 
     internal IReadOnlyList<SelectPropertyDefinition> Properties => Definition.Properties;
 
@@ -117,12 +117,12 @@ internal sealed class SelectInstance
         Value = MinamoNil.Instance;
     }
 
-    internal MinamoFunction Choice(SelectChoiceDefinition choice) => factory.Choice(choice);
+    internal MinamoFunction Handler(SelectActionDefinition action) => factory.Handler(action);
 
-    internal MinamoFunction? ChoiceMetadata(SelectChoiceDefinition choice) =>
-        factory.ChoiceMetadata(choice);
+    internal MinamoFunction? ActionMetadata(SelectActionDefinition action) =>
+        factory.ActionMetadata(action);
 
-    internal MinamoFunction? Guard(SelectChoiceDefinition choice) => factory.Guard(choice);
+    internal MinamoFunction? Guard(SelectActionDefinition action) => factory.Guard(action);
 
     internal MinamoFunction Property(SelectPropertyDefinition property) => factory.Property(property);
 

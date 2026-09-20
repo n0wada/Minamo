@@ -168,26 +168,6 @@ internal sealed class ReplSession : IDisposable
         return PrintResult(result, measureTime);
     }
 
-    public bool RunSelect(string name)
-    {
-        try
-        {
-            return RunSelectAsync(name).GetAwaiter().GetResult();
-        }
-        catch (Exception ex)
-        {
-            ConsoleOutput.Error(ex.Message);
-            return false;
-        }
-    }
-
-    private async Task<bool> RunSelectAsync(string name)
-    {
-        using var select = await session.OpenSelectAsync(name).ConfigureAwait(false);
-        await RunSelectSessionAsync(select).ConfigureAwait(false);
-        return true;
-    }
-
     private async ValueTask RunSelectSessionAsync(MinamoSelect select)
     {
         while (!select.IsCompleted)
@@ -212,18 +192,18 @@ internal sealed class ReplSession : IDisposable
                 continue;
             }
 
-            var choices = select.Choices;
-            if (choices.Count == 0)
+            var actions = select.Actions;
+            if (actions.Count == 0)
             {
-                ConsoleOutput.Output("No choices are currently available.");
+                ConsoleOutput.Output("No actions are currently available.");
                 return;
             }
 
             ConsoleOutput.LineFeed();
-            for (var i = 0; i < choices.Count; i++)
+            for (var i = 0; i < actions.Count; i++)
             {
-                var renderedChoice = choices[i];
-                ConsoleOutput.Output($"{i + 1}. {DisplayText(renderedChoice)}");
+                var renderedAction = actions[i];
+                ConsoleOutput.Output($"{i + 1}. {DisplayText(renderedAction)}");
             }
 
             ConsoleOutput.Prefix("select> ");
@@ -239,42 +219,42 @@ internal sealed class ReplSession : IDisposable
             }
 
             var separator = input.IndexOf(' ');
-            var choiceName = separator < 0 ? input : input[..separator];
+            var actionName = separator < 0 ? input : input[..separator];
             var argument = separator < 0 ? null : input[(separator + 1)..].Trim();
-            if (int.TryParse(choiceName, out var number)
-                && number > 0 && number <= choices.Count)
+            if (int.TryParse(actionName, out var number)
+                && number > 0 && number <= actions.Count)
             {
-                choiceName = choices[number - 1].Id;
+                actionName = actions[number - 1].Id;
             }
 
-            var choice = choices.FirstOrDefault(candidate => candidate.Id == choiceName);
-            if (choice is null)
+            var action = actions.FirstOrDefault(candidate => candidate.Id == actionName);
+            if (action is null)
             {
-                ConsoleOutput.Error($"Unknown choice '{choiceName}'.");
+                ConsoleOutput.Error($"Unknown action '{actionName}'.");
                 continue;
             }
 
             try
             {
-                if (choice.ParameterCount == 0)
+                if (action.ParameterCount == 0)
                 {
                     if (argument is not null)
                     {
-                        ConsoleOutput.Error($"Choice '{choice.Id}' does not accept an argument.");
+                        ConsoleOutput.Error($"Action '{action.Id}' does not accept an argument.");
                         continue;
                     }
 
-                    await select.SelectAsync(choice).ConfigureAwait(false);
+                    await select.SelectAsync(action).ConfigureAwait(false);
                 }
-                else if (choice.ParameterCount == 1 && argument is not null)
+                else if (action.ParameterCount == 1 && argument is not null)
                 {
-                    await select.SelectAsync(choice, argument).ConfigureAwait(false);
+                    await select.SelectAsync(action, argument).ConfigureAwait(false);
                 }
                 else
                 {
                     ConsoleOutput.Error(
-                        $"Choice '{choice.Id}' requires {choice.ParameterCount} argument(s). "
-                        + "The console supports one string argument: <choice> <value>.");
+                        $"Action '{action.Id}' requires {action.ParameterCount} argument(s). "
+                        + "The console supports one string argument: <action> <value>.");
                 }
             }
             catch (Exception ex)
@@ -302,6 +282,23 @@ internal sealed class ReplSession : IDisposable
             return false;
         }
 
+        if (result.Select is { } select)
+        {
+            try
+            {
+                using (select)
+                {
+                    RunSelectSessionAsync(select).GetAwaiter().GetResult();
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ConsoleOutput.Error(ex.Message);
+                return false;
+            }
+        }
+
         var value = result.GetValue<Minamo.Runtime.Types.MinamoObject>();
         if (value is not null and not Minamo.Runtime.Types.MinamoNil
             && RuntimeContext is not null)
@@ -319,21 +316,21 @@ internal sealed class ReplSession : IDisposable
         return true;
     }
 
-    private static string DisplayText(MinamoChoice choice)
+    private static string DisplayText(MinamoSelectAction action)
     {
-        var metadata = choice.Metadata?.GetValue<System.Collections.Generic.Dictionary<string, object?>>();
+        var metadata = action.Metadata?.GetValue<System.Collections.Generic.Dictionary<string, object?>>();
         return metadata is not null
             && metadata.TryGetValue("text", out var text)
             && text is string value
                 ? value
-                : choice.Id;
+                : action.Id;
     }
 
     public void Dispose() => session.Dispose();
 
     private bool TryRunCommand(string line)
     {
-        if (TryRunSelect(line))
+        if (TryRunOpenSelect(line))
         {
             return true;
         }
@@ -351,22 +348,15 @@ internal sealed class ReplSession : IDisposable
         return true;
     }
 
-    // Console command only; select invocation is not part of the language.
-    private bool TryRunSelect(string line)
+    // Bypass the language parser so ExecuteAsync can handle this host execution command.
+    private bool TryRunOpenSelect(string line)
     {
-        if (!line.StartsWith("do ", StringComparison.Ordinal))
+        if (!line.StartsWith("open ", StringComparison.Ordinal))
         {
             return false;
         }
 
-        var name = line[3..].Trim();
-        if (name.Length == 0 || name.Any(character =>
-            !char.IsLetterOrDigit(character) && character is not '_' and not '.'))
-        {
-            return false;
-        }
-
-        RunSelect(name);
+        Eval(line);
         return true;
     }
 }

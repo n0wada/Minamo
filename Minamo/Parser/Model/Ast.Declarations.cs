@@ -171,7 +171,7 @@ public sealed class SelectDeclarationSyntax : SyntaxNode
 
     public List<SelectPropertySyntax> Properties { get; } = new();
 
-    public List<SelectChoiceSyntax> Choices { get; } = new();
+    public List<SelectActionSyntax> Actions { get; } = new();
 
     public List<SelectEventSyntax> Events { get; } = new();
 
@@ -197,9 +197,9 @@ public sealed class SelectDeclarationSyntax : SyntaxNode
         {
             property.ToString(sb);
         }
-        foreach (var choice in Choices)
+        foreach (var action in Actions)
         {
-            choice.ToString(sb);
+            action.ToString(sb);
         }
         foreach (var handler in Events)
         {
@@ -233,9 +233,9 @@ public sealed class SelectPropertySyntax : SyntaxNode
     }
 }
 
-public sealed class SelectChoiceSyntax : SyntaxNode
+public sealed class SelectActionSyntax : SyntaxNode
 {
-    public SelectChoiceSyntax(Location loc) : base(NodeType.SelectChoice, loc) { }
+    public SelectActionSyntax(Location loc) : base(NodeType.SelectAction, loc) { }
 
     public string Name { get; set; } = null!;
 
@@ -249,7 +249,7 @@ public sealed class SelectChoiceSyntax : SyntaxNode
 
     internal override void ToString(StringBuilder sb)
     {
-        sb.Append("case \"");
+        sb.Append("action \"");
         sb.Append(Name);
         sb.Append('"');
         if (Parameters.Count > 0)
