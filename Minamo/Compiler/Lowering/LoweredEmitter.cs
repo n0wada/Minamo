@@ -116,104 +116,14 @@ internal sealed partial class LoweredEmitter
     public LoweredEmitter(ILoweredEmitterTarget target) =>
         this.target = target;
 
-    public void Emit(LoweredAssignment node, bool keepResult, CompilerContext ctx) =>
-        EmitAssignment(node, keepResult, ctx);
-
     public void Emit(LoweredNode node, bool keepResult, CompilerContext ctx) =>
         EmitNode(node, keepResult, ctx);
-
-    public void Emit(LoweredAccess node, bool keepResult, CompilerContext ctx) =>
-        EmitAccess(node, keepResult, ctx);
-
-    public void Emit(LoweredIndexer node, bool keepResult, CompilerContext ctx) =>
-        EmitIndexer(node, keepResult, ctx);
-
-    public void Emit(LoweredFunctionDeclaration node, CompilerContext ctx) =>
-        EmitFunctionDeclaration(node, ctx);
-
-    public void Emit(LoweredSelectDeclaration node, bool keepResult, CompilerContext ctx) =>
-        EmitSelectDeclaration(node, keepResult, ctx);
-
-    public void Emit(LoweredNominalDeclaration node, CompilerContext ctx) =>
-        EmitNominalDeclaration(node, ctx);
-
-    public void Emit(LoweredImplDeclaration node, CompilerContext ctx) =>
-        EmitImplDeclaration(node, ctx);
 
     public void Emit(LoweredImport node) =>
         EmitImport(node);
 
-    public void Emit(LoweredIf node, bool keepResult, CompilerContext ctx) =>
-        EmitIf(node, keepResult, ctx);
-
     public void Emit(LoweredBlock node, bool keepResult, CompilerContext ctx) =>
         EmitBlock(node, keepResult, ctx);
-
-    public void Emit(LoweredMatch node, bool keepResult, CompilerContext ctx) =>
-        EmitMatch(node, keepResult, ctx);
-
-    public void Emit(LoweredTryCatch node, bool keepResult, CompilerContext ctx) =>
-        EmitTryCatch(node, keepResult, ctx);
-
-    public void Emit(LoweredWhile node, bool keepResult, CompilerContext ctx) =>
-        EmitWhile(node, keepResult, ctx);
-
-    public void Emit(LoweredFor node, bool keepResult, CompilerContext ctx) =>
-        EmitFor(node, keepResult, ctx);
-
-    public void Emit(LoweredExpressionStatement node, bool keepResult, CompilerContext ctx) =>
-        EmitExpressionStatement(node, keepResult, ctx);
-
-    public void Emit(LoweredConstDeclaration node, bool keepResult, CompilerContext ctx) =>
-        EmitConstDeclaration(node, keepResult, ctx);
-
-    public void Emit(LoweredBinding node, bool keepResult, CompilerContext ctx) =>
-        EmitBinding(node, keepResult, ctx);
-
-    public void Emit(LoweredRebinding node, bool keepResult, CompilerContext ctx) =>
-        EmitRebinding(node, keepResult, ctx);
-
-    public void Emit(LoweredUnary node, bool keepResult, CompilerContext ctx) =>
-        EmitUnary(node, keepResult, ctx);
-
-    public void Emit(LoweredBinary node, bool keepResult, CompilerContext ctx) =>
-        EmitBinary(node, keepResult, ctx);
-
-    public void Emit(LoweredName node, bool keepResult, CompilerContext ctx) =>
-        EmitName(node, keepResult, ctx);
-
-    public void Emit(LoweredApplication node, bool keepResult, CompilerContext ctx) =>
-        EmitApplication(node, keepResult, ctx);
-
-    public void Emit(LoweredControlTransfer node, bool keepResult, CompilerContext ctx) =>
-        EmitControlTransfer(node, keepResult, ctx);
-
-    public void Emit(LoweredYieldBlock node, bool keepResult, CompilerContext ctx) =>
-        EmitYieldBlock(node, keepResult, ctx);
-
-    public void Emit(LoweredCast node, bool keepResult, CompilerContext ctx) =>
-        EmitCast(node, keepResult, ctx);
-
-    public void Emit(LoweredRange node, bool keepResult, CompilerContext ctx) =>
-        EmitRange(node, keepResult, ctx);
-
-    public void Emit(LoweredTuple node, bool keepResult, CompilerContext ctx) =>
-        EmitTuple(node, keepResult, ctx);
-
-    public void Emit(LoweredArray node, bool keepResult, CompilerContext ctx) =>
-        EmitArray(node, keepResult, ctx);
-
-    public void Emit(LoweredComprehension node, bool keepResult, CompilerContext ctx) =>
-        EmitComprehension(node, keepResult, ctx);
-
-    public void Emit(LoweredLiteral node, bool keepResult) =>
-        EmitLiteral(node, keepResult);
-
-    public void EmitPattern(LoweredPattern node, CompilerContext ctx, bool rebind, bool openMatch, int flags = VarFlags.None) =>
-        BuildPattern(node, ctx, rebind, openMatch, flags);
-
-    public void PreinitPattern(LoweredPattern node, bool rebind, bool openMatch, int flags = VarFlags.None) =>
-        PreinitLoweredPattern(node, rebind, openMatch, flags);
 
     private StackMachineEmitter cw => target.Code;
 

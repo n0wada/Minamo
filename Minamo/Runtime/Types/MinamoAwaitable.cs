@@ -38,18 +38,6 @@ internal class MinamoAwaitable : MinamoObject
         return this;
     }
 
-    internal void Wait()
-    {
-        try
-        {
-            task.GetAwaiter().GetResult();
-        }
-        catch
-        {
-            // The VM observes the exception at the suspended call site.
-        }
-    }
-
     internal async ValueTask WaitAsync(CancellationToken cancellationToken = default)
     {
         try

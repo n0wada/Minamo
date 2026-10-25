@@ -34,12 +34,12 @@ Use `enum` to declare named alternatives. A case may be nullary or carry values 
 field syntax as a struct.
 
 ```swift
-enum Result {
-    Ok(value: String),
-    Err(error: String)
+enum LoadResult {
+    Loaded(value: String),
+    LoadFailed(error: String)
 }
 
-let result = Ok("ready")
+let result = Loaded("ready")
 ```
 
 `Option` models a value that may be present or absent. `Some(value)` carries one value; `None`
@@ -53,8 +53,8 @@ Enum cases work naturally with [pattern matching](ProgramStructure.md#pattern-ma
 
 ```swift
 let message = match result {
-    Ok(value) => value,
-    Err(error) => error
+    Loaded(value) => value,
+    LoadFailed(error) => error
 }
 
 let greeting = match name {

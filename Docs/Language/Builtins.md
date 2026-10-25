@@ -195,8 +195,8 @@ print(readLine(), terminator: nil)
 
 ### `collections`
 
-Import `collections` for collection types whose ordering or capacity has a specific meaning. All
-five types are iterable and expose `Length()` and `Count`; operations that have no value to return
+Import `collections` for collection types whose ordering or capacity has a specific meaning. The
+types below are iterable and expose `Length()` and `Count`; operations that have no value to return
 produce `nil`.
 
 | Type | Purpose and selected operations |
@@ -204,12 +204,15 @@ produce `nil`.
 | `PriorityQueue(values?)` | A minimum-priority queue. `Enqueue(value, priority)`, `Peek()`, and `Dequeue()`; the latter two return `(value, priority)`. Equal priorities retain enqueue order. |
 | `Deque(values?)` | A double-ended queue. `PushFront(value)`, `PushBack(value)`, `PopFront()`, `PopBack()`, `First()`, and `Last()`. |
 | `SortedSet(values?)` | A duplicate-free set iterated in ascending value order. `Add(value)`, `Remove(value)`, `Contains(value)`, `First()`, `Last()`, and `Range(...)`. |
+| `SortedDictionary(values?)` | A dictionary iterated in ascending key order. `Add(key, value)`, `TryGet(key)`, `Remove(key)`, `Range(...)`, and the `Keys` and `Values` properties. |
 | `MultiMap(pairs?)` | Multiple values per key. `Add(key, value)`, `Get(key)`, `Remove(key, value)`, `RemoveKey(key)`, `ContainsKey(key)`, and `Keys`. Keys and values retain insertion order. |
 | `RingBuffer(capacity, values?)` | A fixed-size, oldest-to-newest buffer. `Add(value)` overwrites the oldest value when full; `First()`, `Last()`, and `Capacity` expose its current boundaries. |
 
 `values` is a sequence. `PriorityQueue` expects `(value, priority)` pairs and `MultiMap` expects
 `(key, value)` pairs. `Get` returns an `Array` snapshot, including an empty array when the key is
 absent. `RingBuffer` requires a positive capacity.
+
+`SortedDictionary` accepts a dictionary or a sequence of `(key, value)` pairs.
 
 ```swift
 import * from collections

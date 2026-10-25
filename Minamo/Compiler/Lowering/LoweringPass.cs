@@ -1,3 +1,4 @@
+using Minamo.Parser;
 using Minamo.Parser.Model;
 using System;
 using System.Collections.Generic;
@@ -46,22 +47,7 @@ internal sealed class LoweringPass
     public LoweredAssignment Lower(AssignmentSyntax node, CompilerContext ctx)
     {
         var target = LowerStoreTarget(node.Target, ctx);
-        var kind = target.Kind switch
-        {
-            LoweredStoreKind.PublicMemberSetter when node.AutoAssign is BinaryOperator.Coalesce =>
-                LoweredAssignmentKind.PublicMemberSetterCoalesceAssign,
-            LoweredStoreKind.PublicMemberSetter when node.AutoAssign is not null =>
-                LoweredAssignmentKind.PublicMemberSetterAutoAssign,
-            LoweredStoreKind.PublicMemberSetter =>
-                LoweredAssignmentKind.PublicMemberSetter,
-            _ when node.AutoAssign is BinaryOperator.Coalesce =>
-                LoweredAssignmentKind.CoalesceAssign,
-            _ when node.AutoAssign is not null =>
-                LoweredAssignmentKind.AutoAssign,
-            _ => LoweredAssignmentKind.Simple
-        };
-
-        return new(node.Location, target, LowerNode(node.Value, ctx), node.AutoAssign, kind);
+        return new(node.Location, target, LowerNode(node.Value, ctx), node.AutoAssign);
     }
 
     public LoweredFunctionDeclaration Lower(FunctionDeclarationSyntax node, CompilerContext ctx, bool needsValue, bool iteratorBody)
@@ -122,6 +108,7 @@ internal sealed class LoweringPass
             actions[i] = new(
                 action.Location,
                 action.Name,
+                action.IsHidden,
                 LowerParameters(action.Parameters),
                 action.Metadata is null
                     ? null
@@ -130,59 +117,40 @@ internal sealed class LoweringPass
                 LowerNode(action.Body, new CompilerContext()));
         }
 
-        var events = new LoweredSelectEvent[node.Events.Count];
-        for (var i = 0; i < node.Events.Count; i++)
-        {
-            var handler = node.Events[i];
-            events[i] = new(
-                handler.Location,
-                handler.Name,
-                LowerParameters(handler.Parameters),
-                LowerNode(handler.Body, new CompilerContext()));
-        }
-
         return new(
             node.Location,
             node.Name,
             description,
             locals,
             properties,
-            actions,
-            events);
+            actions);
     }
 
     public LoweredControlTransfer Lower(ExitSyntax node, CompilerContext ctx) =>
-        new(
+        LowerSelectControlSignal(
             node.Location,
-            new LoweredTuple(
-                node.Location,
-                [
-                    new LoweredLiteral(node.Location, SelectControlSignal.Exit, LoweredLiteralKind.String),
-                    node.Expression is null
-                        ? new LoweredLiteral(node.Location, null, LoweredLiteralKind.Nil)
-                        : LowerNode(node.Expression, ctx)
-                ]),
-            LoweredControlTransferKind.Return);
+            SelectControlSignal.Exit,
+            node.Expression is null
+                ? new LoweredLiteral(node.Location, null, LoweredLiteralKind.Nil)
+                : LowerNode(node.Expression, ctx));
 
     public LoweredControlTransfer Lower(SelectGotoSyntax node, CompilerContext ctx) =>
-        new(
-            node.Location,
-            new LoweredTuple(
-                node.Location,
-                [
-                    new LoweredLiteral(node.Location, SelectControlSignal.Goto, LoweredLiteralKind.String),
-                    LowerNode(node.Target, ctx)
-                ]),
-            LoweredControlTransferKind.Return);
+        LowerSelectControlSignal(node.Location, SelectControlSignal.Goto, LowerNode(node.Target, ctx));
 
     public LoweredControlTransfer Lower(SelectReturnSyntax node) =>
-        new(
+        LowerSelectControlSignal(
             node.Location,
+            SelectControlSignal.Return,
+            new LoweredLiteral(node.Location, null, LoweredLiteralKind.Nil));
+
+    private static LoweredControlTransfer LowerSelectControlSignal(Location location, string signal, LoweredNode value) =>
+        new(
+            location,
             new LoweredTuple(
-                node.Location,
+                location,
                 [
-                    new LoweredLiteral(node.Location, SelectControlSignal.Return, LoweredLiteralKind.String),
-                    new LoweredLiteral(node.Location, null, LoweredLiteralKind.Nil)
+                    new LoweredLiteral(location, signal, LoweredLiteralKind.String),
+                    value
                 ]),
             LoweredControlTransferKind.Return);
 

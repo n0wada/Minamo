@@ -57,7 +57,7 @@ let match mut nil not or private return set static throw true try type
 use when while with yield
 ```
 
-`const`, `struct`, `enum`, `trait`, `impl`, `guard`, `finally`, `select`, `prop`, `action`, `on`,
+`const`, `struct`, `enum`, `trait`, `impl`, `guard`, `finally`, `select`, `prop`, `action`, `hidden`,
 `desc`, `goto`, and `exit` are
 contextual keywords.
 
@@ -225,7 +225,7 @@ requests, and nested interactions.
 ```text
 select-declaration
     ::= "select" [ identifier ] "{" [ select-description ] { select-local }
-        { select-property | action-declaration | event-declaration } "}"
+        { select-property | action-declaration } "}"
 
 select-description
     ::= "desc" string-key-dictionary-literal
@@ -240,16 +240,12 @@ select-property
     ::= "prop" ( identifier | string ) [ select-metadata ] "=>" expression
 
 action-declaration
-    ::= "action" string [ select-parameters ]
+    ::= [ "hidden" ] "action" string [ select-parameters ]
         [ "when" expression ] [ select-metadata ]
         "=>" select-action-body
 
 select-metadata
     ::= string-key-dictionary-literal
-
-event-declaration
-    ::= "on" string [ select-parameters ]
-        "=>" select-action-body
 
 select-parameters
     ::= "(" [ select-parameter { "," select-parameter } [ "," ] ] ")"
@@ -275,7 +271,7 @@ exit-statement
 ```
 
 Named select declarations are permitted only at global (module) scope. Select locals are created
-for each interaction instance and must appear before properties, actions, or events. A `prop`
+for each interaction instance and must appear before properties or actions. A `prop`
 declaration publishes a read-only value to the host. Its name may be an identifier or string.
 Properties and their optional metadata dictionaries are reevaluated for every successful
 publication. After an ordinary action finishes, the current select republishes its properties and
@@ -285,15 +281,16 @@ onto the interaction's navigation stack, and publishes the new instance. `return
 current instance with `nil` and restores the preceding instance. At the root it completes the
 interaction with `nil`. `exit` completes the whole interaction, discarding every stacked instance,
 and may supply the interaction's result. There is no `back` keyword.
-Property names, action IDs, and event names are unique within their respective channels. Actions and
-events receive either no
+Property names and action IDs are unique within their respective channels. Visible and hidden
+actions share one ID namespace. Actions receive either no
 argument, one value, or a tuple whose
-elements bind to their parameters. `action` declarations are visible through `Actions`; `on`
-declarations are hidden and delivered through `MinamoSelect.SendAsync`. `when` controls whether a
+elements bind to their parameters. All available actions appear in `Actions` and execute through
+`MinamoSelect.SelectAsync`. `hidden action` sets `MinamoSelectAction.IsHidden` so hosts can omit the
+action from their user interface. `when` controls whether a
 action is currently available. An action's optional metadata dictionary is evaluated only when
 that action is available. Select metadata is free-form UI guidance; Minamo requires string keys but
 does not assign meanings to them.
-When no action is available and the select has no host events, the interaction completes with
+When no visible or hidden action is available, the interaction completes with
 `nil`; when the current select was reached by `goto`, this behaves like `return` and restores its
 caller. Select-local values are available to all actions in their select instance and remain intact
 while that instance is on the navigation stack.
@@ -302,8 +299,9 @@ entire string passed to the Hosting API's `ExecuteAsync`; it is not part of this
 accepted in script files. The host command also accepts a registered dotted alias.
 An action handler may call `request(kind, payload?)` to yield an application-defined input request to
 the host. The host responds through `MinamoSelect.RespondAsync`, and the response becomes the return
-value of `request`. Requests are not valid in host events, guards, or descriptions.
-The select control statements are valid in action and event handler bodies. They do not change the
+value of `request`. Visible and hidden actions may request input; guards, properties, metadata,
+and descriptions may not.
+The select control statements are valid in visible and hidden action bodies. They do not change the
 meaning of `return` inside a function declared within an action: there it remains an ordinary
 function return and may carry a value. A select-level `return` cannot carry a value.
 `desc` is an optional free-form select description. It must be a dictionary literal whose keys are

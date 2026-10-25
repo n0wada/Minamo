@@ -23,23 +23,6 @@ internal static class ConsoleOutput
 
     public static void Output(string data) => WriteLine(data);
 
-    public static void Output(ExecutionResult res)
-    {
-        if (res.Reason != TerminationReason.Complete)
-        {
-            Error($"Terminated, reason: {res.Reason}");
-            return;
-        }
-
-        if (res.Value is MinamoNil || res.Value is null)
-        {
-            return;
-        }
-
-        var fmt = Format(res.Value, res.Context);
-        Output(fmt);
-    }
-
     public static string Format(MinamoObject obj, ExecutionContext ctx, bool notype = false, int maxLen = 0)
     {
         string fmt;

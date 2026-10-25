@@ -5,6 +5,7 @@ using Minamo.Linker;
 using Minamo.Parser;
 using Minamo.Runtime;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -192,7 +193,8 @@ internal sealed class ReplSession : IDisposable
                 continue;
             }
 
-            var actions = select.Actions;
+            var token = select.Token;
+            IReadOnlyList<MinamoSelectAction> actions = select.Actions.Where(action => !action.IsHidden).ToArray();
             if (actions.Count == 0)
             {
                 ConsoleOutput.Output("No actions are currently available.");
@@ -244,11 +246,11 @@ internal sealed class ReplSession : IDisposable
                         continue;
                     }
 
-                    await select.SelectAsync(action).ConfigureAwait(false);
+                    await select.SelectAsync(action.Id, expectedToken: token).ConfigureAwait(false);
                 }
                 else if (action.ParameterCount == 1 && argument is not null)
                 {
-                    await select.SelectAsync(action, argument).ConfigureAwait(false);
+                    await select.SelectAsync(action.Id, argument, expectedToken: token).ConfigureAwait(false);
                 }
                 else
                 {

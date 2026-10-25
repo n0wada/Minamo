@@ -46,7 +46,8 @@ internal static class Program
     {
         while (!select.IsCompleted)
         {
-            var actions = select.Actions;
+            var token = select.Token;
+            IReadOnlyList<MinamoSelectAction> actions = select.Actions.Where(action => !action.IsHidden).ToArray();
             Console.WriteLine();
             Console.WriteLine("[town]");
             for (var i = 0; i < actions.Count; i++)
@@ -75,7 +76,7 @@ internal static class Program
                 continue;
             }
 
-            await select.SelectAsync(selectedAction);
+            await select.SelectAsync(selectedAction.Id, expectedToken: token);
         }
     }
 

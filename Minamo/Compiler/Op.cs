@@ -45,8 +45,6 @@ internal static class Builtins
 
     public static bool IsSetter(string name) => name.StartsWith(SetAccessor);
 
-    public static string GetSetterName(string name) => name[SetAccessor.Length..];
-
     public static bool IsSetter(HashString name) => ((string)name).StartsWith(SetAccessor);
 
     public static string GetSetterName(HashString name) => ((string)name)[SetAccessor.Length..];
@@ -427,8 +425,6 @@ public static class OpExtensions
 
         return Op.Infos[index];
     }
-
-    internal static int GetSize(this OpCode op) => (int)op.GetInfo().Operands;
 
     internal static int GetStack(this OpCode op) =>
         op.GetInfo().StackDelta

@@ -7,6 +7,9 @@ namespace Minamo.Hosting;
 
 public sealed record MinamoSelectActionParameter(string Name, string? TypeName);
 
+/// <summary>Identifies one published state of an interactive select.</summary>
+public readonly record struct MinamoSelectToken(Guid Value);
+
 /// <summary>Free-form dictionary description declared for a select.</summary>
 public sealed class MinamoSelectDescription
 {
@@ -108,6 +111,8 @@ internal sealed class MinamoSelectSnapshot
         Request = request;
     }
 
+    public MinamoSelectToken Token { get; } = new(Guid.NewGuid());
+
     public string Name { get; }
 
     public MinamoSelectDescription? Description { get; }
@@ -135,15 +140,20 @@ public sealed record MinamoSelectAction
     internal MinamoSelectAction(
         string id,
         IReadOnlyList<MinamoSelectActionParameter> parameters,
-        MinamoSelectMetadata? metadata)
+        MinamoSelectMetadata? metadata,
+        bool isHidden)
     {
         Id = id;
         Parameters = parameters.ToArray();
         ParameterCount = Parameters.Count;
         Metadata = metadata;
+        IsHidden = isHidden;
     }
 
     public string Id { get; }
+
+    /// <summary>Gets whether the host should omit this action from the user interface.</summary>
+    public bool IsHidden { get; }
 
     public MinamoSelectMetadata? Metadata { get; }
 

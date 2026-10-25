@@ -263,8 +263,6 @@ internal sealed class StackMachineEmitter
     public void LoadPrivateMember(string name) => Emit(new(OpCode.LoadPrivateMember, IndexString(name)));
     public void StorePrivateMember(string name) => Emit(new(OpCode.StorePrivateMember, IndexString(name)));
 
-    public void CheckContains(string field) => Emit(new(OpCode.CheckContains, IndexObject(new MinamoString(field))));
-
     public void StoreMember(string member) => Emit(new(OpCode.StoreMember, IndexString(member)));
     public void StoreStaticMember(string member) => Emit(new(OpCode.StoreStaticMember, IndexString(member)));
 
@@ -295,13 +293,8 @@ internal sealed class StackMachineEmitter
         Emit(new(OpCode.CallMember, IndexString(name), argCount), -argCount);
     }
 
-    public void CallStatic(string name, int argCount)
-    {
-        Emit(new(OpCode.CallStatic, IndexString(name), argCount), -argCount);
-    }
     public void CheckConstructor(string ctor) => Emit(new(OpCode.CheckConstructor, IndexString(ctor)));
 
-    public void CreateArguments(int Length) => Emit(new(OpCode.CreateArguments, Length), -Length + 1);
     public void CreateDictionary(int Length) => Emit(new(OpCode.CreateDictionary, Length), -Length + 1);
     public void CreateTuple(int Length) => Emit(new(OpCode.CreateTuple, Length), -Length + 1);
     public void CreateFunction(int funHandle) => Emit(new(OpCode.CreateFunction, funHandle));
@@ -329,17 +322,14 @@ internal sealed class StackMachineEmitter
     public void LeaveTry() => Emit(Op.LeaveTry);
     public void Yield() => Emit(Op.Yield);
     public void EndIterator() => Emit(Op.EndIterator);
-    public void ConvertToString() => Emit(Op.ConvertToString);
     public void LoadIndex() => Emit(Op.LoadIndex);
     public void StoreIndex() => Emit(Op.StoreIndex);
     public void LoadRawIndex() => Emit(Op.LoadRawIndex);
     public void StoreRawIndex() => Emit(Op.StoreRawIndex);
     public void LoadThis() => Emit(Op.LoadThis);
-    public void LoadType() => Emit(Op.LoadType);
     public void LoadNil() => Emit(Op.LoadNil);
     public void LoadTerminator() => Emit(Op.LoadTerminator);
     public void NoOperation() => Emit(Op.NoOperation);
-    public void Suspend() => Emit(Op.Suspend);
     public void Drop() => Emit(Op.Drop);
     public void Add() => Emit(Op.Add);
     public void Sub() => Emit(Op.Sub);
@@ -362,10 +352,8 @@ internal sealed class StackMachineEmitter
     public void FinishModule() => Emit(Op.FinishModule);
     public void CheckNull() => Emit(Op.CheckNull);
     public void MarkMutable() => Emit(Op.MarkMutable);
-    public void AddTypeAnnotation() => Emit(Op.AddTypeAnnotation);
     public void CheckType() => Emit(Op.CheckType);
     public void CreateCast() => Emit(Op.CreateCast);
     public void ApplyCast() => Emit(Op.ApplyCast);
     public void ApplyMixin() => Emit(Op.ApplyMixin);
-    public void Debug() => Emit(Op.Debug);
 }

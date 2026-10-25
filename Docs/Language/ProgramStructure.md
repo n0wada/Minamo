@@ -6,7 +6,8 @@ error handling. For the exact grammar, see the [grammar reference](../Reference/
 ## Bindings and constants
 
 Use `let` for an immutable binding and `mut` for a binding that may be reassigned. Use `const` for
-a named constant. `use` disposes its value when the current scope exits.
+a named constant. `use` disposes its value when the current scope exits; see the
+[scope cleanup example](Semantics.md#bindings-and-mutation).
 
 > `const` declarations are permitted only at global (module) scope. A `const` declaration inside
 > a function or another local scope is a compile-time error; use `let` for a local immutable value.
@@ -15,7 +16,6 @@ a named constant. `use` disposes its value when the current scope exits.
 let name = "Ada"
 mut score = 0
 const MaxAttempts = 3
-use file = File.Create("output.txt")
 
 score += 10
 ```

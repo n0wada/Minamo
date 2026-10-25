@@ -13,13 +13,9 @@ internal sealed partial class LoweredEmitter
     private void EmitAssignment(LoweredAssignment node, bool keepResult, CompilerContext ctx)
     {
         var resolvedTarget = ResolveStoreTarget(node.Target, ctx);
-        node = node with
-        {
-            Target = resolvedTarget,
-            Kind = ResolveAssignmentKind(resolvedTarget.Kind, node.AutoAssign)
-        };
+        node = node with { Target = resolvedTarget };
 
-        _ = node.Kind switch
+        _ = ResolveAssignmentKind(resolvedTarget.Kind, node.AutoAssign) switch
         {
             LoweredAssignmentKind.PublicMemberSetterCoalesceAssign => EmitSetterCoalesce(node, keepResult, ctx),
             LoweredAssignmentKind.PublicMemberSetterAutoAssign => EmitSetterAutoAssign(node, keepResult, ctx),

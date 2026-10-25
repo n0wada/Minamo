@@ -28,153 +28,35 @@ partial class Builder
     //names, e.g. "*" becomes "__op_mul"
     private string GetMethodName(string name, LoweredFunctionDeclaration node)
     {
-        switch (name)
+        var parameterCount = node.Parameters.Count;
+        var (methodName, maxArguments) = name switch
         {
-            case "+" when node.Parameters.Count == 0: return Builtins.Plus;
-            case "-" when node.Parameters.Count == 0: return Builtins.Neg;
-            case "!":
-                if (node.Parameters.Count > 0)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
+            "+" when parameterCount == 0 => (Builtins.Plus, 0),
+            "-" when parameterCount == 0 => (Builtins.Neg, 0),
+            "!" => (Builtins.Not, 0),
+            "Length" or "ToLiteral" or "Iterate" or "Dispose" or "Clone" => (name, 0),
+            "ToString" or "Contains" => (name, 1),
+            "+" => (Builtins.Add, 1),
+            "-" => (Builtins.Sub, 1),
+            "*" => (Builtins.Mul, 1),
+            "<<" => (Builtins.ShiftLeft, 1),
+            ">>" => (Builtins.ShiftRight, 1),
+            "/" => (Builtins.Div, 1),
+            "==" => (Builtins.Eq, 1),
+            "!=" => (Builtins.Neq, 1),
+            ">" => (Builtins.Gt, 1),
+            "<" => (Builtins.Lt, 1),
+            ">=" => (Builtins.Gte, 1),
+            "<=" => (Builtins.Lte, 1),
+            _ => (name, int.MaxValue)
+        };
 
-                return Builtins.Not;
-            case "Length":
-                if (node.Parameters.Count > 0)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return name;
-            case "ToLiteral":
-                if (node.Parameters.Count > 0)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return name;
-            case "Iterate":
-                if (node.Parameters.Count > 0)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return name;
-            case "Dispose":
-                if (node.Parameters.Count > 0)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return name;
-            case "Clone":
-                if (node.Parameters.Count > 0)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return name;
-            case "ToString":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return name;
-            case "Contains":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return name;
-            case "+":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.Add;
-            case "-":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.Sub;
-            case "*":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.Mul;
-            case "<<":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.ShiftLeft;
-            case ">>":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.ShiftRight;
-            case "/":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.Div;
-            case "==":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.Eq;
-            case "!=":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.Neq;
-            case ">":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.Gt;
-            case "<":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.Lt;
-            case ">=":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.Gte;
-            case "<=":
-                if (node.Parameters.Count > 1)
-                {
-                    AddError(CompilerError.BuiltinWrongArguments, node.Location);
-                }
-
-                return Builtins.Lte;
-            default:
-                return name;
+        if (parameterCount > maxArguments)
+        {
+            AddError(CompilerError.BuiltinWrongArguments, node.Location);
         }
+
+        return methodName;
     }
 
 

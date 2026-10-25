@@ -44,10 +44,18 @@ const MaximumAttempts = 3
 attempts += 1
 ```
 
-`use` owns a value for the current scope and disposes it when that scope exits.
+`use` calls a value's `Dispose()` method when the current scope exits:
 
 ```swift
-use file = File.Create("output.txt")
+struct Session { name }
+func Session.Dispose() => print(fmt("Closed {0}", this.name))
+
+func run() {
+    use session = Session("demo")
+    print(session.name)
+}
+
+run() // prints "demo", then "Closed demo"
 ```
 
 ## Nil and conditional evaluation

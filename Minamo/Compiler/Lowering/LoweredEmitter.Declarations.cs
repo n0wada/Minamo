@@ -648,91 +648,28 @@ internal sealed partial class LoweredEmitter
                 Array.Empty<LoweredParameter>(),
                 ctx,
                 ref closureCount);
-            var hiddenName = $"$select:{node.Name ?? "anonymous"}:{i}";
-            int? guardSlot = null;
-            if (action.Guard is not null)
-            {
-                var hiddenGuardName = $"$select-guard:{node.Name}:{i}";
-                var guard = new LoweredFunctionDeclaration(
-                    action.Location,
-                    TypeName: null,
-                    TargetTypeName: null,
-                    Name: hiddenGuardName,
-                    IsStatic: false,
-                    IsIndexer: false,
-                    IsConstructor: false,
-                    Getter: false,
-                    Setter: false,
-                    IsIterator: false,
-                    IsImplInitializer: false,
-                    IsPrivate: true,
-                    Parameters: Array.Empty<LoweredParameter>(),
-                    Body: action.Guard,
-                    NeedsValue: false,
-                    IteratorBody: false,
-                    IsStdCall: !target.NoOptimizations);
-                EmitFunctionBody(-1, guard, ctx, iteratorBody: false);
-                guardSlot = closureCount++;
-            }
-
-            var function = new LoweredFunctionDeclaration(
-                action.Location,
-                TypeName: null,
-                TargetTypeName: null,
-                Name: hiddenName,
-                IsStatic: false,
-                IsIndexer: false,
-                IsConstructor: false,
-                Getter: false,
-                Setter: false,
-                IsIterator: false,
-                IsImplInitializer: false,
-                IsPrivate: true,
-                Parameters: action.Parameters,
-                Body: action.Body,
-                NeedsValue: false,
-                IteratorBody: false,
-                IsStdCall: !target.NoOptimizations);
-            EmitFunctionBody(-1, function, ctx, iteratorBody: false);
-            var functionSlot = closureCount++;
+            var guardSlot = EmitSelectHook(
+                action.Guard,
+                $"$select-guard:{node.Name}:{i}",
+                Array.Empty<LoweredParameter>(),
+                ctx,
+                ref closureCount,
+                action.Location);
+            var functionSlot = EmitSelectHook(
+                action.Body,
+                $"$select:{node.Name ?? "anonymous"}:{i}",
+                action.Parameters,
+                ctx,
+                ref closureCount,
+                action.Location)
+                ?? throw new InvalidOperationException("A select action must have a body.");
             actions.Add(new(
                 action.Name,
+                action.IsHidden,
                 functionSlot,
                 guardSlot,
                 metadataSlot,
                 SelectParameters(action.Parameters)));
-        }
-
-        var eventNames = new HashSet<string>(StringComparer.Ordinal);
-        var events = new List<SelectEventDefinition>(node.Events.Count);
-        for (var i = 0; i < node.Events.Count; i++)
-        {
-            var handler = node.Events[i];
-            if (!eventNames.Add(handler.Name))
-            {
-                target.AddError(CompilerError.SelectDuplicateEvent, handler.Location, handler.Name);
-            }
-
-            var function = new LoweredFunctionDeclaration(
-                handler.Location,
-                TypeName: null,
-                TargetTypeName: null,
-                Name: $"$select-event:{node.Name ?? "anonymous"}:{i}",
-                IsStatic: false,
-                IsIndexer: false,
-                IsConstructor: false,
-                Getter: false,
-                Setter: false,
-                IsIterator: false,
-                IsImplInitializer: false,
-                IsPrivate: true,
-                Parameters: handler.Parameters,
-                Body: handler.Body,
-                NeedsValue: false,
-                IteratorBody: false,
-                IsStdCall: !target.NoOptimizations);
-            EmitFunctionBody(-1, function, ctx, iteratorBody: false);
-            events.Add(new(handler.Name, closureCount++, SelectParameters(handler.Parameters)));
         }
 
         cw.CreateSelectFactory(new MinamoSelectDefinitionValue(
@@ -740,8 +677,7 @@ internal sealed partial class LoweredEmitter
                 node.Name,
                 descriptionSlot,
                 properties,
-                actions,
-                events),
+                actions),
             closureCount), closureCount);
         if (node.Name is not null && !node.IsInstanceFactory)
         {
@@ -763,7 +699,8 @@ internal sealed partial class LoweredEmitter
         string name,
         IReadOnlyList<LoweredParameter> stateParameters,
         CompilerContext selectContext,
-        ref int closureCount)
+        ref int closureCount,
+        Location? location = null)
     {
         if (body is null)
         {
@@ -771,7 +708,7 @@ internal sealed partial class LoweredEmitter
         }
 
         var function = new LoweredFunctionDeclaration(
-            body.Location,
+            location ?? body.Location,
             TypeName: null,
             TargetTypeName: null,
             Name: name,
@@ -1070,30 +1007,6 @@ internal sealed partial class LoweredEmitter
         }
 
         return variadicIndex;
-    }
-
-    private bool IsStdCall(LoweredFunctionDeclaration node)
-    {
-        if (target.NoOptimizations)
-        {
-            return false;
-        }
-
-        if (node.TargetTypeName is not null)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < node.Parameters.Count; i++)
-        {
-            if (node.Parameters[i].HasDefaultValue
-                || node.Parameters[i].IsVarArgs)
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private void EmitMethodAttachment(LoweredFunctionDeclaration node, CompilerContext ctx)

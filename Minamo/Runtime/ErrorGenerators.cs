@@ -23,17 +23,17 @@ public static class ErrorGenerators
     internal static MinamoExceptionObject RuntimeException(string constructor, MinamoTuple data) =>
         new(constructor, GetErrorDescription(constructor, data), data);
 
-    public static MinamoObject CustomError(this ExecutionContext ctx, string constructor)
+    private static MinamoObject SetError(ExecutionContext ctx, MinamoExceptionObject error)
     {
-        ctx.Error = RuntimeException(constructor);
+        ctx.Error = error;
         return Nil;
     }
 
-    public static MinamoObject Failure(this ExecutionContext ctx, string detail)
-    {
-        ctx.Error = RuntimeException(MinamoError.Failure, detail);
-        return Nil;
-    }
+    public static MinamoObject CustomError(this ExecutionContext ctx, string constructor) =>
+        SetError(ctx, RuntimeException(constructor));
+
+    public static MinamoObject Failure(this ExecutionContext ctx, string detail) =>
+        SetError(ctx, RuntimeException(MinamoError.Failure, detail));
 
     public static MinamoObject OverloadProhibited(this ExecutionContext ctx, MinamoTypeInfo typeInfo, string name)
     {
@@ -60,81 +60,44 @@ public static class ErrorGenerators
             name = $"{typeInfo.ReflectedTypeName}.{name}";
         }
 
-        ctx.Error = RuntimeException(MinamoError.OverloadProhibited, name);
-        return Nil;
+        return SetError(ctx, RuntimeException(MinamoError.OverloadProhibited, name));
     }
 
-    public static MinamoObject IOFailed(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.IOFailed);
-        return Nil;
-    }
+    public static MinamoObject IOFailed(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.IOFailed));
 
-    public static MinamoObject IOFailed(this ExecutionContext ctx, string detail)
-    {
-        ctx.Error = RuntimeException(MinamoError.IOFailed, detail);
-        return Nil;
-    }
+    public static MinamoObject IOFailed(this ExecutionContext ctx, string detail) =>
+        SetError(ctx, RuntimeException(MinamoError.IOFailed, detail));
 
-    public static MinamoObject TypeClosed(this ExecutionContext ctx, MinamoTypeInfo typeInfo)
-    {
-        ctx.Error = RuntimeException(MinamoError.TypeClosed, typeInfo.ReflectedTypeName);
-        return Nil;
-    }
+    public static MinamoObject TypeClosed(this ExecutionContext ctx, MinamoTypeInfo typeInfo) =>
+        SetError(ctx, RuntimeException(MinamoError.TypeClosed, typeInfo.ReflectedTypeName));
 
-    public static MinamoObject Overflow(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.Overflow);
-        return Nil;
-    }
+    public static MinamoObject Overflow(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.Overflow));
 
-    public static MinamoObject InvalidOperation(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidOperation);
-        return Nil;
-    }
+    public static MinamoObject InvalidOperation(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidOperation));
 
-    public static MinamoObject NotImplemented(this ExecutionContext ctx, string op)
-    {
-        ctx.Error = RuntimeException(MinamoError.NotImplemented, Builtins.NameToOperator(op));
-        return Nil;
-    }
+    public static MinamoObject NotImplemented(this ExecutionContext ctx, string op) =>
+        SetError(ctx, RuntimeException(MinamoError.NotImplemented, Builtins.NameToOperator(op)));
 
-    public static MinamoObject ParsingFailed(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.ParsingFailed);
-        return Nil;
-    }
+    public static MinamoObject ParsingFailed(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.ParsingFailed));
 
-    public static MinamoObject ParsingFailed(this ExecutionContext ctx, string detail)
-    {
-        ctx.Error = RuntimeException(MinamoError.ParsingFailed, detail);
-        return Nil;
-    }
+    public static MinamoObject ParsingFailed(this ExecutionContext ctx, string detail) =>
+        SetError(ctx, RuntimeException(MinamoError.ParsingFailed, detail));
 
-    public static MinamoObject Timeout(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.Timeout);
-        return Nil;
-    }
+    public static MinamoObject Timeout(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.Timeout));
 
-    public static MinamoObject ValueMissing(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.ValueMissing);
-        return Nil;
-    }
+    public static MinamoObject ValueMissing(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.ValueMissing));
 
-    public static MinamoObject InvalidOverload(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidOverload);
-        return Nil;
-    }
+    public static MinamoObject InvalidOverload(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidOverload));
 
-    public static MinamoObject InvalidOverload(this ExecutionContext ctx, object func)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidOverload, func);
-        return Nil;
-    }
+    public static MinamoObject InvalidOverload(this ExecutionContext ctx, object func) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidOverload, func));
 
     public static MinamoObject ConstructorFailed(this ExecutionContext ctx, object[]? args, Type type, Exception ex)
     {
@@ -142,81 +105,46 @@ public static class ErrorGenerators
         sb.Append("new(");
         ProcessArguments(sb, args);
         sb.Append(')');
-        ctx.Error = RuntimeException(MinamoError.ConstructorFailed, sb.ToString(), type.FullName ?? type.Name, ex.Message);
-        return Nil;
+        return SetError(ctx, RuntimeException(MinamoError.ConstructorFailed, sb.ToString(), type.FullName ?? type.Name, ex.Message));
     }
 
-    public static MinamoObject InvalidValue(this ExecutionContext ctx, object val1)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidValue, val1);
-        return Nil;
-    }
+    public static MinamoObject InvalidValue(this ExecutionContext ctx, object val1) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidValue, val1));
 
-    public static MinamoObject InvalidValue(this ExecutionContext ctx, object val1, object val2)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidValue, val1, val2);
-        return Nil;
-    }
+    public static MinamoObject InvalidValue(this ExecutionContext ctx, object val1, object val2) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidValue, val1, val2));
 
-    public static MinamoObject InvalidValue(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidValue);
-        return Nil;
-    }
+    public static MinamoObject InvalidValue(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidValue));
 
-    public static MinamoObject PrivateAccess(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.PrivateAccess);
-        return Nil;
-    }
+    public static MinamoObject PrivateAccess(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.PrivateAccess));
 
-    public static MinamoObject IndexReadOnly(this ExecutionContext ctx, object obj)
-    {
-        ctx.Error = RuntimeException(MinamoError.IndexReadOnly, obj);
-        return Nil;
-    }
+    public static MinamoObject IndexReadOnly(this ExecutionContext ctx, object obj) =>
+        SetError(ctx, RuntimeException(MinamoError.IndexReadOnly, obj));
 
-    public static MinamoObject IndexReadOnly(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.IndexReadOnly);
-        return Nil;
-    }
+    public static MinamoObject IndexReadOnly(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.IndexReadOnly));
 
-    public static MinamoObject MultipleValuesForArgument(this ExecutionContext ctx, string funName, string argName)
-    {
-        ctx.Error = RuntimeException(MinamoError.MultipleValuesForArgument, funName, argName);
-        return Nil;
-    }
+    public static MinamoObject MultipleValuesForArgument(this ExecutionContext ctx, string funName, string argName) =>
+        SetError(ctx, RuntimeException(MinamoError.MultipleValuesForArgument, funName, argName));
 
-    public static MinamoObject CollectionModified(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.CollectionModified);
-        return Nil;
-    }
+    public static MinamoObject CollectionModified(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.CollectionModified));
 
-    public static MinamoObject AssertionFailed(this ExecutionContext ctx, string reason)
-    {
-        ctx.Error = RuntimeException(MinamoError.AssertionFailed, reason);
-        return Nil;
-    }
+    public static MinamoObject AssertionFailed(this ExecutionContext ctx, string reason) =>
+        SetError(ctx, RuntimeException(MinamoError.AssertionFailed, reason));
 
-    public static MinamoObject PrivateNameAccess(this ExecutionContext ctx, string name)
-    {
-        ctx.Error = RuntimeException(MinamoError.PrivateNameAccess, name);
-        return Nil;
-    }
+    public static MinamoObject PrivateNameAccess(this ExecutionContext ctx, string name) =>
+        SetError(ctx, RuntimeException(MinamoError.PrivateNameAccess, name));
 
-    public static MinamoObject OperationNotSupported(this ExecutionContext ctx, string op, MinamoObject obj)
-    {
-        ctx.Error = RuntimeException(MinamoError.OperationNotSupported, Builtins.NameToOperator(op), obj.TypeName);
-        return Nil;
-    }
+    public static MinamoObject OperationNotSupported(this ExecutionContext ctx, string op, MinamoObject obj) =>
+        SetError(ctx, RuntimeException(MinamoError.OperationNotSupported, Builtins.NameToOperator(op), obj.TypeName));
 
     public static MinamoObject OperationNotSupported(this ExecutionContext ctx, string op, int typeId)
     {
         var typeName = ctx.RuntimeContext.Types[typeId].ReflectedTypeName;
-        ctx.Error = RuntimeException(MinamoError.OperationNotSupported, Builtins.NameToOperator(op), typeName, 0, 0);
-        return Nil;
+        return SetError(ctx, RuntimeException(MinamoError.OperationNotSupported, Builtins.NameToOperator(op), typeName, 0, 0));
     }
 
     public static MinamoObject StaticOperationNotSupported(this ExecutionContext ctx, string op, int typeId)
@@ -224,145 +152,84 @@ public static class ErrorGenerators
         var typeName = ctx.RuntimeContext.Types[typeId].ReflectedTypeName;
         //Small hack to get OperationNotSupported.4. It allows to use the same general code of "OperationNotSupported",
         //but a different text for a case of a static operation
-        ctx.Error = RuntimeException(MinamoError.OperationNotSupported, Builtins.NameToOperator(op), typeName, 0, 0);
-        return Nil;
+        return SetError(ctx, RuntimeException(MinamoError.OperationNotSupported, Builtins.NameToOperator(op), typeName, 0, 0));
     }
 
-    public static MinamoObject OperationNotSupported(this ExecutionContext ctx, string op, MinamoObject obj1, MinamoObject obj2)
-    {
-        ctx.Error = RuntimeException(MinamoError.OperationNotSupported, Builtins.NameToOperator(op), obj1.TypeName, obj2.TypeName);
-        return Nil;
-    }
+    public static MinamoObject OperationNotSupported(this ExecutionContext ctx, string op, MinamoObject obj1, MinamoObject obj2) =>
+        SetError(ctx, RuntimeException(MinamoError.OperationNotSupported, Builtins.NameToOperator(op), obj1.TypeName, obj2.TypeName));
 
-    public static MinamoObject InvalidCast(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidCast);
-        return Nil;
-    }
+    public static MinamoObject InvalidCast(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidCast));
 
-    public static MinamoObject InvalidCast(this ExecutionContext ctx, string type1, string type2)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidCast, type1, type2);
-        return Nil;
-    }
+    public static MinamoObject InvalidCast(this ExecutionContext ctx, string type1, string type2) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidCast, type1, type2));
 
-    public static MinamoObject IndexOutOfRange(this ExecutionContext ctx, object obj)
-    {
-        ctx.Error = RuntimeException(MinamoError.IndexOutOfRange, obj);
-        return Nil;
-    }
+    public static MinamoObject IndexOutOfRange(this ExecutionContext ctx, object obj) =>
+        SetError(ctx, RuntimeException(MinamoError.IndexOutOfRange, obj));
 
-    public static MinamoObject IndexOutOfRange(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.IndexOutOfRange);
-        return Nil;
-    }
+    public static MinamoObject IndexOutOfRange(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.IndexOutOfRange));
 
-    public static MinamoObject KeyNotFound(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.KeyNotFound);
-        return Nil;
-    }
+    public static MinamoObject KeyNotFound(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.KeyNotFound));
 
-    public static MinamoObject KeyNotFound(this ExecutionContext ctx, object key)
-    {
-        ctx.Error = RuntimeException(MinamoError.KeyNotFound, key);
-        return Nil;
-    }
+    public static MinamoObject KeyNotFound(this ExecutionContext ctx, object key) =>
+        SetError(ctx, RuntimeException(MinamoError.KeyNotFound, key));
 
-    public static MinamoObject KeyAlreadyPresent(this ExecutionContext ctx, object key)
-    {
-        ctx.Error = RuntimeException(MinamoError.KeyAlreadyPresent, key);
-        return Nil;
-    }
+    public static MinamoObject KeyAlreadyPresent(this ExecutionContext ctx, object key) =>
+        SetError(ctx, RuntimeException(MinamoError.KeyAlreadyPresent, key));
 
-    public static MinamoObject KeyAlreadyPresent(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.KeyAlreadyPresent);
-        return Nil;
-    }
+    public static MinamoObject KeyAlreadyPresent(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.KeyAlreadyPresent));
 
-    public static MinamoObject InvalidType(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidType);
-        return Nil;
-    }
+    public static MinamoObject InvalidType(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidType));
 
-    public static MinamoObject InvalidType(this ExecutionContext ctx, MinamoObject value)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidType, value.TypeName);
-        return Nil;
-    }
+    public static MinamoObject InvalidType(this ExecutionContext ctx, MinamoObject value) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidType, value.TypeName));
 
-    public static MinamoObject InvalidType(this ExecutionContext ctx, int expected, MinamoObject got)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidType, ctx.RuntimeContext.Types[expected].ReflectedTypeName, got.TypeName);
-        return Nil;
-    }
+    public static MinamoObject InvalidType(this ExecutionContext ctx, int expected, MinamoObject got) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidType, ctx.RuntimeContext.Types[expected].ReflectedTypeName, got.TypeName));
 
-    public static MinamoObject InvalidType(this ExecutionContext ctx, int expected1, int exptected2, MinamoObject got)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName, ctx.RuntimeContext.Types[got.TypeId].ReflectedTypeName);
-        return Nil;
-    }
+    public static MinamoObject InvalidType(this ExecutionContext ctx, int expected1, int exptected2, MinamoObject got) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName, ctx.RuntimeContext.Types[got.TypeId].ReflectedTypeName));
 
     public static MinamoObject InvalidType(this ExecutionContext ctx, int expected1, int exptected2, int expected3, MinamoObject got)
     {
-        ctx.Error = RuntimeException(MinamoError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName,
-            ctx.RuntimeContext.Types[expected3].ReflectedTypeName, got.TypeName);
-        return Nil;
+        return SetError(ctx, RuntimeException(MinamoError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName,
+            ctx.RuntimeContext.Types[expected3].ReflectedTypeName, got.TypeName));
     }
 
     public static MinamoObject InvalidType(this ExecutionContext ctx, int expected1, int exptected2, int expected3, int expected4, MinamoObject got)
     {
-        ctx.Error = RuntimeException(MinamoError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName,
-            ctx.RuntimeContext.Types[expected3].ReflectedTypeName, ctx.RuntimeContext.Types[expected4].ReflectedTypeName, got.TypeName);
-        return Nil;
+        return SetError(ctx, RuntimeException(MinamoError.InvalidType, ctx.RuntimeContext.Types[expected1].ReflectedTypeName, ctx.RuntimeContext.Types[exptected2].ReflectedTypeName,
+            ctx.RuntimeContext.Types[expected3].ReflectedTypeName, ctx.RuntimeContext.Types[expected4].ReflectedTypeName, got.TypeName));
     }
 
-    public static MinamoObject InvalidType(this ExecutionContext ctx, string typeName)
-    {
-        ctx.Error = RuntimeException(MinamoError.InvalidType, typeName);
-        return Nil;
-    }
+    public static MinamoObject InvalidType(this ExecutionContext ctx, string typeName) =>
+        SetError(ctx, RuntimeException(MinamoError.InvalidType, typeName));
 
     public static MinamoObject ExternalFunctionFailure(this ExecutionContext ctx, MinamoFunction func, string error)
     {
         var functionName = func.Self is null ? func.FunctionName
             : $"{func.Self.TypeName}.{func.FunctionName}";
-        ctx.Error = RuntimeException(MinamoError.ExternalFunctionFailure, functionName, error);
-        return Nil;
+        return SetError(ctx, RuntimeException(MinamoError.ExternalFunctionFailure, functionName, error));
     }
 
-    public static MinamoObject DivideByZero(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.DivideByZero);
-        return Nil;
-    }
+    public static MinamoObject DivideByZero(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.DivideByZero));
 
-    public static MinamoObject TooManyArguments(this ExecutionContext ctx)
-    {
-        ctx.Error = RuntimeException(MinamoError.TooManyArguments);
-        return Nil;
-    }
+    public static MinamoObject TooManyArguments(this ExecutionContext ctx) =>
+        SetError(ctx, RuntimeException(MinamoError.TooManyArguments));
 
-    public static MinamoObject TooManyArguments(this ExecutionContext ctx, string functionName, int functionArguments, int passedArguments)
-    {
-        ctx.Error = RuntimeException(MinamoError.TooManyArguments, functionName, functionArguments, passedArguments);
-        return Nil;
-    }
+    public static MinamoObject TooManyArguments(this ExecutionContext ctx, string functionName, int functionArguments, int passedArguments) =>
+        SetError(ctx, RuntimeException(MinamoError.TooManyArguments, functionName, functionArguments, passedArguments));
 
-    public static MinamoObject RequiredArgumentMissing(this ExecutionContext ctx, string functionName, string argumentName)
-    {
-        ctx.Error = RuntimeException(MinamoError.RequiredArgumentMissing, functionName, argumentName);
-        return Nil;
-    }
+    public static MinamoObject RequiredArgumentMissing(this ExecutionContext ctx, string functionName, string argumentName) =>
+        SetError(ctx, RuntimeException(MinamoError.RequiredArgumentMissing, functionName, argumentName));
 
-    public static MinamoObject ArgumentNotFound(this ExecutionContext ctx, string functionName, string argumentName)
-    {
-        ctx.Error = RuntimeException(MinamoError.ArgumentNotFound, functionName, argumentName);
-        return Nil;
-    }
+    public static MinamoObject ArgumentNotFound(this ExecutionContext ctx, string functionName, string argumentName) =>
+        SetError(ctx, RuntimeException(MinamoError.ArgumentNotFound, functionName, argumentName));
 
     public static MinamoObject MethodNotFound(this ExecutionContext ctx, string name, Type type, MinamoObject[]? args)
     {
@@ -373,8 +240,7 @@ public static class ErrorGenerators
         sb.Append('(');
         ProcessArguments(sb, args);
         sb.Append(')');
-        ctx.Error = RuntimeException(MinamoError.MethodNotFound, sb.ToString());
-        return Nil;
+        return SetError(ctx, RuntimeException(MinamoError.MethodNotFound, sb.ToString()));
     }
 
     public static MinamoError GetErrorCode(MinamoObject err)

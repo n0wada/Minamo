@@ -1,9 +1,9 @@
 using Minamo.Compiler;
+using Minamo.Hosting;
 using Minamo.Linker;
 using Minamo.Parser;
 using Minamo.Runtime;
 using Minamo.Runtime.Types;
-using System.Reflection;
 
 namespace Minamo.UnitTesting;
 
@@ -87,23 +87,41 @@ internal static class PipelineScenarios
 
     internal static void InteropMethodMatching()
     {
-        var parameters = typeof(PipelineScenarios)
-            .GetMethod(nameof(TwoParameters), BindingFlags.NonPublic | BindingFlags.Static)!
-            .GetParameters();
+        var target = new OverloadedMethods();
+        using var instance = new MinamoHost().CreateInstance(
+            new MinamoEnvironment().Expose("target", target));
 
+        var first = instance.Execute("target.Match(\"text\", 42)");
+        Assert(first.Success && first.GetValue<string>() == "text-number",
+            $"interop method matching accepts compatible parameter types: {first.Failure}");
+
+        var second = instance.Execute("target.Match(42, \"text\")");
+        Assert(second.Success && second.GetValue<string>() == "number-text",
+            "interop method matching selects the compatible overload");
+
+        var mismatch = instance.Execute("target.Match(\"text\", \"text\")");
         Assert(
-            MinamoInteropTypeInfo.ParametersMatch(
-                parameters,
-                new MinamoObject[] { new MinamoInterop(typeof(string)), new MinamoInterop(typeof(int)) }),
-            "interop method matching accepts compatible parameter types");
-        Assert(
-            !MinamoInteropTypeInfo.ParametersMatch(
-                parameters,
-                new MinamoObject[] { new MinamoInterop(typeof(string)), new MinamoInterop(typeof(string)) }),
+            !mismatch.Success && mismatch.Failure?.Kind == MinamoFailureKind.Runtime,
             "interop method matching rejects a partial type match");
+        Assert(target.Calls == 2, "incompatible overloads are not invoked");
     }
 
-    private static void TwoParameters(string text, int number) { }
+    private sealed class OverloadedMethods
+    {
+        public int Calls { get; private set; }
+
+        public string Match(string text, int number)
+        {
+            Calls++;
+            return "text-number";
+        }
+
+        public string Match(int number, string text)
+        {
+            Calls++;
+            return "number-text";
+        }
+    }
 
     private static void Assert(bool condition, string name)
     {

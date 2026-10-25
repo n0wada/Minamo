@@ -63,18 +63,12 @@ public partial class MinamoLinker
 
         fullPath = NormalizePath(fullPath);
         linkingPaths.Add(fullPath);
-
-        var codeModel = ProcessBuffer(buffer);
-
-        if (codeModel is null)
-        {
-            linkingPaths.Remove(fullPath);
-            return Result.Create(default(UnitComposition), Messages);
-        }
-
         try
         {
-            return Make(codeModel);
+            var codeModel = ProcessBuffer(buffer);
+            return codeModel is null
+                ? Result.Create(default(UnitComposition), Messages)
+                : Make(codeModel);
         }
         finally
         {
@@ -171,30 +165,17 @@ public partial class MinamoLinker
             }
         }
     }
-    private void AddError(LinkerError error, string fileName, Location loc, params object[] args) =>
-        AddMessage(BuildMessageType.Error, (int)error, error.ToString(), fileName, loc, args);
 
-    private void AddWarning(LinkerWarning warn, string fileName, Location loc, params object[] args) =>
-        AddMessage(BuildMessageType.Warning, (int)warn, warn.ToString(), fileName, loc, args);
-
-    private void AddMessage(BuildMessageType type, int code, string codeName, string fileName, Location loc, params object[] args)
+    private void AddError(LinkerError error, string fileName, Location loc, params object[] args)
     {
-        if (type == BuildMessageType.Warning && ShouldSuppressWarning(code))
-        {
-            return;
-        }
-
-        var str = MessageCatalog.Find(MessageGroup.Linker, codeName);
-        str ??= codeName;
+        var codeName = error.ToString();
+        var str = MessageCatalog.Find(MessageGroup.Linker, codeName) ?? codeName;
 
         if (args is not null)
         {
             str = string.Format(str, args);
         }
 
-        Messages.Add(new(str, type, code, loc.Line, loc.Column, fileName));
+        Messages.Add(new(str, BuildMessageType.Error, (int)error, loc.Line, loc.Column, fileName));
     }
-
-    private bool ShouldSuppressWarning(int warn) =>
-        BuilderOptions.NoWarningsLinker || BuilderOptions.IgnoreWarnings.Contains(warn);
 }

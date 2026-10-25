@@ -13,8 +13,7 @@ internal sealed record SelectDefinition(
     string? Name,
     int? DescriptionFunctionSlot,
     IReadOnlyList<SelectPropertyDefinition> Properties,
-    IReadOnlyList<SelectActionDefinition> Actions,
-    IReadOnlyList<SelectEventDefinition> Events);
+    IReadOnlyList<SelectActionDefinition> Actions);
 
 internal sealed record SelectParameterDefinition(string Name, string? TypeName);
 
@@ -25,18 +24,8 @@ internal sealed record SelectPropertyDefinition(
 
 internal sealed record SelectActionDefinition(
     string Name,
+    bool IsHidden,
     int FunctionSlot,
     int? GuardFunctionSlot,
     int? MetadataFunctionSlot,
-    IReadOnlyList<SelectParameterDefinition> Parameters)
-{
-    internal int ParameterCount => Parameters.Count;
-}
-
-internal sealed record SelectEventDefinition(
-    string Name,
-    int FunctionSlot,
-    IReadOnlyList<SelectParameterDefinition> Parameters)
-{
-    internal int ParameterCount => Parameters.Count;
-}
+    IReadOnlyList<SelectParameterDefinition> Parameters);

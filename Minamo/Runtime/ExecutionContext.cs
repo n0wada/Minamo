@@ -55,21 +55,6 @@ public sealed class ExecutionContext
         return fn.Call(this, arg);
     }
 
-    internal MinamoObject InvokeCallBackFunction(MinamoObject arg1, MinamoObject arg2)
-    {
-        var fn = CallBackFunction!;
-        CallBackFunction = null;
-        Error = null;
-        return fn.Call(this, arg1, arg2);
-    }
-
-    internal MinamoObject InvokeCallBackFunction(params MinamoObject[] args)
-    {
-        var fn = CallBackFunction!;
-        CallBackFunction = null;
-        Error = null;
-        return fn.Call(this, args);
-    }
     #endregion
 
     #region Critical sections
@@ -337,9 +322,6 @@ internal sealed class ExecutionResult
 
     internal static ExecutionResult Fetch(long ticks, MinamoObject? value, ExecutionContext ctx) =>
         new(ticks, value, ctx, TerminationReason.Complete);
-
-    internal static ExecutionResult Abort(long ticks, ExecutionContext ctx) =>
-        new(ticks, null, ctx, TerminationReason.Abort);
 
     internal static ExecutionResult Suspend(
         ExecutionContext ctx,

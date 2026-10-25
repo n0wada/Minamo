@@ -50,7 +50,6 @@
     <message id="VarArgOnlyOne">Only one parameter of type argument list is allowed.</message>
       <message id="SelectDuplicateAction">The action '{0}' is already declared in this select.</message>
       <message id="SelectOnlyGlobalScope">Select declarations are permitted only at global (module) scope.</message>
-      <message id="SelectDuplicateEvent">The event '{0}' is already declared in this select.</message>
       <message id="SelectDuplicateProperty">The property '{0}' is already declared in this select.</message>
     <message id="InvalidDefaultValue">Default parameter value for '{0}' must be of a primitive type (integer, float, character, string or nil).</message>
     <message id="PatternNotSupported">Pattern "{0}" not supported in this context.</message>

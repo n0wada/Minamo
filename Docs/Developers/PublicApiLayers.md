@@ -31,11 +31,17 @@ the runtime object model. `MinamoEnvironment.UseInputAsync` supplies arbitrary v
 When the entire source passed to `ExecuteAsync` is `open name`, the result's `Select` property
 contains a live `MinamoSelect`; all other source follows the ordinary script execution path.
 Interactive UIs may also use `MinamoInstance.OpenSelectAsync` when they want a direct opening API.
-`MinamoSelectProperty` publishes script-defined read-only values, while
+`MinamoSelect.GetProperty(name)` retrieves a published `MinamoSelectProperty` by name; its
+`GetValue<T>()` reads the value and `Metadata` exposes its UI hints.
 `MinamoSelectDescription` and `MinamoSelectMetadata` expose free-form string-key dictionaries
 through typed host conversion. Language-level `action` declarations appear as `MinamoSelectAction`
-objects in `MinamoSelect.Actions`; hosts select the published object rather than parsing or
-invoking script syntax directly.
+objects in `MinamoSelect.Actions`. Hosts normally call `SelectAsync(id, argument?)` to execute the
+currently available action by ID. `MinamoSelect.Token` identifies the current publication with a
+`MinamoSelectToken` value; `SelectAsync(id, expectedToken: token)` and
+`SelectAsync(id, argument, expectedToken: token)` additionally validate that publication before
+executing the action. This includes `hidden action` declarations: their objects
+have `IsHidden == true`, and hosts omit them from user-facing choices while invoking them through
+the same `SelectAsync` API.
 
 Compiler and parser results expose a fixed `Messages` snapshot together with filtered `Errors` and
 `Warnings` lists. Use `TryGetValue(out var value)` for normal branching or `GetValueOrThrow()` when

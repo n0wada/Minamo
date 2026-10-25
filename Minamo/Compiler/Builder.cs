@@ -187,8 +187,6 @@ internal sealed partial class Builder : ILoweredEmitterTarget
     private void AddWarning(CompilerWarning warning, string fileName, Location loc, params object[] args) =>
         diagnostics.AddWarning(warning, fileName, new(Line(loc), Col(loc)), args);
 
-    public bool Success => diagnostics.Success;
-
     StackMachineEmitter ILoweredEmitterTarget.Code => cw;
 
     int ILoweredEmitterTarget.ErrorCount => ErrorCount;

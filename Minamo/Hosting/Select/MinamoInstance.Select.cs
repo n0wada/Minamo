@@ -184,7 +184,6 @@ public sealed partial class MinamoInstance
     internal async Task<ExecutionResult> InvokeSelectActionAsync(
         MinamoFunction action,
         MinamoObject[] arguments,
-        bool allowRequests = false,
         CancellationToken cancellationToken = default)
     {
         var ownsGate = !operationScope.Value;
@@ -211,7 +210,7 @@ public sealed partial class MinamoInstance
             control = CreateControl(cancellationToken);
             control?.Checkpoint();
             var context = CreateExecutionContext(runtimeContext!, control);
-            context.SelectRequestsAllowed = allowRequests;
+            context.SelectRequestsAllowed = true;
             if (action is not MinamoNativeFunction function)
             {
                 throw new InvalidOperationException("The select action function is unavailable.");
@@ -222,7 +221,7 @@ public sealed partial class MinamoInstance
                 CancellationToken.None).ConfigureAwait(false);
             result = await CompleteAwaitablesAsync(
                 result,
-                stopAtSelectRequest: allowRequests).ConfigureAwait(false);
+                stopAtSelectRequest: true).ConfigureAwait(false);
             control?.Checkpoint();
             return result;
         }

@@ -147,9 +147,6 @@ public sealed class MinamoHost
         return CreateInstance(environment ?? new MinamoEnvironment(), program);
     }
 
-    internal MinamoInstance CreateInstance(object? hostContext, MinamoTuple? arguments) =>
-        CreateInstance(new MinamoEnvironment(hostContext), null, arguments);
-
     internal MinamoInstance CreateInstance(MinamoEnvironment environment, MinamoTuple? arguments) =>
         CreateInstance(environment, null, arguments);
 

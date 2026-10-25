@@ -101,7 +101,6 @@ public enum NodeType
     ,Exit
     ,SelectGoto
     ,SelectReturn
-    ,SelectEvent
 }
 
 public interface INamedNode

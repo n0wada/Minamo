@@ -251,7 +251,11 @@ internal static class HostingScenarios
         AssertNoMethod<MinamoSelect>("Select", "synchronous basic select action");
         AssertNoMethod<MinamoSelect>("Send", "synchronous basic select host event delivery");
         AssertHasMethod<MinamoSelect>("SelectAsync", "asynchronous basic select action");
-        AssertHasMethod<MinamoSelect>("SendAsync", "asynchronous basic select host event delivery");
+        Assert(typeof(MinamoSelect).GetMethods()
+            .Where(method => method.Name == "SelectAsync")
+            .All(method => method.GetParameters()[0].ParameterType == typeof(string)),
+            "select execution requires an explicit action ID");
+        AssertNoMethod<MinamoSelect>("SendAsync", "removed select host event delivery");
         AssertNoMethod<MinamoSelect>("RefreshAsync", "removed select refresh");
         AssertNoMethod<MinamoSelect>("Cancel", "removed select cancellation");
         AssertNoMethod<MinamoSelect>("InvalidateAsync", "removed select invalidation");
@@ -262,19 +266,30 @@ internal static class HostingScenarios
         AssertNoProperty<MinamoSelect>("Revision", "removed select revision");
         AssertHasProperty<MinamoSelect>("Description", "select description");
         AssertHasProperty<MinamoSelect>("Actions", "published select actions");
+        AssertHasProperty<MinamoSelect>("Token", "current select publication token");
+        AssertHasMethod<MinamoSelect>("GetProperty", "named select property lookup");
+        Assert(!typeof(MinamoSelect).GetMethods().Any(method =>
+                method.Name == "GetProperty" && method.IsGenericMethod),
+            "select property lookup is non-generic");
+        AssertHasProperty<MinamoSelectAction>("IsHidden", "hidden select actions");
         AssertNoProperty<MinamoSelect>("Choices", "removed select choices");
         AssertHasProperty<MinamoSelect>("Request", "current select request");
         AssertNoProperty<MinamoSelect>("IsWaitingForResponse", "removed select request wait state");
         AssertHasMethod<MinamoSelect>("GetValue", "typed completed select value");
         AssertHasMethod<MinamoSelect>("TryGetValue", "optional completed select value");
-        Assert(!typeof(MinamoSelect).GetMethods().Any(method =>
-                method.Name == "SelectAsync"
-                && method.GetParameters().FirstOrDefault()?.ParameterType == typeof(string)),
-            "removed string select action overload");
         Assert(typeof(MinamoSelect).GetMethods().Any(method =>
                 method.Name == "SelectAsync"
-                && method.GetParameters().FirstOrDefault()?.ParameterType == typeof(MinamoSelectAction)),
-            "select action object overload");
+                && method.GetParameters().FirstOrDefault()?.ParameterType == typeof(string)),
+            "string select action overload");
+        Assert(typeof(MinamoSelect).GetMethods().Any(method =>
+                method.Name == "SelectAsync"
+                && method.GetParameters().Any(parameter =>
+                    parameter.Name == "expectedToken" && parameter.ParameterType == typeof(MinamoSelectToken))),
+            "select publication token overload");
+        Assert(!typeof(MinamoSelect).GetMethods().Any(method =>
+                method.Name == "SelectAsync"
+                && method.GetParameters().Any(parameter => parameter.ParameterType == typeof(MinamoSelectAction))),
+            "removed action object execution overload");
         AssertHasMethod<MinamoSelectRequest>("GetPayload", "typed select request payload");
         AssertHasMethod<MinamoSelectRequest>("TryGetPayload", "optional select request payload");
         AssertNoProperty<MinamoSelectRequest>("Revision", "removed select request revision");

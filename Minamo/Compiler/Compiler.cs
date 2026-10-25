@@ -202,8 +202,6 @@ public enum CompilerError
 
     SelectOnlyGlobalScope = 290,
 
-    SelectDuplicateEvent = 292,
-
     SelectDuplicateProperty = 293,
 
     IfExpressionRequiresElse = 279,

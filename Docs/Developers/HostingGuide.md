@@ -395,8 +395,8 @@ CLR conversion rules used by host command arguments.
 
 Only C# can call `Set`, `Remove`, and `Clear`; assignment through `host.Registry` is rejected.
 Registry operations are individually thread-safe, but a sequence of reads and writes is not a
-transaction. An external registry write does not republish an interactive select; deliver an `on`
-event with `SendAsync` when the select must react to the change.
+transaction. An external registry write does not republish an interactive select; invoke a
+`hidden action` through `SelectAsync` when the select must react to the change.
 
 Minamo reads require `registry.read`.
 In `Automatic` mode these checks are inactive when the host has no explicit allow-list;

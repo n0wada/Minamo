@@ -95,33 +95,8 @@ public class MinamoSet : MinamoEnumerable
 
     public MinamoTuple ToTuple(ExecutionContext _) => new(InternalToArray());
 
-    public void IntersectWith(ExecutionContext ctx, MinamoObject other)
-    {
-        var seq = MinamoIterator.ToEnumerable(ctx, other);
-
-        if (ctx.HasErrors)
-        {
-            return;
-        }
-
-        var values = new HashSet<MinamoObject>(seq, MinamoObjectKeyComparer.Instance);
-        var removed = false;
-        foreach (var value in Set.Keys.ToArray())
-        {
-            if (values.Contains(value))
-            {
-                continue;
-            }
-
-            Set.Remove(value);
-            removed = true;
-        }
-
-        if (removed)
-        {
-            Version++;
-        }
-    }
+    public void IntersectWith(ExecutionContext ctx, MinamoObject other) =>
+        RemoveByMembership(ctx, other, removeContained: false);
 
     public void UnionWith(ExecutionContext ctx, MinamoObject other)
     {
@@ -149,7 +124,10 @@ public class MinamoSet : MinamoEnumerable
         }
     }
 
-    public void ExceptWith(ExecutionContext ctx, MinamoObject other)
+    public void ExceptWith(ExecutionContext ctx, MinamoObject other) =>
+        RemoveByMembership(ctx, other, removeContained: true);
+
+    private void RemoveByMembership(ExecutionContext ctx, MinamoObject other, bool removeContained)
     {
         var seq = MinamoIterator.ToEnumerable(ctx, other);
 
@@ -162,7 +140,7 @@ public class MinamoSet : MinamoEnumerable
         var removed = false;
         foreach (var value in Set.Keys.ToArray())
         {
-            if (!values.Contains(value))
+            if (values.Contains(value) != removeContained)
             {
                 continue;
             }

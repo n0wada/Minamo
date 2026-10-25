@@ -173,8 +173,6 @@ public sealed class SelectDeclarationSyntax : SyntaxNode
 
     public List<SelectActionSyntax> Actions { get; } = new();
 
-    public List<SelectEventSyntax> Events { get; } = new();
-
     internal override void ToString(StringBuilder sb)
     {
         sb.Append("select ");
@@ -200,10 +198,6 @@ public sealed class SelectDeclarationSyntax : SyntaxNode
         foreach (var action in Actions)
         {
             action.ToString(sb);
-        }
-        foreach (var handler in Events)
-        {
-            handler.ToString(sb);
         }
         sb.Append('}');
     }
@@ -239,6 +233,8 @@ public sealed class SelectActionSyntax : SyntaxNode
 
     public string Name { get; set; } = null!;
 
+    public bool IsHidden { get; set; }
+
     public List<ParameterSyntax> Parameters { get; } = new();
 
     public ArrayLiteralSyntax? Metadata { get; set; }
@@ -249,6 +245,10 @@ public sealed class SelectActionSyntax : SyntaxNode
 
     internal override void ToString(StringBuilder sb)
     {
+        if (IsHidden)
+        {
+            sb.Append("hidden ");
+        }
         sb.Append("action \"");
         sb.Append(Name);
         sb.Append('"');
@@ -270,33 +270,6 @@ public sealed class SelectActionSyntax : SyntaxNode
             sb.Append(' ');
             Metadata.ToString(sb);
         }
-        sb.Append(" => ");
-        Body.ToString(sb);
-    }
-}
-
-public sealed class SelectEventSyntax : SyntaxNode
-{
-    public SelectEventSyntax(Location loc) : base(NodeType.SelectEvent, loc) { }
-
-    public string Name { get; set; } = null!;
-
-    public List<ParameterSyntax> Parameters { get; } = new();
-
-    public SyntaxNode Body { get; set; } = null!;
-
-    internal override void ToString(StringBuilder sb)
-    {
-        sb.Append("on \"");
-        sb.Append(Name);
-        sb.Append('"');
-        if (Parameters.Count > 0)
-        {
-            sb.Append('(');
-            Parameters.ToString(sb);
-            sb.Append(')');
-        }
-
         sb.Append(" => ");
         Body.ToString(sb);
     }

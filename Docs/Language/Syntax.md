@@ -44,9 +44,16 @@ let user_name = "Ada"
 let locale = app.Settings
 ```
 
-Keywords have a defined role in the language and cannot be used as ordinary identifiers. The
-current keyword set includes `let`, `mut`, `func`, `if`, `for`, `match`, `struct`, `enum`, `trait`,
-`impl`, `import`, `return`, `throw`, and `yield`.
+Reserved words such as `let`, `mut`, `func`, `if`, `for`, `match`, `import`, `return`, `throw`,
+and `yield` cannot be used as ordinary identifiers. Contextual keywords such as `struct`, `enum`,
+`trait`, and `impl` have a special meaning only in the relevant syntax and can otherwise be names:
+
+```swift
+let struct = 1
+print(struct)
+```
+
+See the [grammar reference](../Reference/Grammar.md#identifiers-and-keywords) for both keyword lists.
 
 ## Numbers
 

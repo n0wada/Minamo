@@ -131,7 +131,7 @@ public partial class MinamoLinker
             module += EXT;
         }
 
-        if (!FindModuleExact(self.FileName!, module, mod, out var path))
+        if (!FindModuleExact(self.FileName!, module, out var path))
         {
             AddError(LinkerError.ModuleNotFound, mod.SourceFileName!, mod.SourceLocation, module);
             return null;
@@ -142,24 +142,13 @@ public partial class MinamoLinker
         }
     }
 
-    private bool FindModuleExact(string workingDir, string module, Reference mod, out string? path)
+    private bool FindModuleExact(string workingDir, string module, out string? path)
     {
         path = null;
 
         if (!Lookup.Find(Path.GetDirectoryName(workingDir), module, out var fullPath))
         {
             return false;
-        }
-
-        if (!ShouldSuppressWarning((int)LinkerWarning.NewerSourceFile)
-            && !string.Equals(Path.GetExtension(module), ".DLL", StringComparison.OrdinalIgnoreCase))
-        {
-            var sf = Path.Combine(Path.GetDirectoryName(fullPath)!, Path.GetFileNameWithoutExtension(fullPath) + ".nami");
-
-            if (File.Exists(sf) && File.GetLastWriteTime(sf) > File.GetLastWriteTime(fullPath))
-            {
-                AddWarning(LinkerWarning.NewerSourceFile, mod.SourceFileName!, mod.SourceLocation, Path.GetFileNameWithoutExtension(fullPath));
-            }
         }
 
         path = NormalizePath(fullPath);

@@ -77,8 +77,6 @@ internal sealed class MinamoSelectFactory : MinamoObject
     internal MinamoFunction? PropertyMetadata(SelectPropertyDefinition property) =>
         property.MetadataFunctionSlot is int slot ? closures![slot] : null;
 
-    internal MinamoFunction Event(SelectEventDefinition handler) => closures![handler.FunctionSlot];
-
     internal MinamoFunction? Description() =>
         Definition!.DescriptionFunctionSlot is int slot ? closures![slot] : null;
 
@@ -105,8 +103,6 @@ internal sealed class SelectInstance
 
     internal IReadOnlyList<SelectPropertyDefinition> Properties => Definition.Properties;
 
-    internal IReadOnlyList<SelectEventDefinition> Events => Definition.Events;
-
     internal bool IsCompleted => completed;
 
     internal MinamoObject Value { get; private set; } = MinamoNil.Instance;
@@ -128,8 +124,6 @@ internal sealed class SelectInstance
 
     internal MinamoFunction? PropertyMetadata(SelectPropertyDefinition property) =>
         factory.PropertyMetadata(property);
-
-    internal MinamoFunction Event(SelectEventDefinition handler) => factory.Event(handler);
 
     internal MinamoFunction? Description() => factory.Description();
 

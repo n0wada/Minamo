@@ -4,7 +4,6 @@ using Minamo.Linker;
 using Minamo.Parser;
 using Minamo.Runtime;
 using Minamo.Runtime.Types;
-using System.Reflection;
 using System.Text;
 using Xunit;
 
@@ -15,19 +14,8 @@ namespace Minamo.UnitTesting.Security;
 public sealed class SecurityRegressionTests
 {
     [Fact]
-    public void MultiParameterOverloadRequiresEveryParameterToMatch()
-    {
-        var parameters = typeof(SecurityRegressionTests)
-            .GetMethod(nameof(TwoParameters), BindingFlags.NonPublic | BindingFlags.Static)!
-            .GetParameters();
-
-        Assert.True(MinamoInteropTypeInfo.ParametersMatch(
-            parameters,
-            new MinamoObject[] { new MinamoInterop(typeof(string)), new MinamoInterop(typeof(int)) }));
-        Assert.False(MinamoInteropTypeInfo.ParametersMatch(
-            parameters,
-            new MinamoObject[] { new MinamoInterop(typeof(string)), new MinamoInterop(typeof(string)) }));
-    }
+    public void MultiParameterOverloadRequiresEveryParameterToMatch() =>
+        PipelineScenarios.InteropMethodMatching();
 
     [Fact]
     public void NumericConversionEnforcesSignedAndUnsignedBounds()
@@ -238,8 +226,6 @@ public sealed class SecurityRegressionTests
 
         Assert.True(result.Success);
     }
-
-    private static void TwoParameters(string text, int number) { }
 
     [MinamoResource("ProtectedResource")]
     private sealed class ProtectedResource : MinamoResource { }

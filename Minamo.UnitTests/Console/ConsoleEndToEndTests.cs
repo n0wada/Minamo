@@ -83,6 +83,9 @@ public sealed class ConsoleEndToEndTests
             await File.WriteAllTextAsync(source, """
                 select counter {
                     mut count = 0
+                    hidden action "internal-reset" ["text": "Internal reset"] => {
+                        print("Hidden action executed")
+                    }
                     action "add" when count == 0 ["text": "Add one"] => { count += 1 }
                     action "finish" when count == 1 ["text": "Finish counting"] => {
                         print(fmt("Count: {0}", count))
@@ -92,13 +95,15 @@ public sealed class ConsoleEndToEndTests
                 """, Encoding.UTF8);
 
             var result = useRepl
-                ? await RunWithInputAsync("open counter\nadd\nfinish\n#exit\n", source, "-i", "-nologo")
-                : await RunWithInputAsync("add\nfinish\n", source, "--open", "counter", "-nologo");
+                ? await RunWithInputAsync("open counter\ninternal-reset\n1\n1\n#exit\n", source, "-i", "-nologo")
+                : await RunWithInputAsync("internal-reset\n1\n1\n", source, "--open", "counter", "-nologo");
 
             Assert.Equal(0, result.ExitCode);
             Assert.Contains("Add one", result.StandardOutput, StringComparison.Ordinal);
             Assert.Contains("Finish counting", result.StandardOutput, StringComparison.Ordinal);
             Assert.Contains("Count: 1", result.StandardOutput, StringComparison.Ordinal);
+            Assert.DoesNotContain("Internal reset", result.StandardOutput, StringComparison.Ordinal);
+            Assert.DoesNotContain("Hidden action executed", result.StandardOutput, StringComparison.Ordinal);
         }
         finally
         {

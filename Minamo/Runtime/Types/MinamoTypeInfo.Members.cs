@@ -449,8 +449,6 @@ public abstract partial class MinamoTypeInfo : MinamoObject
         ops |= ti.ops;
     }
 
-    internal IEnumerable<int> GetMixins() => mixins;
-
     internal bool CheckType(MinamoTypeInfo typeInfo) =>
         ReflectedTypeId == typeInfo.ReflectedTypeId || mixins.Contains(typeInfo.ReflectedTypeId);
     #endregion

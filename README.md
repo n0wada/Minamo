@@ -66,20 +66,20 @@ actions currently available to the host:
 select Player {
     desc ["title": "Player"]
 
-    mut player = loadPlayer()
-    prop state => player.state
+    mut state = "stopped"
+    prop state => state
 
-    action "play" when player.state == "stopped" => {
-        player.state = "playing"
-        player.play()
+    action "play" when state == "stopped" => {
+        state = "playing"
+        print("Playing")
     }
 
-    action "stop" when player.state == "playing" => {
-        player.state = "stopped"
-        player.stop()
+    action "stop" when state == "playing" => {
+        state = "stopped"
+        print("Stopped")
     }
 
-    action "close" => exit player
+    action "close" => exit state
 }
 ```
 
@@ -125,7 +125,7 @@ var host = new MinamoHost();
 host.AddModule(new AppCommands());
 
 using var instance = host.CreateInstance();
-var result = instance.ExecuteFile("hello.nami");
+var result = await instance.ExecuteFileAsync("hello.nami");
 
 if (!result.Success)
     Console.Error.WriteLine(result.Failure?.Message);
@@ -158,8 +158,8 @@ the application, tooling, and runtime-extension surfaces.
   dotnet run --project .\Examples\OrderWorkflow\OrderWorkflow.csproj
   ```
 
-- [Quest Console](Examples/QuestConsole/README.md) is a game-style interactive select where C#
-  owns quest data and Minamo owns dialogue states and actions:
+- [Quest Console](Examples/QuestConsole/README.md) is a game-style interactive select where Minamo
+  owns quest flags, dialogue state, and actions, while C# renders the terminal UI:
 
   ```powershell
   dotnet run --project .\Examples\QuestConsole\QuestConsole.csproj

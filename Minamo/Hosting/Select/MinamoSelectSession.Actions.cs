@@ -13,6 +13,7 @@ internal sealed partial class MinamoSelectSession
 {
     private sealed record ResolvedSelectAction(
         string Id,
+        bool IsHidden,
         IReadOnlyList<MinamoSelectActionParameter> Parameters,
         MinamoFunction? Handler,
         MinamoSelectMetadata? Metadata)
@@ -37,8 +38,7 @@ internal sealed partial class MinamoSelectSession
                 selectInstance,
                 cancellationToken,
                 control).ConfigureAwait(false);
-            if (actions.Count == 0
-                && selectInstance.Events.Count == 0)
+            if (actions.Count == 0)
             {
                 if (ReturnFromCurrentSelect())
                 {
@@ -49,22 +49,22 @@ internal sealed partial class MinamoSelectSession
                 return;
             }
 
-            var visibleActions = new MinamoSelectAction[actions.Count];
+            var publishedActions = new MinamoSelectAction[actions.Count];
             for (var i = 0; i < actions.Count; i++)
             {
                 var action = actions[i];
-                visibleActions[i] = new MinamoSelectAction(
+                publishedActions[i] = new MinamoSelectAction(
                     action.Id,
                     action.Parameters,
-                    action.Metadata);
+                    action.Metadata,
+                    action.IsHidden);
             }
 
             var properties = await GetPropertiesAsync(
                 selectInstance,
                 cancellationToken,
                 control).ConfigureAwait(false);
-            var publishedActions = Array.AsReadOnly(visibleActions);
-            var publishedSnapshot = CreateSnapshot(properties, publishedActions);
+            var publishedSnapshot = CreateSnapshot(properties, Array.AsReadOnly(publishedActions));
 
             availableActions = actions;
             snapshot = publishedSnapshot;
@@ -98,6 +98,7 @@ internal sealed partial class MinamoSelectSession
             {
                 available.Add(new(
                     action.Name,
+                    action.IsHidden,
                     action.Parameters
                         .Select(parameter => new MinamoSelectActionParameter(
                             parameter.Name,
@@ -144,11 +145,6 @@ internal sealed partial class MinamoSelectSession
 
         return Array.AsReadOnly(properties);
     }
-
-    private IReadOnlyList<SelectEventDefinition> GetEventHandlers(string eventId) =>
-        selectInstance.Events
-            .Where(candidate => string.Equals(candidate.Name, eventId, StringComparison.Ordinal))
-            .ToArray();
 
     private async Task<MinamoSelectDescription?> CreateDescriptionAsync(
         MinamoFunction? description,
@@ -201,21 +197,15 @@ internal sealed partial class MinamoSelectSession
     private static MinamoObject[] ConvertArguments(
         ResolvedSelectAction action,
         object? argument,
-        bool hasArgument) =>
-        ConvertArguments(action.Id, action.ParameterCount, "Action", argument, hasArgument);
-
-    private static MinamoObject[] ConvertArguments(
-        string name,
-        int parameterCount,
-        string actionKind,
-        object? argument,
         bool hasArgument)
     {
+        var name = action.Id;
+        var parameterCount = action.ParameterCount;
         if (parameterCount == 0)
         {
             if (hasArgument)
             {
-                throw new ArgumentException($"{actionKind} '{name}' does not accept an argument.", nameof(argument));
+                throw new ArgumentException($"Action '{name}' does not accept an argument.", nameof(argument));
             }
 
             return Array.Empty<MinamoObject>();
@@ -223,7 +213,7 @@ internal sealed partial class MinamoSelectSession
 
         if (!hasArgument)
         {
-            throw new ArgumentException($"{actionKind} '{name}' requires an argument.", nameof(argument));
+            throw new ArgumentException($"Action '{name}' requires an argument.", nameof(argument));
         }
 
         if (parameterCount == 1)
@@ -234,7 +224,7 @@ internal sealed partial class MinamoSelectSession
         if (argument is not ITuple tuple || tuple.Length != parameterCount)
         {
             throw new ArgumentException(
-                $"{actionKind} '{name}' requires one tuple with {parameterCount} elements.",
+                $"Action '{name}' requires one tuple with {parameterCount} elements.",
                 nameof(argument));
         }
 

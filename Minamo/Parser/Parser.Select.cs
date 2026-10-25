@@ -72,26 +72,12 @@ internal sealed partial class HandwrittenParser
                 continue;
             }
 
-            if (IsContextualKeyword("action"))
+            if (IsContextualKeyword("action") || IsContextualKeyword("hidden"))
             {
                 var action = ParseSelectAction();
                 if (action is not null)
                 {
                     declaration.Actions.Add(action);
-                }
-                else
-                {
-                    SynchronizeStatement();
-                }
-                continue;
-            }
-
-            if (IsContextualKeyword("on"))
-            {
-                var handler = ParseSelectEvent();
-                if (handler is not null)
-                {
-                    declaration.Events.Add(handler);
                 }
                 else
                 {
@@ -108,8 +94,14 @@ internal sealed partial class HandwrittenParser
 
     private SelectActionSyntax? ParseSelectAction()
     {
+        var isHidden = IsContextualKeyword("hidden");
+        if (isHidden)
+        {
+            Consume();
+        }
         if (!IsContextualKeyword("action"))
         {
+            Report(ParserError.InvalidStatement, Current);
             return null;
         }
 
@@ -123,7 +115,8 @@ internal sealed partial class HandwrittenParser
         var name = (StringLiteralSyntax)ParseString();
         var action = new SelectActionSyntax(name.Location)
         {
-            Name = name.Value ?? string.Empty
+            Name = name.Value ?? string.Empty,
+            IsHidden = isHidden
         };
         ParseSelectParameters(action.Parameters);
 
@@ -221,28 +214,6 @@ internal sealed partial class HandwrittenParser
             Metadata = metadata,
             Expression = expression
         };
-    }
-
-    private SelectEventSyntax? ParseSelectEvent()
-    {
-        Consume();
-        if (!Check(TokenKind.String))
-        {
-            ReportExpected(TokenKind.String);
-            return null;
-        }
-
-        var name = (StringLiteralSyntax)ParseString();
-        var handler = new SelectEventSyntax(name.Location) { Name = name.Value ?? string.Empty };
-        ParseSelectParameters(handler.Parameters);
-        var body = ParseSelectActionBody();
-        if (body is null)
-        {
-            return null;
-        }
-
-        handler.Body = body;
-        return handler;
     }
 
     private ArrayLiteralSyntax? ParseSelectDescription()

@@ -101,21 +101,11 @@ partial class Builder
         currentCounter = counters.Pop();
     }
 
-    //Generate line pragma for a string and remembers last position
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void AddLinePragma(SyntaxNode node)
-    {
-        lastLocation = node.Location;
-        pdb.AddLineSym(cw.Offset, Line(lastLocation), Col(lastLocation));
-        //cw.Debug();
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void AddLinePragma(Location loc)
     {
         lastLocation = loc;
         pdb.AddLineSym(cw.Offset, Line(loc), Col(loc));
-        //cw.Debug();
     }
 
     //Used only when extended debug info is generated

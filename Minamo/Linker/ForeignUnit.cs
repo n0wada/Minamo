@@ -16,7 +16,6 @@ public abstract class ForeignUnit : Unit
 
     private bool initialized;
     private RuntimeContext? initializedTypesContext;
-    private readonly Dictionary<Type, MinamoForeignTypeInfo> typeInfos = new();
 
     internal List<MinamoForeignTypeInfo> Types { get; }
 
@@ -33,8 +32,6 @@ public abstract class ForeignUnit : Unit
         UnitIds.Add(0); //Self reference, to mimic the behavior of regular units
     }
 
-    internal T GetTypeInfo<T>() where T : MinamoForeignTypeInfo => (T)typeInfos[typeof(T)];
-
     protected void Add(string name, MinamoObject obj)
     {
         ExportList.Add(name, new ScopeVar(0 | ExportList.Count << 8, VarFlags.Foreign));
@@ -44,7 +41,6 @@ public abstract class ForeignUnit : Unit
     protected T AddType<T>() where T : MinamoForeignTypeInfo, new()
     {
         var t = new T();
-        typeInfos.Add(typeof(T), t);
         Types.Add(t);
         Add(t.ReflectedTypeName, t);
         t.DeclaringUnit = this;

@@ -53,13 +53,13 @@ Line two
 ## Variables and constants
 
 `let` creates an immutable binding, `mut` creates a mutable binding, and `const` declares constants.
-`use` disposes its value when the current scope exits.
+`use` disposes its value when the current scope exits; see the
+[scope cleanup example](Semantics.md#bindings-and-mutation).
 
 ```swift
 let name = "Ada"
 mut score = 0
 const MaxAttempts = 3
-use file = File.Create("output.txt")
 
 score += 10
 ```
@@ -188,8 +188,10 @@ free-form dictionary evaluated once for each select instance.
 free-form UI hints; properties and member metadata are reevaluated whenever the interaction is
 published. Minamo assigns no built-in meaning to metadata keys.
 
-Hidden host events may be declared with `on` and delivered from C# with `SendAsync`. An interaction
-with no available actions or host events completes with `nil`. Select-local values and `when` guards
+Host events may be handled by `hidden action` declarations. These appear in `Actions` with
+`IsHidden == true` and execute from C# through `SelectAsync`; hosts omit them from user-facing
+choices. An interaction with no available visible or hidden actions completes with `nil`.
+Select-local values and `when` guards
 let earlier actions change which actions are presented next. An action handler can call
 `request(kind, payload?)` to yield an input request to the host and continue with its response.
 Named selects can also be opened from C#.
@@ -255,10 +257,10 @@ that may carry values using the same field syntax.
 
 ```swift
 struct Point { mut x: Float, y: Float }
-enum Result { Ok(value: String), Err(error: String) }
+enum LoadResult { Loaded(value: String), LoadFailed(error: String) }
 
 let point = Point(10.0, 20.0)
-let result = Ok(42)
+let result = Loaded("ready")
 ```
 
 ## Traits and implementations

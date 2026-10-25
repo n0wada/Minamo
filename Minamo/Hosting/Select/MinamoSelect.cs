@@ -24,8 +24,28 @@ public sealed class MinamoSelect : IDisposable
     /// <summary>Gets the read-only properties published by the currently active select.</summary>
     public IReadOnlyList<MinamoSelectProperty> Properties => session.Properties;
 
-    /// <summary>Gets the actions currently available to the host.</summary>
+    /// <summary>Gets a property by name from the current publication.</summary>
+    /// <exception cref="ArgumentNullException">The name is null.</exception>
+    /// <exception cref="ArgumentException">No property with that name is currently published.</exception>
+    public MinamoSelectProperty GetProperty(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        foreach (var property in Properties)
+        {
+            if (string.Equals(property.Name, name, StringComparison.Ordinal))
+            {
+                return property;
+            }
+        }
+
+        throw new ArgumentException($"No property named '{name}' is published by select '{Name}'.", nameof(name));
+    }
+
+    /// <summary>Gets all currently available actions, including hidden actions.</summary>
     public IReadOnlyList<MinamoSelectAction> Actions => session.Actions;
+
+    /// <summary>Gets the token identifying the current publication of this select.</summary>
+    public MinamoSelectToken Token => session.Token;
 
     /// <summary>Gets whether the whole select interaction has completed.</summary>
     public bool IsCompleted => session.IsCompleted;
@@ -33,26 +53,21 @@ public sealed class MinamoSelect : IDisposable
     /// <summary>Gets the input request currently waiting for a host response.</summary>
     public MinamoSelectRequest? Request => session.Request;
 
-    /// <summary>Executes an action from the currently published screen.</summary>
-    public Task SelectAsync(MinamoSelectAction action)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-        return session.SelectAsync(action);
-    }
+    /// <summary>Executes the action with the specified ID from the current publication.</summary>
+    public Task SelectAsync(string actionId) =>
+        session.SelectAsync(actionId);
 
-    /// <summary>Executes an action with its host-supplied argument from the published screen.</summary>
-    public Task SelectAsync(MinamoSelectAction action, object? argument)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-        return session.SelectAsync(action, argument);
-    }
+    /// <summary>Executes the action with the specified ID and a host-supplied argument.</summary>
+    public Task SelectAsync(string actionId, object? argument) =>
+        session.SelectAsync(actionId, argument);
 
-    /// <summary>Asynchronously sends a host event that does not accept an argument.</summary>
-    public Task SendAsync(string eventId) => session.SendAsync(eventId);
+    /// <summary>Executes an action after verifying the token of the expected publication.</summary>
+    public Task SelectAsync(string actionId, MinamoSelectToken expectedToken) =>
+        session.SelectAsync(actionId, expectedToken);
 
-    /// <summary>Asynchronously sends a host event with its host-supplied argument.</summary>
-    public Task SendAsync(string eventId, object? argument) =>
-        session.SendAsync(eventId, argument);
+    /// <summary>Executes an action with an argument after verifying the expected publication token.</summary>
+    public Task SelectAsync(string actionId, object? argument, MinamoSelectToken expectedToken) =>
+        session.SelectAsync(actionId, argument, expectedToken);
 
     /// <summary>Resumes the action with a nil response to its current request.</summary>
     public Task RespondAsync(MinamoSelectRequest request)

@@ -52,6 +52,8 @@ internal sealed partial class MinamoSelectSession : IDisposable
 
     internal MinamoSelectSnapshot Snapshot => CurrentSnapshot;
 
+    internal MinamoSelectToken Token => CurrentSnapshot.Token;
+
     internal MinamoSelectDescription? Description => CurrentSnapshot.Description;
 
     internal IReadOnlyList<MinamoSelectProperty> Properties => CurrentSnapshot.Properties;
@@ -111,17 +113,17 @@ internal sealed partial class MinamoSelectSession : IDisposable
             actions,
             selectInstance.IsCompleted);
 
-    internal Task SelectAsync(MinamoSelectAction action) =>
-        SelectCoreAsync(action.Id, null, hasArgument: false, expectedAction: action);
+    internal Task SelectAsync(string actionId) =>
+        SelectCoreAsync(actionId, null, hasArgument: false);
 
-    internal Task SelectAsync(MinamoSelectAction action, object? argument) =>
-        SelectCoreAsync(action.Id, argument, hasArgument: true, expectedAction: action);
+    internal Task SelectAsync(string actionId, object? argument) =>
+        SelectCoreAsync(actionId, argument, hasArgument: true);
 
-    internal Task SendAsync(string eventId) =>
-        SendCoreAsync(eventId, null, hasArgument: false);
+    internal Task SelectAsync(string actionId, MinamoSelectToken expectedToken) =>
+        SelectCoreAsync(actionId, null, hasArgument: false, expectedToken: expectedToken);
 
-    internal Task SendAsync(string eventId, object? argument) =>
-        SendCoreAsync(eventId, argument, hasArgument: true);
+    internal Task SelectAsync(string actionId, object? argument, MinamoSelectToken expectedToken) =>
+        SelectCoreAsync(actionId, argument, hasArgument: true, expectedToken: expectedToken);
 
     internal Task RespondAsync(
         MinamoSelectRequest request,
@@ -155,14 +157,14 @@ internal sealed partial class MinamoSelectSession : IDisposable
         string actionId,
         object? argument,
         bool hasArgument,
-        MinamoSelectAction? expectedAction)
+        MinamoSelectToken? expectedToken = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
         await EnterActionGateAsync().ConfigureAwait(false);
         try
         {
             EnsureNotWaitingForResponse();
-            EnsureCurrentAction(expectedAction);
+            EnsureCurrentToken(expectedToken);
             if (selectInstance.IsCompleted)
             {
                 throw new InvalidOperationException($"Select session '{Name}' has already completed.");
@@ -181,62 +183,9 @@ internal sealed partial class MinamoSelectSession : IDisposable
             var result = await instance.InvokeSelectActionAsync(
                 action.Handler ?? throw new InvalidOperationException("The select action handler is unavailable."),
                 arguments,
-                allowRequests: true,
                 cancellationToken: sessionCancellation.Token).ConfigureAwait(false);
             sessionCancellation.Token.ThrowIfCancellationRequested();
             await ApplyActionExecutionAsync(result, sessionCancellation.Token).ConfigureAwait(false);
-        }
-        finally
-        {
-            CompleteDisposalIfRequested();
-            actionGate.Release();
-        }
-    }
-
-    private async Task SendCoreAsync(
-        string eventId,
-        object? argument,
-        bool hasArgument)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
-        await EnterActionGateAsync().ConfigureAwait(false);
-        try
-        {
-            EnsureNotWaitingForResponse();
-            if (selectInstance.IsCompleted)
-            {
-                throw new InvalidOperationException($"Select session '{Name}' has already completed.");
-            }
-
-            var eventOwner = selectInstance;
-            var handlers = GetEventHandlers(eventId);
-            if (handlers.Count == 0)
-            {
-                throw new ArgumentException(
-                    $"Event '{eventId}' is not handled in select '{Name}'.",
-                    nameof(eventId));
-            }
-
-            foreach (var handler in handlers)
-            {
-                var arguments = ConvertArguments(
-                    handler.Name,
-                    handler.ParameterCount,
-                    "Event",
-                    argument,
-                    hasArgument);
-                var result = await instance.InvokeSelectActionAsync(
-                    eventOwner.Event(handler),
-                    arguments,
-                    cancellationToken: sessionCancellation.Token).ConfigureAwait(false);
-                sessionCancellation.Token.ThrowIfCancellationRequested();
-                await ApplyActionExecutionAsync(result, sessionCancellation.Token).ConfigureAwait(false);
-                if (eventOwner.IsCompleted
-                    || !ReferenceEquals(selectInstance, eventOwner))
-                {
-                    return;
-                }
-            }
         }
         finally
         {
@@ -412,17 +361,16 @@ internal sealed partial class MinamoSelectSession : IDisposable
         }
     }
 
-    private void EnsureCurrentAction(MinamoSelectAction? expectedAction)
+    private void EnsureCurrentToken(MinamoSelectToken? expectedToken)
     {
-        if (expectedAction is null
-            || CurrentSnapshot.Actions.Any(action => ReferenceEquals(action, expectedAction)))
+        if (expectedToken is null || expectedToken == CurrentSnapshot.Token)
         {
             return;
         }
 
         throw new ArgumentException(
-            $"Action '{expectedAction.Id}' is not currently available in select '{Name}'.",
-            nameof(expectedAction));
+            $"The token does not identify the current publication of select '{Name}'.",
+            nameof(expectedToken));
     }
 
     private void EnsureNotWaitingForResponse()

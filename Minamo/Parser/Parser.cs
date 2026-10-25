@@ -6,7 +6,7 @@ using System.Globalization;
 
 namespace Minamo.Parser;
 
-internal readonly record struct ParserMark(int TokenPosition, int TokensSinceError);
+internal readonly record struct ParserMark(int TokenPosition);
 
 internal sealed partial class HandwrittenParser
 {
@@ -37,13 +37,7 @@ internal sealed partial class HandwrittenParser
 
     public LexToken Peek(int offset = 0) => cursor.Peek(offset);
 
-    public ParserMark Mark() => new(cursor.Mark(), tokensSinceError);
-
-    public void Reset(ParserMark mark)
-    {
-        cursor.Reset(mark.TokenPosition);
-        tokensSinceError = mark.TokensSinceError;
-    }
+    public ParserMark Mark() => new(cursor.Mark());
 
     public Result<MinamoCodeModel> Parse()
     {

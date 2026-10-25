@@ -78,8 +78,7 @@ internal sealed record LoweredAssignment(
     Location Location,
     LoweredStoreTarget Target,
     LoweredNode Value,
-    BinaryOperator? AutoAssign,
-    LoweredAssignmentKind Kind) : LoweredNode(Location);
+    BinaryOperator? AutoAssign) : LoweredNode(Location);
 
 internal sealed record LoweredFunctionDeclaration(
     Location Location,
@@ -98,21 +97,7 @@ internal sealed record LoweredFunctionDeclaration(
     LoweredNode? Body,
     bool NeedsValue,
     bool IteratorBody,
-    bool IsStdCall) : LoweredNode(Location)
-{
-    public bool IsVariadic()
-    {
-        for (var i = 0; i < Parameters.Count; i++)
-        {
-            if (Parameters[i].IsVarArgs)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-}
+    bool IsStdCall) : LoweredNode(Location);
 
 internal sealed record LoweredSelectDeclaration(
     Location Location,
@@ -121,12 +106,12 @@ internal sealed record LoweredSelectDeclaration(
     IReadOnlyList<LoweredBinding> Locals,
     IReadOnlyList<LoweredSelectProperty> Properties,
     IReadOnlyList<LoweredSelectAction> Actions,
-    IReadOnlyList<LoweredSelectEvent> Events,
     bool IsInstanceFactory = false) : LoweredNode(Location);
 
 internal sealed record LoweredSelectAction(
     Location Location,
     string Name,
+    bool IsHidden,
     IReadOnlyList<LoweredParameter> Parameters,
     LoweredArray? Metadata,
     LoweredNode? Guard,
@@ -137,12 +122,6 @@ internal sealed record LoweredSelectProperty(
     string Name,
     LoweredArray? Metadata,
     LoweredNode Expression);
-
-internal sealed record LoweredSelectEvent(
-    Location Location,
-    string Name,
-    IReadOnlyList<LoweredParameter> Parameters,
-    LoweredNode Body);
 
 internal sealed record LoweredParameter(
     Location Location,

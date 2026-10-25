@@ -10,20 +10,15 @@ internal sealed class CallStack : IEnumerable<Caller>
 {
     private const int DefaultSize = 6;
 
-    private readonly int initialSize;
     private Caller[] array;
 
     public int Count { get; private set; }
 
-    public Caller this[int index]
-    {
-        get => array[index];
-        set => array[index] = value;
-    }
+    public Caller this[int index] => array[index];
 
     public CallStack() : this(DefaultSize) { }
 
-    private CallStack(int size) => (initialSize, array) = (size, new Caller[size]);
+    private CallStack(int size) => array = new Caller[size];
 
     public IEnumerator<Caller> GetEnumerator() => array.Take(Count).GetEnumerator();
 
@@ -31,17 +26,7 @@ internal sealed class CallStack : IEnumerable<Caller>
 
     public CallStack Clone() => (CallStack)MemberwiseClone();
 
-    public void Clear() => (Count, array) = (0, new Caller[initialSize]);
-
     public Caller Pop() => Count == 0 ? throw new IndexOutOfRangeException() : array[--Count];
-
-    public bool PopLast()
-    {
-        array[--Count] = null!;
-        return true;
-    }
-
-    public Caller Peek() => array[Count - 1];
 
     public void Push(Caller val)
     {
@@ -129,7 +114,6 @@ internal sealed class SectionStack : IEnumerable<CatchMarks>
 {
     private const int DefaultSize = 4;
     private CatchMarks[] array;
-    private readonly int initialSize;
 
     public int Count { get; private set; }
 
@@ -137,7 +121,6 @@ internal sealed class SectionStack : IEnumerable<CatchMarks>
 
     public SectionStack(int size)
     {
-        initialSize = size;
         array = new CatchMarks[size];
     }
 
@@ -152,12 +135,6 @@ internal sealed class SectionStack : IEnumerable<CatchMarks>
     }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-    public void Clear()
-    {
-        Count = 0;
-        array = new CatchMarks[initialSize];
-    }
 
     public CatchMarks Pop() => Count == 0 ? throw new IndexOutOfRangeException() : array[--Count];
 
@@ -193,10 +170,4 @@ internal sealed class SectionStack : IEnumerable<CatchMarks>
     }
 
     public void Replace(CatchMarks val) => array[Count - 1] = val;
-
-    public CatchMarks this[int index]
-    {
-        get => array[index];
-        set => array[index] = value;
-    }
 }

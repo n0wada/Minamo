@@ -86,12 +86,7 @@ public sealed class FileLookup
             && TryGetPathWithinRoot(currentPath, fileName, out fullPath)
             && File.Exists(fullPath))
         {
-            if (options.LinkerLog is not null)
-            {
-                WriteToLog($"Found");
-                WriteToLog($"Load from \"{fullPath}\"");
-            }
-
+            LogFound(fullPath);
             return true;
         }
 
@@ -128,17 +123,21 @@ public sealed class FileLookup
 
             if (File.Exists(path))
             {
-                if (options.LinkerLog is not null)
-                {
-                    WriteToLog($"Found");
-                    WriteToLog($"Load from \"{path}\"");
-                }
-
+                LogFound(path);
                 return true;
             }
         }
 
         return false;
+    }
+
+    private void LogFound(string path)
+    {
+        if (options.LinkerLog is not null)
+        {
+            WriteToLog("Found");
+            WriteToLog($"Load from \"{path}\"");
+        }
     }
 
     private static bool TryGetPathWithinRoot(string root, string fileName, out string path)

@@ -362,8 +362,6 @@ public class MinamoTuple : MinamoCollection
         return arr;
     }
 
-    internal bool HasItem(string name) => GetOrdinal(name) is not -1;
-
     internal MinamoObject[] UnsafeAccess() => values;
 
     private static MinamoObject Compare(bool gt, MinamoTuple xs, MinamoTuple ys, ExecutionContext ctx)

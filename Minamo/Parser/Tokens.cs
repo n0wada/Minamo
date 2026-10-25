@@ -141,17 +141,6 @@ internal sealed class TokenCursor
     }
 
     public bool Check(TokenKind kind) => Current.Kind == kind;
-
-    public bool Match(TokenKind kind)
-    {
-        if (!Check(kind))
-        {
-            return false;
-        }
-
-        Consume();
-        return true;
-    }
 }
 
 internal static class TokenFacts
