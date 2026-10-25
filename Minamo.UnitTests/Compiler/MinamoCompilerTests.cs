@@ -64,7 +64,7 @@ public sealed class MinamoCompilerTests
     }
 
     [Fact]
-    public void ResolvesExplicitRelativeImportPaths()
+    public void ResolvesDottedModuleNamesAsFilePaths()
     {
         var root = Path.Combine(
             Path.GetTempPath(),
@@ -76,7 +76,7 @@ public sealed class MinamoCompilerTests
         try
         {
             File.WriteAllText(Path.Combine(modules, "helper.nami"), "func value() => 42");
-            File.WriteAllText(mainPath, "import ./modules/helper\nhelper.value()");
+            File.WriteAllText(mainPath, "import modules.helper\nhelper.value()");
 
             var options = BuilderOptions.Default();
             var lookup = FileLookup.Restricted(options).AddPath(root).Build();
@@ -89,6 +89,18 @@ public sealed class MinamoCompilerTests
         {
             Directory.Delete(root, recursive: true);
         }
+    }
+
+    [Theory]
+    [InlineData("import System.dll")]
+    [InlineData("import \"System.dll\"")]
+    [InlineData("import * from libraries.System.dll")]
+    public void KeepsDllImportsDisabledForDottedModuleNames(string source)
+    {
+        var result = MinamoCompiler.Compile(source);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, error => error.Code == (int)CompilerError.DllImportNotAllowed);
     }
 
     [Fact]

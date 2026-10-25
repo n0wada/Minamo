@@ -150,10 +150,14 @@ Use `import` to bring a module into the current file. An import may have an alia
 name, or import every public name. Imports are local and are not re-exported.
 
 ```swift
-import ./modules/pricing as pricing
-import receiptLine from ./modules/text
-import * from ./modules/common
+import modules.pricing as pricing
+import receiptLine from modules.text
+import * from modules.common
 ```
+
+Dots separate module name segments: `modules.pricing` resolves to a C# module registered
+under that full name, or otherwise to `modules/pricing.nami` through the configured file
+lookup. Without an alias, the last segment becomes the local module name (`pricing`).
 
 Module declarations are public by default. Prefix a module-level binding, constant, function,
 struct, enum, or trait with `private` to keep it within its module.

@@ -91,7 +91,7 @@ internal static class ParserSelfTest
     private static void VerifyGrammarAndMetadata()
     {
         const string source = """
-            import text/format as format
+            import text.format as format
             const Answer = 42
             struct Box { mut value }
             enum Maybe { None, Some(value) }

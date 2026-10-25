@@ -66,22 +66,62 @@ public sealed class ParserTests
     }
 
     [Theory]
-    [InlineData("import ./modules/pricing as pricing")]
-    [InlineData("import Discount from ./modules/pricing")]
-    [InlineData("import * from ./modules/pricing")]
-    public void AcceptsExplicitRelativeImportPaths(string source)
+    [InlineData("import modules.pricing")]
+    [InlineData("import modules.pricing as pricing")]
+    [InlineData("import Discount from modules.pricing")]
+    [InlineData("import * from modules.pricing")]
+    public void ParsesAndFormatsDottedModuleNames(string source)
     {
         var result = MinamoParser.Parse(source);
-        var bareResult = MinamoParser.Parse(
-            source.Replace("./", string.Empty, StringComparison.Ordinal));
 
         Assert.True(result.Success);
-        Assert.True(bareResult.Success);
         var import = Assert.Single(result.Value!.Imports);
-        var bareImport = Assert.Single(bareResult.Value!.Imports);
         Assert.Equal("modules", import.LocalPath);
         Assert.Equal("pricing", import.ModuleName);
-        Assert.Equal(bareImport.ToString(), import.ToString());
+        Assert.Equal(source, import.ToString());
+    }
+
+    [Fact]
+    public void MapsNestedModuleNamesToDirectorySegments()
+    {
+        var result = MinamoParser.Parse("import app.modules.pricing as pricing");
+
+        Assert.True(result.Success);
+        var import = Assert.Single(result.Value!.Imports);
+        Assert.Equal("app/modules", import.LocalPath);
+        Assert.Equal("pricing", import.ModuleName);
+        Assert.Equal("import app.modules.pricing as pricing", import.ToString());
+    }
+
+    [Fact]
+    public void ParsesQuotedDottedModuleNames()
+    {
+        var result = MinamoParser.Parse("import \"modules.pricing\" as pricing");
+
+        Assert.True(result.Success);
+        var import = Assert.Single(result.Value!.Imports);
+        Assert.Equal("modules", import.LocalPath);
+        Assert.Equal("pricing", import.ModuleName);
+    }
+
+    [Theory]
+    [InlineData("import modules/pricing")]
+    [InlineData("import modules/pricing as pricing")]
+    [InlineData("import Discount from modules/pricing")]
+    [InlineData("import * from modules/pricing")]
+    [InlineData("import ./modules/pricing")]
+    [InlineData("import Discount from ./modules/pricing")]
+    [InlineData("import * from ./modules/pricing")]
+    [InlineData("import \"modules/pricing\"")]
+    [InlineData("import \"modules\\\\pricing\"")]
+    [InlineData("import modules..pricing")]
+    [InlineData("import modules.")]
+    [InlineData("import \"..modules.pricing\"")]
+    [InlineData("import \"modules..pricing\"")]
+    [InlineData("from modules.pricing import Discount")]
+    public void RejectsInvalidOrRemovedImportPaths(string source)
+    {
+        Assert.False(MinamoParser.Parse(source).Success);
     }
 
     [Fact]

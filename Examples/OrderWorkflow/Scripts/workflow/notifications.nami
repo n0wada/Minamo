@@ -1,4 +1,4 @@
-import workflow/model as model
+import workflow.model as model
 
 func Submitted(order) =>
     "Accepted " + model.Describe(order) + "; requesting payment."

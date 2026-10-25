@@ -1,10 +1,10 @@
 #region "Initialize"
-import refs/libtest as lib
-import refs/libtest
-import * from refs/libtest
-import refs/libtest1 as lib1
-import * from refs/libtest1
-import refs/visibility as visibility
+import refs.libtest as lib
+import refs.libtest
+import * from refs.libtest
+import refs.libtest1 as lib1
+import * from refs.libtest1
+import refs.visibility as visibility
 #endregion
 
 #region "Private module declarations"

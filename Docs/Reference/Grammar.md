@@ -610,18 +610,23 @@ impl Point with Displayable {
 
 ```text
 import ::=
-    "import" module-path [ "as" import-name ]
-  | "import" import-name "from" module-path
-  | "import" "*" "from" module-path
+    "import" module-name [ "as" import-name ]
+  | "import" import-name "from" module-name
+  | "import" "*" "from" module-name
 
-module-path ::= [ "./" ] import-name { "/" import-name }
+module-name ::= identifier { "." identifier } | string
 import-name ::= identifier | string
 ```
 
 Imports are local and are not re-exported. Module declarations are public by default. `private`
 may prefix module-level bindings, constants, functions, structs, enums, and traits, but not imports
-or `impl` members. `./` explicitly marks an import as relative; it uses the same lookup order as
-the equivalent path without the prefix.
+or `impl` members. All forms begin with `import`.
+
+Module names use dots, not slashes: `refs.math` first resolves against the C# host module
+registry using the full name, then falls back to `refs/math.nami` through the configured file
+lookup. A module import without an alias binds its last segment (`math`). Quoted module names
+use the same dot-separated notation. Empty segments, slash-separated paths, and the `./` prefix
+are not supported; omit the `.nami` file extension.
 
 ## Exceptions
 

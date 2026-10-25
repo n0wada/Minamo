@@ -14,15 +14,13 @@ public partial class MinamoLinker
     {
         if (!UnitMap.TryGetValue(mod.Id, out var unit))
         {
-            if (mod.LocalPath is null)
+            var moduleName = mod.GetPath().Replace('/', '.');
+            if (BuilderOptions.ModuleProvider?.TryGetUnit(moduleName, out var hostUnit) == true)
             {
-                if (BuilderOptions.ModuleProvider?.TryGetUnit(mod.ModuleName, out var hostUnit) == true)
-                {
-                    unit = hostUnit;
-                }
+                unit = hostUnit;
             }
 
-            if (unit is null && mod.ModuleName == nameof(lang))
+            if (unit is null && moduleName == nameof(lang))
             {
                 unit = lang;
             }

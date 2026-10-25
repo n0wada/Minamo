@@ -445,8 +445,8 @@
 #endregion
 
 #region "Type annotations 2"
-    import refs/libtest1 as lib
-    import Asset from refs/libtest1
+    import refs.libtest1 as lib
+    import Asset from refs.libtest1
     func assetToString(lib.Asset ass) {
         ass.ToString()
     }
@@ -492,7 +492,7 @@
 #endregion
 
 #region "Complex type annotations 2"
-    import refs/libtest as libtest
+    import refs.libtest as libtest
     func test(libtest.Foobar|Integer x) {
         match x {
             value when value is Integer => assert(got: true),
@@ -606,8 +606,8 @@
 #endregion
 
 #region "Complex definition 1"
-    import refs/libtest as libtest
-    import Foo from refs/libtest
+    import refs.libtest as libtest
+    import Foo from refs.libtest
     func libtest.Foo as Integer {
         this.x
     }

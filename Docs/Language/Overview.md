@@ -314,14 +314,18 @@ for value in sequence() {
 
 ## Modules
 
-Modules are imported by path or registered by a C# host.
+Modules use dot-separated names and may be loaded from files or registered by a C# host.
 
 ```swift
-import refs/math
-import refs/math as mathematics
-import square from refs/math
+import refs.math
+import refs.math as mathematics
+import square from refs.math
 import * from text
 ```
+
+`refs.math` first looks for a C# module registered under that full name, then for
+`refs/math.nami` in the configured file lookup paths. Without an alias, the module is bound
+to its last segment (`math`). Slash-separated paths and the `./` prefix are not supported.
 
 Module declarations are public by default. Use `private` for declarations that must remain inside
 the module. Imports are local and are not re-exported.

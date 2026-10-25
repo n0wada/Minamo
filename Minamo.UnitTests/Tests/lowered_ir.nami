@@ -1,5 +1,5 @@
 #region "Lowered IR: dispatcher smoke"
-    import refs/libtest as irlib
+    import refs.libtest as irlib
 
     struct IrBox { value }
     impl IrBox {

@@ -346,7 +346,7 @@ public sealed class ImportSyntax
 
     public override string ToString()
     {
-        var path = LocalPath is null ? "" : $"{LocalPath}/";
+        var path = LocalPath is null ? "" : $"{LocalPath.Replace('/', '.')}.";
         var module = $"{path}{ModuleName}";
         return Kind switch
         {

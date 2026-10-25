@@ -379,9 +379,11 @@ partial class Builder
     private Reference CreateImportReference(LoweredImport node)
     {
         var localPath = node.LocalPath;
+        var moduleName = localPath is null
+            ? node.ModuleName
+            : $"{localPath.Replace('/', '.')}.{node.ModuleName}";
 
-        if ((localPath is not null && localPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-            || node.ModuleName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+        if (moduleName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
         {
             AddError(CompilerError.DllImportNotAllowed, node.Location);
             throw new TerminationException();

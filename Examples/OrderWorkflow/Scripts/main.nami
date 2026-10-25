@@ -1,7 +1,7 @@
-import workflow/model as model
-import workflow/validation as validation
-import workflow/shipping as shipping
-import workflow/notifications as notifications
+import workflow.model as model
+import workflow.validation as validation
+import workflow.shipping as shipping
+import workflow.notifications as notifications
 import orders
 
 func onSubmitted(payload) {

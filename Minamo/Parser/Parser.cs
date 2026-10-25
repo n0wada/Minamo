@@ -3,6 +3,7 @@ using Minamo.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace Minamo.Parser;
 
@@ -113,19 +114,6 @@ internal sealed partial class HandwrittenParser
                 return null;
             }
         }
-        else if (Check(TokenKind.Dot))
-        {
-            node.Kind = ImportKind.Module;
-            if (!TryParseImportPath(node))
-            {
-                return null;
-            }
-
-            if (Match(TokenKind.As))
-            {
-                node.Alias = ParseImportToken();
-            }
-        }
         else
         {
             var firstName = ParseImportToken();
@@ -146,7 +134,11 @@ internal sealed partial class HandwrittenParser
             else
             {
                 node.Kind = ImportKind.Module;
-                ParseImportPathRest(node, firstName);
+                if (!TrySetImportPath(node, firstName))
+                {
+                    return null;
+                }
+
                 if (Match(TokenKind.As))
                 {
                     node.Alias = ParseImportToken();
@@ -160,38 +152,23 @@ internal sealed partial class HandwrittenParser
 
     private bool TryParseImportPath(ImportSyntax import)
     {
-        if (Match(TokenKind.Dot) && !Expect(TokenKind.Divide))
-        {
-            return false;
-        }
-
-        var firstName = ParseImportToken();
-        if (firstName is null)
-        {
-            return false;
-        }
-
-        ParseImportPathRest(import, firstName);
-        return true;
+        var name = ParseImportToken();
+        return name is not null && TrySetImportPath(import, name);
     }
 
-    private void ParseImportPathRest(ImportSyntax import, string lastName)
+    private bool TrySetImportPath(ImportSyntax import, string name)
     {
-        while (Match(TokenKind.Divide))
+        if (name.Contains('/') || name.Contains('\\')
+            || name.Split('.').Any(string.IsNullOrEmpty))
         {
-            var nextName = ParseImportToken();
-            if (nextName is null)
-            {
-                return;
-            }
-
-            import.LocalPath = import.LocalPath is null
-                ? lastName
-                : string.Concat(import.LocalPath, "/", lastName);
-            lastName = nextName;
+            Report(ParserError.InvalidImport, Previous);
+            return false;
         }
 
-        import.ModuleName = lastName;
+        var separator = name.LastIndexOf('.');
+        import.LocalPath = separator < 0 ? null : name[..separator].Replace('.', '/');
+        import.ModuleName = name[(separator + 1)..];
+        return true;
     }
 
     private string? ParseImportToken()
