@@ -15,11 +15,11 @@ The core runtime includes these commonly used values and types:
 | Value or type | Purpose |
 | --- | --- |
 | `nil` / `Nil` | Absence of a value |
-| `true`, `false` / `Boolean` | Boolean values |
+| `true`, `false` / `Bool` | Bool values |
 | `Integer`, `Float`, `Char`, `String`, `ByteArray` | Primitive values |
 | `Json` | JSON parsing and serialization |
 | `Array`, `Tuple`, `Dictionary`, `Set` | Collection values |
-| `Range`, `Iterator` | Lazy or bounded sequences |
+| `Iterator` | Lazy or bounded sequences, including ranges |
 | `Option` | A value that may be present (`Some`) or absent (`None`) |
 | `Result` | A successful value (`Ok`) or an error value (`Err`) |
 | `Exception` | A tagged error value that can be thrown and caught |
@@ -52,6 +52,11 @@ let theme = settings.TryGet("theme") ?? "system"
 ```
 
 `TryGet` returns the stored value or `nil`, so it works naturally with `??`.
+
+`Dictionary.Keys()` returns an `Iterator` over the current keys in insertion order, including
+non-string keys. Keys are retained by reference. Enumeration starts when the iterator is consumed;
+adding or removing entries during enumeration raises `CollectionModified`. Use `Keys().ToArray()`
+to collect the keys before changing the dictionary.
 
 ## Option
 

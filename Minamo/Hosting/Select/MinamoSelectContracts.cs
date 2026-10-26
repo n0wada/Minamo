@@ -41,6 +41,7 @@ public sealed class MinamoSelectMetadata
 }
 
 /// <summary>A read-only value published by the currently active select.</summary>
+/// <remarks>The script value is retained by reference; mutable values are not cloned.</remarks>
 public sealed class MinamoSelectProperty
 {
     private readonly MinamoObject value;
@@ -92,7 +93,7 @@ public sealed class MinamoSelectRequest
         MinamoHostValueConverter.TryConvert(payload, out result);
 }
 
-/// <summary>Immutable data published internally for the current select screen.</summary>
+/// <summary>Published select state retaining references to script values.</summary>
 internal sealed class MinamoSelectSnapshot
 {
     internal MinamoSelectSnapshot(

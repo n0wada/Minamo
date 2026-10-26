@@ -7,7 +7,7 @@ Minamo's public API is divided by purpose. Application code should normally impo
 | --- | --- | --- |
 | Application API | `Minamo.Hosting` | Create a host and instance, register commands, execute source or files, and consume results |
 | Tooling API | `Minamo.Parser`, `Minamo.Parser.Model`, `Minamo.Compiler`, `Minamo.Linker`, `Minamo.Debug`, `Minamo.Codegen` | Parse and inspect syntax trees, compile or link units, inspect bytecode, and build debuggers or language tools |
-| Runtime extension API | `Minamo.Runtime`, `Minamo.Runtime.Types`, `Minamo.Runtime.Interop`, and `Minamo` | Implement native runtime values, foreign units, and integrations that deliberately participate in VM semantics |
+| Runtime extension API | `Minamo.Runtime`, `Minamo.Runtime.Types`, and `Minamo` | Implement native runtime values, foreign units, and integrations that deliberately participate in VM semantics |
 | Internal implementation | Non-public types | VM stacks and dispatch machinery, compiler implementation state, host registries, and process/environment helpers |
 
 ## Application API

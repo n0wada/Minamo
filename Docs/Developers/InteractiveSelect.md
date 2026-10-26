@@ -85,8 +85,9 @@ The handle exposes the latest published state:
 | `IsCompleted` | Whether the whole interaction has finished. |
 
 `GetProperty(name)` returns a property from the current publication. Use its `GetValue<T>()`
-to read the value or `Metadata` to access its UI hints. Retained property objects keep the values
-from their publication, as `initialCount` does above.
+to read the value or `Metadata` to access its UI hints. Retained property objects keep the script
+value references captured at their publication. Scalars keep their earlier values, as `initialCount`
+does above; mutations to a shared array or dictionary are visible through older property objects.
 
 Action parameters determine the host payload shape:
 
@@ -177,10 +178,10 @@ while (profile.Request is { } request)
 }
 ```
 
-While a request is pending, properties retain their last values, `Actions` is empty, and all action
-selection is rejected. An action may issue multiple requests; each request object accepts one
-response, and old objects are rejected. `request` is available only in action handlers, including
-hidden actions. Disposing the select abandons a pending request.
+While a request is pending, properties are not reevaluated and retain their published references.
+`Actions` is empty, and all action selection is rejected. An action may issue multiple requests;
+each request object accepts one response, and old objects are rejected. `request` is available only
+in action handlers, including hidden actions. Disposing the select abandons a pending request.
 
 ## Navigation and factories
 
@@ -239,9 +240,12 @@ publishes the new instance, and `return` republishes the restored parent.
 | Action metadata | Every publication where that action is available. |
 | Action bodies | When invoked by the host. |
 
-Properties and metadata are snapshots; retained objects keep their old values. Keep guards,
+Published properties, descriptions, and metadata retain script value references; they are not deep
+copies. Rebinding a script variable does not replace a value held by an older publication, but
+mutating a shared array or dictionary is visible through older publication objects. Keep guards,
 properties, and metadata free of side effects. If ordinary republication fails while evaluating
-them, the operation throws and retains the last successful publication and its token.
+them, the operation throws and retains the last successful publication and its token. This does not
+roll back mutations to referenced values.
 
 Operations on one handle execute serially. Hosts should coordinate rendering data reads, token
 capture, external data changes, and action calls through their own dispatcher. Concurrent calls

@@ -35,7 +35,7 @@ let normalized = +amount
 
 ## Comparison and logical operators
 
-Comparison operators produce a Boolean value. Logical operators use doubled symbols and can be
+Comparison operators produce a `Bool` value. Logical operators use doubled symbols and can be
 combined with `!` for negation.
 
 ```swift

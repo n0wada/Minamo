@@ -256,6 +256,43 @@ public sealed class SelectSessionTests
         Assert.Equal(resourceId, select.GetValue<Guid>());
     }
 
+    [Fact]
+    public async Task SelectPublicationsRetainMutableValueReferences()
+    {
+        using var instance = new MinamoHost().CreateInstance();
+        var initialized = await instance.ExecuteAsync("""
+            select counter {
+                let items = [1]
+                let state = ["count": 1]
+
+                prop items ["items": items] => items
+                prop state => state
+                action "add" ["items": items] => {
+                    items.Add(2)
+                    state["count"] = 2
+                }
+                action "finish" => exit
+            }
+            """);
+        Assert.True(initialized.Success, initialized.Failure?.Message);
+        using var select = await instance.OpenSelectAsync("counter");
+        var items = select.GetProperty("items");
+        var state = select.GetProperty("state");
+        var propertyMetadata = items.Metadata!;
+        var actionMetadata = Action(select, "add").Metadata!;
+        Assert.Equal(new long[] { 1 }, items.GetValue<long[]>());
+        Assert.Equal(1L, state.GetValue<Dictionary<string, long>>()!["count"]);
+
+        await select.SelectAsync("add");
+
+        Assert.Equal(new long[] { 1, 2 }, items.GetValue<long[]>());
+        Assert.Equal(2L, state.GetValue<Dictionary<string, long>>()!["count"]);
+        Assert.Equal(new long[] { 1, 2 },
+            propertyMetadata.GetValue<Dictionary<string, long[]>>()!["items"]);
+        Assert.Equal(new long[] { 1, 2 },
+            actionMetadata.GetValue<Dictionary<string, long[]>>()!["items"]);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

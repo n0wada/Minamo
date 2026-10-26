@@ -10,6 +10,46 @@
     assert(["ada:1", "lin:2"], labels)
 #endregion
 
+#region "Methods: Keys preserve insertion order and key identity"
+    let objectKey = [1]
+    let map = Dictionary()
+    map.Add("first", 1)
+    map.Add(42, 2)
+    map.Add(nil, 3)
+    map.Add(objectKey, 4)
+
+    let keys = map.Keys()
+    assert(Iterator, keys.GetType())
+    let values = keys.ToArray()
+    assert(["first", 42, nil, objectKey], values)
+    assert(true, referenceEquals(objectKey, values[3]))
+#endregion
+
+#region "Methods: Keys enumerate the current dictionary"
+    let map = Dictionary()
+    let keys = map.Keys()
+    assert([], keys.ToArray())
+
+    map.Add("first", 1)
+    map.Add("second", 2)
+    map.Remove("first")
+    map.Add("first", 3)
+    assert(["second", "first"], keys.ToArray())
+#endregion
+
+#region "Methods: Keys reject structural changes during iteration"
+    let map = ["first": 1, "second": 2]
+    let modified = try {
+        for key in map.Keys() {
+            map.Add("third", 3)
+        }
+        false
+    } catch error {
+        constructorName(error) == "CollectionModified"
+    }
+    assert(true, modified)
+#endregion
+
 #region "Constructor 1"
     let xs = Dictionary(
         (x: 1, y: 2, z: "foo")

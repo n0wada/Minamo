@@ -271,6 +271,21 @@ internal sealed partial class MinamoDictionaryTypeInfo : MinamoTypeInfo
     [MinamoMethod(BuiltinMethodNames.ToTuple)]
     internal static MinamoObject ToTuple(MinamoDictionary self) => new MinamoTuple(self.GetArrayOfLabels());
 
+    [MinamoMethod(BuiltinMethodNames.Keys)]
+    internal static MinamoObject Keys(MinamoDictionary self)
+    {
+        IEnumerable<MinamoObject> Iterate()
+        {
+            using var iterator = new MinamoDictionaryEnumerator(self);
+            while (iterator.MoveNext())
+            {
+                yield return iterator.CurrentKey;
+            }
+        }
+
+        return MinamoIterator.Create(Iterate());
+    }
+
     [MinamoMethod(BuiltinMethodNames.Compact)]
     internal static void Compact(ExecutionContext ctx, MinamoDictionary self, [Default]MinamoObject predicate)
     {
@@ -364,6 +379,9 @@ internal sealed class MinamoDictionaryEnumerator : IEnumerator<MinamoObject>
     }
 
     object IEnumerator.Current => Current;
+
+    internal MinamoObject CurrentKey =>
+        ((KeyValuePair<MinamoObject, MinamoObject>)enumerator.Current).Key;
 
     public void Dispose() { }
 
