@@ -350,10 +350,12 @@ public sealed class MinamoHostEnvironment : IDisposable
         IEnumerable<string> capabilities,
         bool unrestricted,
         IReadOnlyList<Action<MinamoLogEntry>> logHandlers,
-        MinamoExecutionLimits limits)
+        MinamoExecutionLimits limits,
+        bool allowClrMemberAccess)
     {
         HostContext = hostContext;
         Limits = limits;
+        AllowClrMemberAccess = allowClrMemberAccess;
         Telemetry = new(logHandlers);
         Capabilities = new(capabilities, unrestricted);
         resourceDefinitions = resourceTypes.ToDictionary(definition => definition.ResourceType);
@@ -371,6 +373,7 @@ public sealed class MinamoHostEnvironment : IDisposable
     public MinamoTelemetry Telemetry { get; }
     public MinamoExecutionLimits Limits { get; }
     internal MinamoObject Root { get; }
+    internal bool AllowClrMemberAccess { get; }
 
     internal void Reset()
     {

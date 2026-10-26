@@ -654,4 +654,9 @@ The grammar does not currently provide:
 - class declarations or inheritance;
 - automatic string interpolation;
 - preprocessor directives such as `#warning`;
-- implicit host-object reflection in the Hosting API.
+- automatic reflection of the host context through the global `host` object.
+
+`host` provides input, registry, and logging APIs; it does not reflect the host context's CLR
+members. Automatic member access for CLR values explicitly exposed by environment bindings or
+command results is controlled separately by `MinamoHostOptions.AllowClrMemberAccess`; see
+[CLR member access](../Developers/HostingGuide.md#clr-member-access).

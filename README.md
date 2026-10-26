@@ -14,8 +14,9 @@ console, standard-library modules, and a C# Hosting API.
 ## Why Minamo?
 
 - **Embeddable by design** — create isolated instances and execute scripts from C#.
-- **Explicit host boundaries** — scripts see registered commands and resources, not
-  arbitrary CLR members.
+- **Explicit host boundaries** — hosts choose the commands, resources, and CLR values to expose.
+  Automatic CLR member access is enabled by default and can be disabled with
+  `AllowClrMemberAccess = false`.
 - **Controlled execution** — hosts can apply capabilities, cancellation, and execution
   limits.
 - **An expressive language** — functions, iterators, pattern matching, modules,

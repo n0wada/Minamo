@@ -197,6 +197,7 @@ internal static class HostingScenarios
         AssertNoProperty<MinamoHostOptions>("Trace", "removed host tracing");
         AssertNoProperty<MinamoHostOptions>("Progress", "removed host progress handler");
         AssertHasProperty<MinamoHostOptions>("ExposeHostObject", "host object visibility");
+        AssertHasProperty<MinamoHostOptions>("AllowClrMemberAccess", "automatic CLR member access policy");
         AssertNoMethod<MinamoCommandContext>("ReportProgress", "removed command progress reporting");
         AssertNoMethod<MinamoTelemetry>("Report", "removed telemetry progress reporting");
         Assert(

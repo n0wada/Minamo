@@ -69,6 +69,11 @@ internal sealed class MinamoInteropFunction : MinamoForeignFunction
 
     private MinamoObject CallInteropMethod(ExecutionContext ctx, MinamoObject self, MinamoObject[] args)
     {
+        if (!MinamoInteropTypeInfo.CheckMemberAccess(ctx))
+        {
+            return Nil;
+        }
+
         var tupleArgs = args.Length > 0 ? ((MinamoTuple)args[0]).UnsafeAccess() : null;
         var arguments = tupleArgs is null ? Array.Empty<object>() : tupleArgs.Select(a => a.ToObject()).ToArray();
         var argumentTypes = tupleArgs is null ? Array.Empty<Type>() : arguments.Select(a => a is null ? MinamoNil.Instance.GetType() : a.GetType()).ToArray();

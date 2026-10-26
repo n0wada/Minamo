@@ -1,5 +1,6 @@
 using Minamo.Codegen;
 using Minamo.Compiler;
+using Minamo.Hosting;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -48,6 +49,11 @@ internal partial class MinamoInteropTypeInfo : MinamoTypeInfo
 
     private MinamoObject CreateNew(ExecutionContext ctx, MinamoObject self, MinamoObject args)
     {
+        if (!CheckMemberAccess(ctx))
+        {
+            return Nil;
+        }
+
         var interop = (MinamoInterop)self;
         var values = ((MinamoTuple)args).UnsafeAccess();
         var arr = values.Select(o => o.ToObject()).ToArray();
@@ -67,6 +73,11 @@ internal partial class MinamoInteropTypeInfo : MinamoTypeInfo
 
     internal override MinamoObject GetInstanceMember(MinamoObject self, HashString nameStr, ExecutionContext ctx)
     {
+        if (!CheckMemberAccess(ctx))
+        {
+            return Nil;
+        }
+
         var interop = (MinamoInterop)self;
         var name = (string)nameStr;
         var typeObject = interop.Object is Type;
@@ -74,7 +85,7 @@ internal partial class MinamoInteropTypeInfo : MinamoTypeInfo
         var key = (interop.Type, name, typeObject);
         if (!instanceMembers.TryGetValue(key, out var func))
         {
-            func = GetInteropFunction(interop, name, ctx);
+            func = GetInteropFunction(interop, name);
 
             if (func is not null)
             {
@@ -90,7 +101,7 @@ internal partial class MinamoInteropTypeInfo : MinamoTypeInfo
         return ctx.OperationNotSupported(name, self);
     }
 
-    private MinamoFunction? GetInteropFunction(MinamoInterop self, string name, ExecutionContext _)
+    private MinamoFunction? GetInteropFunction(MinamoInterop self, string name)
     {
         var typeObject = self.Object is Type;
         if (typeObject && name == "new")
@@ -116,6 +127,18 @@ internal partial class MinamoInteropTypeInfo : MinamoTypeInfo
         }
 
         return new MinamoInteropFunction(name, type, methods, auto);
+    }
+
+    internal static bool CheckMemberAccess(ExecutionContext ctx)
+    {
+        if (ctx.GetContextVariable<MinamoHostEnvironment>(MinamoHostEnvironment.ContextKey)
+            ?.AllowClrMemberAccess != false)
+        {
+            return true;
+        }
+
+        ctx.Failure("Automatic CLR member access is disabled for this host.");
+        return false;
     }
     #endregion
 }

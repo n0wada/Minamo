@@ -117,8 +117,11 @@ Commands may accept Minamo callbacks through `MinamoCommandContext.Callback(...)
 rules. A callback is valid only for the lifetime of the host command, including the awaited lifetime
 of an asynchronous command, and must not be retained for detached work.
 
-For returned CLR objects, the declared C# return type is the exposure boundary; runtime types do not
-reveal additional members. Use a resource wrapper when the script needs a deliberately broader API.
+Returned CLR objects expose public members of their declared C# return type by default. An inherited
+`GetType()` method can also expose the runtime type's public static members, so the declared return
+type is not an access-control boundary. To restrict automatic CLR member access, use the option below
+and expose operations through registered commands and resources.
+
 Generated commands support `Task`, `Task<T>`, `ValueTask`, and `ValueTask<T>`; manual registration
 provides `AsyncCommand(...)`. Minamo suspends the VM while the CLR awaitable completes without adding
 language-level `async` or `await` syntax.
@@ -126,6 +129,34 @@ language-level `async` or `await` syntax.
 Module, resource, and capability names use dotted identifier segments. Commands,
 static host types, and parameters use single identifiers. Invalid names are rejected during host
 configuration. Group static host commands with `module.Type(...)`.
+
+## CLR member access
+
+`MinamoHostOptions.AllowClrMemberAccess` defaults to `true`, preserving direct access to CLR
+objects for application-owned scripts. Set it to `false` when scripts should use registered
+commands and resource methods:
+
+```csharp
+var host = new MinamoHost(new()
+{
+    AllowClrMemberAccess = false
+});
+```
+
+CLR `GetType` methods follow this option like other CLR members, including `Type.GetType(...)`
+and `Assembly.GetType(...)`. Minamo's own type information, such as `"text".GetType()`, is unaffected.
+Registered commands remain available under the normal command policy.
+
+Setting `AllowClrMemberAccess` to `false` rejects all reflected CLR instance methods, property
+getters, static members on exposed CLR types, and constructor calls. It applies to values from
+commands, environment bindings, the registry, input, and select action arguments, including CLR
+callables obtained from another instance. CLR values can still be passed to registered commands
+as opaque arguments. Registered commands, resource methods, and native Minamo values continue
+to work normally.
+
+The setting is independent of `CapabilityMode` and is retained after instance reset. It controls
+reflected member access; normal value conversion and code inside registered commands remain
+host-defined. Capabilities and execution limits are configured separately.
 
 ## Instances
 

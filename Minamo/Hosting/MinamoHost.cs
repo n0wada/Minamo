@@ -27,6 +27,8 @@ public sealed class MinamoHostOptions
     public MinamoExecutionLimits Limits { get; init; } = new();
     public Action<MinamoLogEntry>? Log { get; init; }
     public bool ExposeHostObject { get; init; } = true;
+    /// <summary>Allows scripts to access CLR members through reflection. Defaults to true.</summary>
+    public bool AllowClrMemberAccess { get; init; } = true;
 }
 
 public sealed class MinamoHost
@@ -43,6 +45,7 @@ public sealed class MinamoHost
     private readonly MinamoExecutionLimits limits;
     private readonly MinamoCapabilityMode capabilityMode;
     private readonly bool exposeHostObject;
+    private readonly bool allowClrMemberAccess;
 
     public MinamoHost(MinamoHostOptions? options = null)
     {
@@ -60,6 +63,7 @@ public sealed class MinamoHost
         limits.Validate();
         logHandlers = Handlers(options.Log);
         exposeHostObject = options.ExposeHostObject;
+        allowClrMemberAccess = options.AllowClrMemberAccess;
     }
 
     public IReadOnlyCollection<MinamoModuleBuilder> Modules => modules.Values;
@@ -176,7 +180,8 @@ public sealed class MinamoHost
                 _ => throw new InvalidOperationException("Unknown capability mode.")
             },
             logHandlers.ToArray(),
-            limits);
+            limits,
+            allowClrMemberAccess);
         return new MinamoInstance(instanceLookup, hostEnvironment, environment, program, arguments);
     }
 
