@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace Minamo;
 
 internal static class ConsoleApp

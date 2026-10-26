@@ -44,6 +44,70 @@ public sealed class ConsoleEndToEndTests
         }
     }
 
+    [Theory]
+    [InlineData("io")]
+    [InlineData("text")]
+    public async Task RejectsRemovedLibraryImports(string name)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "minamo-cli-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var source = Path.Combine(root, "import.nami");
+            await File.WriteAllTextAsync(source, $"import {name}", Encoding.UTF8);
+
+            var result = await RunAsync(source, "-nologo");
+
+            Assert.Equal(1, result.ExitCode);
+            Assert.Contains(name, result.StandardError + result.StandardOutput, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ReadsLinesWithoutImportsAndReturnsAnEmptyStringAtEndOfInput()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "minamo-cli-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var source = Path.Combine(root, "input.nami");
+            await File.WriteAllTextAsync(source, """
+                let first = readLine()
+                let second = Console.ReadLine()
+                let end = readLine()
+                print(fmt("input:{0}|{1}|{2}", first, second, end))
+                """, Encoding.UTF8);
+
+            var check = await RunAsync(source, "--check", "-nologo");
+            var result = await RunWithInputAsync("Minamo\nConsole\n", source, "-nologo");
+
+            Assert.Equal(0, check.ExitCode);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("input:Minamo|Console|", result.StandardOutput, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ReplKeepsConsoleInputAvailableAfterReset()
+    {
+        var result = await RunWithInputAsync(
+            "print(fmt(\"input:{0}\", readLine()))\nMinamo\n#reset\n"
+                + "print(fmt(\"reset:{0}\", Console.ReadLine()))\nAgain\n#exit\n",
+            "-nologo");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("input:Minamo", result.StandardOutput, StringComparison.Ordinal);
+        Assert.Contains("reset:Again", result.StandardOutput, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task ChecksSourceFilesWithoutExecutingThem()
     {

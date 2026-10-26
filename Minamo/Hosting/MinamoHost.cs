@@ -238,6 +238,7 @@ public sealed class MinamoHost
             NoOptimizations = source.NoOptimizations,
             LinkerSkipChecksum = source.LinkerSkipChecksum,
             LinkerLog = source.LinkerLog,
+            LangFactory = source.LangFactory,
             AllowEnvironmentNames = source.AllowEnvironmentNames,
             ExposeHostObject = source.ExposeHostObject
         };

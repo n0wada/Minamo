@@ -2,8 +2,9 @@ using Minamo.Codegen;
 using Minamo.Runtime;
 using Minamo.Runtime.Types;
 using System.IO;
+using System.Threading.Tasks;
 
-namespace Minamo.Library.ConsoleLibrary;
+namespace Minamo;
 
 [MinamoType]
 public sealed partial class MinamoConsoleTypeInfo : MinamoForeignTypeInfo

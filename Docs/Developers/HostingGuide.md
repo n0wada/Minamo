@@ -243,8 +243,9 @@ to `host.Input()` obtains one value from that source; `null` becomes Minamo `nil
 a configured source is a runtime error. Hosting input never reads `Console.In`.
 
 As an auxiliary setting, `UseOutput(Action<string>)` redirects text chunks written by `print`;
-without it, `print` uses the process console. The `readline` module belongs to Minamo.Console and
-reads `Console.In` directly; it is independent of Hosting input.
+without it, `print` uses the process console. The command-line host provides `readLine()` and the `Console`
+type without an import; they read terminal input independently of Hosting input. Applications using
+`Minamo.dll` must define their own input commands or configure `host.Input()` through `UseInputAsync`.
 
 Use `ExecuteFileAsync("Scripts/startup.nami")` for a host-selected entry script. Imports still obey
 the configured `FileLookup`; file I/O failures return an `Input` failure.
@@ -516,8 +517,6 @@ implicitly. Register it with `AddPath` when it is intended to be importable.
 
 Call `DisableFileImports()` after `UseFileLookup(...)` when a restricted console must explicitly
 disable file imports.
-
-The command-line host registers its standard modules, including `io`, through this same C# API.
 
 ## Generated command bindings
 

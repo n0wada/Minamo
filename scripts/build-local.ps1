@@ -38,10 +38,10 @@ if ($LASTEXITCODE -ne 0)
 
 if ($Configuration -eq "Release")
 {
-    $consoleProject = Join-Path $repoRoot "Minamo.Console\Minamo.Console.csproj"
+    $runtimeProject = Join-Path $repoRoot "Minamo\Minamo.csproj"
     $releaseOutput = Join-Path $repoRoot "bin"
 
-    dotnet restore $consoleProject `
+    dotnet restore $runtimeProject `
         --configfile $nugetConfig `
         -m:1 `
         -p:BuildInParallel=false
@@ -51,7 +51,7 @@ if ($Configuration -eq "Release")
         exit $LASTEXITCODE
     }
 
-    dotnet publish $consoleProject `
+    dotnet publish $runtimeProject `
         -c Release `
         --self-contained false `
         --no-restore `
@@ -66,11 +66,9 @@ if ($Configuration -eq "Release")
     }
 
     foreach ($fileName in @(
-        "Minamo.deps.json",
         "Minamo.pdb",
         "Minamo.Generators.deps.json",
-        "Minamo.Generators.pdb",
-        "Minamo.Console.pdb"))
+        "Minamo.Generators.pdb"))
     {
         $file = Join-Path $releaseOutput $fileName
         if (Test-Path -LiteralPath $file)

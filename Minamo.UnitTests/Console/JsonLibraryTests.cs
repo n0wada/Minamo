@@ -1,5 +1,4 @@
 using Minamo.Hosting;
-using Minamo.Library;
 using Xunit;
 
 namespace Minamo.UnitTesting.Cli;

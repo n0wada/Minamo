@@ -21,7 +21,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Minamo.Generators\Minamo.Generators.csproj" Condition="'$(LanguageRunner)' != 'true'" />
-    <ProjectReference Include="..\Minamo.Console\Minamo.Console.csproj" />
     <ProjectReference Include="..\Minamo\Minamo.csproj" />
   </ItemGroup>
 

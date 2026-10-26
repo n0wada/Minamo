@@ -1,9 +1,8 @@
 # Built-in types and functions
 
 Minamo provides a small set of core values, types, and functions to every script. The `minamo`
-console also registers the standard-library modules shipped with the executable. An embedding host
-can choose which modules and commands to expose, so a script must not assume that console modules
-are available in every hosted environment.
+console also provides terminal input and display functions. An embedding host chooses which
+modules and commands to expose.
 
 This page is a practical guide to the built-ins that are part of the current runtime. See the
 [grammar reference](../Reference/Grammar.md) for syntax and the [Hosting API guide](../Developers/HostingGuide.md)
@@ -133,7 +132,7 @@ try {
 
 ## Core functions
 
-These functions are available without importing a standard-library module.
+These functions are available without importing a module.
 
 | Function | Description |
 | --- | --- |
@@ -162,75 +161,24 @@ host-provided input values.
 suspends that action without blocking a thread. The host receives the kind and optional payload
 through `MinamoSelectRequest`, then resumes the action with `MinamoSelect.RespondAsync`.
 
-## Standard library modules
+## Console functions
 
-The `minamo` console registers its standard library modules. Import a module before using its public
-names. `ByteArray` and `Json` are core types and are available without an import.
-
-```swift
-import * from math
-
-print(sqrt(81))
-```
-
-| Modules | Main capabilities |
-| --- | --- |
-| `collections` | Collection types beyond the core collection types. |
-| `readline` | Minamo.Console input through `readLine`. |
-| `io` | Files, directories, paths, drives, and file attributes. |
-| `math` | General numeric functions and constants. |
-| `random` | Independent pseudo-random generators. |
-| `text` | Text-processing types such as regular expressions and string builders. |
-| `time` | UTC and local date-time values, durations, and fixed offsets. |
-| `uuid` | UUID parsing, formatting, and generation. |
-
-For example, `readline` reads `Console.In` while `print` remains a core function. It does not
-consume values configured with the Hosting API's `UseInputAsync`:
+The `minamo` console provides `readLine()` and the `Console` type directly in scripts and the REPL.
+No import is required. `readLine()` and `Console.ReadLine()` read one line from `Console.In` and
+return an empty string at end of input. They do not consume Hosting input configured with
+`UseInputAsync`.
 
 ```swift
-import * from readline
-
 print(readLine(), terminator: nil)
 ```
 
-### `collections`
+These functions belong to the console host. Applications embedding `Minamo.dll` define their own
+input commands or use `host.Input()` with a configured input source. There is no `readline` module.
 
-Import `collections` for collection types whose ordering or capacity has a specific meaning. The
-types below are iterable and expose `Length()` and `Count`; operations that have no value to return
-produce `nil`.
+## Data formats
 
-| Type | Purpose and selected operations |
-| --- | --- |
-| `PriorityQueue(values?)` | A minimum-priority queue. `Enqueue(value, priority)`, `Peek()`, and `Dequeue()`; the latter two return `(value, priority)`. Equal priorities retain enqueue order. |
-| `Deque(values?)` | A double-ended queue. `PushFront(value)`, `PushBack(value)`, `PopFront()`, `PopBack()`, `First()`, and `Last()`. |
-| `SortedSet(values?)` | A duplicate-free set iterated in ascending value order. `Add(value)`, `Remove(value)`, `Contains(value)`, `First()`, `Last()`, and `Range(...)`. |
-| `SortedDictionary(values?)` | A dictionary iterated in ascending key order. `Add(key, value)`, `TryGet(key)`, `Remove(key)`, `Range(...)`, and the `Keys` and `Values` properties. |
-| `MultiMap(pairs?)` | Multiple values per key. `Add(key, value)`, `Get(key)`, `Remove(key, value)`, `RemoveKey(key)`, `ContainsKey(key)`, and `Keys`. Keys and values retain insertion order. |
-| `RingBuffer(capacity, values?)` | A fixed-size, oldest-to-newest buffer. `Add(value)` overwrites the oldest value when full; `First()`, `Last()`, and `Capacity` expose its current boundaries. |
-
-`values` is a sequence. `PriorityQueue` expects `(value, priority)` pairs and `MultiMap` expects
-`(key, value)` pairs. `Get` returns an `Array` snapshot, including an empty array when the key is
-absent. `RingBuffer` requires a positive capacity.
-
-`SortedDictionary` accepts a dictionary or a sequence of `(key, value)` pairs.
-
-```swift
-import * from collections
-
-let work = PriorityQueue()
-work.Enqueue("write release notes", 2)
-work.Enqueue("ship", 1)
-let next = work.Dequeue()       // (value: "ship", priority: 1)
-
-let recent = RingBuffer(3, [1, 2, 3])
-recent.Add(4)
-print(recent.ToArray())         // [2, 3, 4]
-```
-
-The `readline` and `io` modules can access host resources. An embedding host chooses which
-modules to register and can instead expose narrower host commands and capabilities.
-
-Core types provide explicit conversions for common data formats:
+`ByteArray` and `Json` are core types available without an import. They provide explicit conversions
+for common data formats:
 
 ```swift
 let bytes = ByteArray.FromString("Minamo")
@@ -239,21 +187,6 @@ print(bytes.ToHex())
 let value = Json.Parse("""{"ready":true,"ports":[8080,8081]}""")
 print(Json.Stringify(value, indented: true))
 ```
-
-Seeded random generators are independent and reproducible within the running Minamo version:
-
-```swift
-import * from random
-
-let generator = Random(42)
-print(generator.Next(min: 1, max: 7))
-print(generator.Shuffle(("red", "green", "blue")))
-```
-
-`DateTime` represents UTC values and reads the clock through `DateTime.UtcNow()`. `LocalDateTime`
-stores local clock fields together with a fixed offset; use `ToLocal(...)`, `FromUtc(...)`, and
-`ToUtc()` for explicit conversion. Only `LocalDateTime.Now()`, `LocalDateTime.SystemOffset`, and an
-omitted local offset consult the system time zone.
 
 ## Next steps
 

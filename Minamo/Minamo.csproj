@@ -2,6 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>$(MinamoRuntimeTargetFramework)</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>true</IsPackable>
+    <ApplicationIcon>Misc\minamo.ico</ApplicationIcon>
     <Title>$(MinamoProductName)</Title>
     <Description>Minamo, a dynamic language for .NET</Description>
     <PackageIcon>minamo.png</PackageIcon>
@@ -16,6 +19,11 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Misc\messages.xml" LogicalName="Minamo.Resources.messages.xml" />
+    <None Update="Console\minamo.json"
+          TargetPath="minamo.json"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          Pack="false" />
     <None Update="Misc\minamo.png" Pack="true" PackagePath="minamo.png" />
     <None Include="..\README.md" Pack="true" PackagePath="README.md" />
     <None Include="$(MinamoGeneratorOutputPath)"
@@ -25,9 +33,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>Minamo.Console</_Parameter1>
-    </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>spk-tests</_Parameter1>
     </AssemblyAttribute>

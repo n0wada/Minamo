@@ -1,6 +1,5 @@
 using Minamo.Compiler;
 using Minamo.Hosting;
-using Minamo.Library;
 using Minamo.Linker;
 using Minamo.Parser;
 using Minamo.Runtime;
@@ -47,7 +46,8 @@ internal sealed class ReplSession : IDisposable
             NoOptimizations = options.NoOptimizations,
             NoLangModule = options.NoLang,
             NoWarnings = options.NoWarnings,
-            NoWarningsLinker = options.NoWarningsLinker
+            NoWarningsLinker = options.NoWarningsLinker,
+            LangFactory = (arguments, exposeHostObject) => new ConsoleLang(arguments, exposeHostObject)
         };
 
         if (options.IgnoreWarnings != null)
@@ -65,7 +65,6 @@ internal sealed class ReplSession : IDisposable
         {
             BuilderOptions = buildOptions
         })
-            .AddStandardLibrary()
             .AddConfiguredExtensionLibraries();
 
         host.ConfigureModules(buildOptions);

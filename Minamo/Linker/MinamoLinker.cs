@@ -33,7 +33,10 @@ public partial class MinamoLinker
     {
         Lookup = lookup ?? throw new ArgumentNullException(nameof(lookup));
         BuilderOptions = lookup.BuilderOptions;
-        lang = new(args, BuilderOptions.ExposeHostObject) { FileName = nameof(lang), Id = 1 };
+        lang = BuilderOptions.LangFactory?.Invoke(args, BuilderOptions.ExposeHostObject)
+            ?? new Lang(args, BuilderOptions.ExposeHostObject);
+        lang.FileName = nameof(lang);
+        lang.Id = 1;
         Units.Add(null!);
         Units.Add(lang);
     }

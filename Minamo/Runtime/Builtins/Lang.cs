@@ -8,7 +8,7 @@ using System.Collections;
 namespace Minamo.Linker;
 
 [GeneratedModule]
-internal sealed partial class Lang : ForeignUnit
+internal partial class Lang : ForeignUnit
 {
     private readonly MinamoTuple? startupArguments;
     private MinamoHostRootTypeInfo hostRootType = null!;

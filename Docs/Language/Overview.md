@@ -289,8 +289,8 @@ func Integer.Double() => this * 2
 Custom types can define methods, getters, setters, indexers, and operators.
 
 ```swift
-func get Point.Length() =>
-    Sqrt(this.x * this.x + this.y * this.y)
+func get Point.LengthSquared() =>
+    this.x * this.x + this.y * this.y
 
 func Point + (other) =>
     Point(this.x + other.x, this.y + other.y)
@@ -320,7 +320,7 @@ Modules use dot-separated names and may be loaded from files or registered by a 
 import refs.math
 import refs.math as mathematics
 import square from refs.math
-import * from text
+import * from refs.math
 ```
 
 `refs.math` first looks for a C# module registered under that full name, then for

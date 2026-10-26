@@ -2,7 +2,6 @@
   <PropertyGroup>
     <!-- Product identity lives here so a future rename does not require editing every project. -->
     <MinamoProductName>Minamo</MinamoProductName>
-    <MinamoLauncherName>minamo</MinamoLauncherName>
     <MinamoVersion>0.9.5</MinamoVersion>
     <MinamoCompany>Minamo Contributors</MinamoCompany>
     <MinamoCopyright>Copyright (c) Minamo Contributors</MinamoCopyright>
@@ -17,8 +16,7 @@
     <MinamoOutputRoot>$(MSBuildThisFileDirectory)bin\</MinamoOutputRoot>
     <MinamoGeneratorOutputPath Condition="'$(Configuration)' == 'Release'">$(MinamoOutputRoot)Minamo.Generators.dll</MinamoGeneratorOutputPath>
     <MinamoGeneratorOutputPath Condition="'$(Configuration)' != 'Release'">$(MinamoOutputRoot)tools\generators\$(Configuration)\Minamo.Generators.dll</MinamoGeneratorOutputPath>
-    <MinamoProductProject Condition="'$(MSBuildProjectName)' == 'Minamo'
-      Or '$(MSBuildProjectName)' == 'Minamo.Console'">true</MinamoProductProject>
+    <MinamoProductProject Condition="'$(MSBuildProjectName)' == 'Minamo'">true</MinamoProductProject>
     <OutputPath>$(MinamoOutputRoot)projects\$(MSBuildProjectName)\$(Configuration)\</OutputPath>
 
     <Version Condition="'$(Version)' == ''">$(MinamoVersion)</Version>

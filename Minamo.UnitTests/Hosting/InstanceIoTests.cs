@@ -1,5 +1,4 @@
 using Minamo.Hosting;
-using Minamo.Library;
 using System.Text;
 using Xunit;
 
@@ -9,11 +8,26 @@ namespace Minamo.UnitTesting.Hosting;
 public sealed class InstanceIoTests
 {
     [Fact]
+    public void ReadLineRequiresAnExplicitHostCommand()
+    {
+        using var plain = new MinamoHost().CreateInstance();
+        Assert.False(plain.Execute("readLine()").Success);
+        Assert.False(plain.Execute("Console.ReadLine()").Success);
+
+        var host = new MinamoHost().Module("input", module =>
+            module.Command("readLine", _ => "host input"));
+        using var instance = host.CreateInstance();
+        var result = instance.Execute("import * from input\nreadLine()");
+
+        Assert.True(result.Success, result.Failure?.Message);
+        Assert.Equal("host input", result.GetValue<string>());
+    }
+
+    [Fact]
     public async Task RoutesHostInputAndTextOutputThroughTheInstanceEnvironment()
     {
         var output = new StringBuilder();
         using var instance = new MinamoHost()
-            .AddStandardLibrary()
             .CreateInstance(
             new MinamoEnvironment()
                 .UseInputAsync(_ => ValueTask.FromResult("instance input"))
@@ -32,7 +46,6 @@ public sealed class InstanceIoTests
         var completion = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var output = new StringBuilder();
         using var instance = new MinamoHost()
-            .AddStandardLibrary()
             .CreateInstance(
                 new MinamoEnvironment()
                     .UseInputAsync(async _ =>
@@ -119,8 +132,7 @@ public sealed class InstanceIoTests
         using var rendezvous = new Barrier(2);
         var firstOutput = new StringBuilder();
         var secondOutput = new StringBuilder();
-        var host = new MinamoHost()
-            .AddStandardLibrary();
+        var host = new MinamoHost();
         using var first = host.CreateInstance(
             Environment("first", firstOutput, rendezvous));
         using var second = host.CreateInstance(

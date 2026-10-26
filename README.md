@@ -9,7 +9,7 @@ It gives applications a real programming language without giving scripts unrestr
 access to the host.
 
 Minamo includes a handwritten parser, bytecode compiler, virtual machine, interactive
-console, standard-library modules, and a C# Hosting API.
+console, and a C# Hosting API.
 
 ## Why Minamo?
 
@@ -56,6 +56,10 @@ Start the interactive console:
 
 Use `--help` or `--version` for command-line information; enter `#help` in the REPL for
 interactive commands.
+
+The `Minamo` project produces `Minamo.exe` and `Minamo.dll`. The executable starts the console;
+applications reference the DLL for embedding. Supporting runtime configuration files are also
+generated. Console-specific input functions are registered only when the command-line host starts.
 
 ## Interactive selects
 
@@ -170,8 +174,8 @@ the application, tooling, and runtime-extension surfaces.
 
 | Path | Purpose |
 | --- | --- |
-| `Minamo` | Parser, compiler, linker, VM, runtime types, and Hosting API |
-| `Minamo.Console` | `minamo` command-line runner, REPL, and standard modules |
+| `Minamo` | Parser, compiler, linker, VM, runtime types, Hosting API, and executable entry point |
+| `Minamo/Console` | Command-line runner, REPL, terminal functions, and extension loading |
 | `Minamo.Generators` | Source generators for C# host bindings |
 | `Minamo.UnitTests` | xUnit tests and the optional `.nami` language report runner |
 | `Examples` | Runnable C# hosts and Minamo scripts |

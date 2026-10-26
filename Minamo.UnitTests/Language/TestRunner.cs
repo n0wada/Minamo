@@ -1,6 +1,5 @@
 using Minamo.Compiler;
 using Minamo.Hosting;
-using Minamo.Library;
 using Minamo.Linker;
 using Minamo.Parser;
 using Minamo.Parser.Model;
@@ -223,8 +222,7 @@ internal sealed class TestRunner
                     MaxExecutionTime = options.TestTimeout
                 }
             })
-                .UseFileLookup(lookup)
-                .AddStandardLibrary();
+                .UseFileLookup(lookup);
             using var session = host.CreateInstance();
             var execution = session.ExecuteAsync(ast).GetAwaiter().GetResult();
             warns.AddRange(execution.Diagnostics

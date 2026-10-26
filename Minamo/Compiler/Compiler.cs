@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Minamo.Linker;
 using Minamo.Parser.Model;
+using Minamo.Runtime.Types;
 
 namespace Minamo.Compiler;
 
@@ -23,6 +24,8 @@ public sealed class BuilderOptions
     public string? LinkerLog { get; set; }
 
     internal IModuleProvider? ModuleProvider { get; set; }
+
+    internal Func<MinamoTuple?, bool, Lang>? LangFactory { get; set; }
 
     internal bool AllowEnvironmentNames { get; set; }
 

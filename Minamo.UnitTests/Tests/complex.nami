@@ -1,7 +1,3 @@
-#region "Initialize"
-import math as math
-#endregion
-
 #region "FizzBuzz"
     mut n = 1
     mut acc = ""
@@ -197,7 +193,7 @@ import math as math
         mut values = []
         mut x = 0
         while x <= n {
-            values.Add(x + "=" + math.round(y))
+            values.Add(x + "=" + y.ToString("0.##"))
             y += h * fn(y)
             x += h
         }
@@ -347,7 +343,7 @@ import math as math
                 r.Add(r[r.Length() - 1] + cache[0][0])
             } else {
                 for x in 1..l {
-                    r.Add(r[r.Length() - 1] + cache[l - x][math.min(x, l-x)])
+                    r.Add(r[r.Length() - 1] + cache[l - x][x < l-x ? x : l-x])
                 }
             }
             cache.Add(r)

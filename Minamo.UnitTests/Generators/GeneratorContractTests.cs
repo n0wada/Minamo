@@ -123,6 +123,27 @@ public sealed class GeneratorContractTests
     }
 
     [Fact]
+    public void ExtensionAssemblyRegistersGeneratedModulesWithoutALibraryInterface()
+    {
+        var generated = Generate(SnapshotSource, "Minamo.ExtensionLoadingFixture");
+        AssertNoErrors(generated.Diagnostics);
+        AssertNoErrors(generated.Compilation.GetDiagnostics());
+
+        using var stream = new MemoryStream();
+        var emit = generated.Compilation.Emit(stream);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+
+        var assembly = Assembly.Load(stream.ToArray());
+        var host = new MinamoHost();
+        ExtensionLibraryLoader.RegisterAssembly(host, assembly, assembly.GetName().Name!);
+        using var instance = host.CreateInstance();
+        var result = instance.Execute("import snapshot\nsnapshot.echo(\"Minamo\", 1)");
+
+        Assert.True(result.Success, result.Failure?.Message);
+        Assert.Equal("Minamo", result.GetValue<string>());
+    }
+
+    [Fact]
     public void DiagnosticsIncludeIdLocationAndMessageArguments()
     {
         const string source = """

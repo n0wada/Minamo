@@ -8,8 +8,7 @@ marketing name or approximate .NET support.
 
 | Component | Target framework | Contract |
 | --- | --- | --- |
-| `Minamo` | `net10.0` | Compiler, runtime, and Hosting API |
-| `Minamo.Console` | `net10.0` | Command-line host and standard modules |
+| `Minamo` | `net10.0` | Compiler, runtime, Hosting API, and command-line host |
 | `Minamo.UnitTests` | `net10.0` | Standard xUnit contract tests |
 | `Minamo.UnitTests` with `LanguageRunner=true` | `net10.0` | `.nami` language corpus report runner |
 | `Minamo.Generators` | `netstandard2.0` | Compiler-loaded source generators |
@@ -36,7 +35,7 @@ Add a target framework only for a concrete embedding host. Before calling it sup
 1. `Minamo.dll` and generated bindings load in the host.
 2. Parsing, compilation, execution, cancellation, limits, and disposal pass there.
 3. Host commands, registry values, resources, and structured logs cross the boundary correctly.
-4. The optional library remains separate so a restricted host can omit it.
+4. Host-specific modules remain optional and are registered explicitly.
 5. Platform-specific APIs stay outside the core assembly or are guarded by the target.
 
 Prefer the smallest target set backed by real hosts. Multi-targeting without a host test matrix
