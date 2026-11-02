@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
@@ -63,6 +64,81 @@ internal readonly struct GeneratorTarget
 [Generator]
 public sealed class MinamoTypeGenerator : IIncrementalGenerator
 {
+    // Keep the adapters internal to each consuming assembly, including external type bindings.
+    private const string SharedSource = @"#nullable enable
+using System;
+using Minamo.Debug;
+using Minamo.Runtime.Types;
+using ExecutionContext = Minamo.Runtime.ExecutionContext;
+namespace Minamo.Generated
+{
+    internal abstract class GeneratedBuiltinFunctionBase : MinamoForeignFunction
+    {
+        private readonly Func<int, MinamoFunction> factory;
+        private readonly int factoryId;
+        private readonly Func<ExecutionContext, MinamoObject, MinamoObject>? property;
+        protected GeneratedBuiltinFunctionBase(string name, Par[] pars, int varArgIndex,
+            Func<int, MinamoFunction> factory, int factoryId, Func<ExecutionContext, MinamoObject, MinamoObject>? property)
+            : base(name, pars, varArgIndex)
+        {
+            this.factory = factory;
+            this.factoryId = factoryId;
+            this.property = property;
+            if (property != null) Attr |= 0x01;
+        }
+        protected override MinamoFunction Clone(ExecutionContext ctx) => factory(factoryId);
+        protected override MinamoObject BindOrRun(ExecutionContext ctx, MinamoObject arg) => property != null ? property(ctx, arg) : base.BindOrRun(ctx, arg);
+    }
+
+    internal sealed class GeneratedBuiltinFunction : GeneratedBuiltinFunctionBase
+    {
+        private readonly Func<ExecutionContext, MinamoObject, MinamoObject[], MinamoObject> invoke;
+        internal GeneratedBuiltinFunction(string name, Par[] pars, int varArgIndex,
+            Func<ExecutionContext, MinamoObject, MinamoObject[], MinamoObject> invoke, Func<int, MinamoFunction> factory, int factoryId,
+            Func<ExecutionContext, MinamoObject, MinamoObject>? property)
+            : base(name, pars, varArgIndex, factory, factoryId, property) => this.invoke = invoke;
+        protected override MinamoObject CallWithMemoryLayout(ExecutionContext ctx, MinamoObject[] args) => invoke(ctx, Self!, args);
+        protected override bool Equals(MinamoFunction other) => other is GeneratedBuiltinFunction fn && invoke.Equals(fn.invoke) && IsSameInstance(this, other);
+    }
+
+    internal sealed class GeneratedBuiltinFunction0 : GeneratedBuiltinFunctionBase
+    {
+        private readonly Func<ExecutionContext, MinamoObject, MinamoObject> invoke;
+        internal GeneratedBuiltinFunction0(string name, Par[] pars, int varArgIndex,
+            Func<ExecutionContext, MinamoObject, MinamoObject> invoke, Func<int, MinamoFunction> factory, int factoryId,
+            Func<ExecutionContext, MinamoObject, MinamoObject>? property)
+            : base(name, pars, varArgIndex, factory, factoryId, property) => this.invoke = invoke;
+        protected override MinamoObject CallWithMemoryLayout(ExecutionContext ctx, MinamoObject[] args) => invoke(ctx, Self!);
+        protected override bool Equals(MinamoFunction other) => other is GeneratedBuiltinFunction0 fn && invoke.Equals(fn.invoke) && IsSameInstance(this, other);
+    }
+
+    internal sealed class GeneratedBuiltinFunction1 : GeneratedBuiltinFunctionBase
+    {
+        private readonly Func<ExecutionContext, MinamoObject, MinamoObject, MinamoObject> invoke;
+        internal GeneratedBuiltinFunction1(string name, Par[] pars, int varArgIndex,
+            Func<ExecutionContext, MinamoObject, MinamoObject, MinamoObject> invoke, Func<int, MinamoFunction> factory, int factoryId,
+            Func<ExecutionContext, MinamoObject, MinamoObject>? property)
+            : base(name, pars, varArgIndex, factory, factoryId, property) => this.invoke = invoke;
+        protected override MinamoObject CallWithMemoryLayout(ExecutionContext ctx, MinamoObject[] args) => invoke(ctx, Self!, args[0]);
+        protected override bool Equals(MinamoFunction other) => other is GeneratedBuiltinFunction1 fn && invoke.Equals(fn.invoke) && IsSameInstance(this, other);
+        protected override bool CanCallWithSingleArgumentDirectly => true;
+        protected override MinamoObject CallWithSingleArgument(ExecutionContext ctx, MinamoObject arg) => ctx.HasErrors ? MinamoNil.Instance : invoke(ctx, Self!, arg);
+    }
+
+    internal sealed class GeneratedBuiltinFunction2 : GeneratedBuiltinFunctionBase
+    {
+        private readonly Func<ExecutionContext, MinamoObject, MinamoObject, MinamoObject, MinamoObject> invoke;
+        internal GeneratedBuiltinFunction2(string name, Par[] pars, int varArgIndex,
+            Func<ExecutionContext, MinamoObject, MinamoObject, MinamoObject, MinamoObject> invoke, Func<int, MinamoFunction> factory, int factoryId,
+            Func<ExecutionContext, MinamoObject, MinamoObject>? property)
+            : base(name, pars, varArgIndex, factory, factoryId, property) => this.invoke = invoke;
+        protected override MinamoObject CallWithMemoryLayout(ExecutionContext ctx, MinamoObject[] args) => invoke(ctx, Self!, args[0], args[1]);
+        protected override bool Equals(MinamoFunction other) => other is GeneratedBuiltinFunction2 fn && invoke.Equals(fn.invoke) && IsSameInstance(this, other);
+        protected override bool CanCallWithTwoArgumentsDirectly => true;
+        protected override MinamoObject CallWithTwoArguments(ExecutionContext ctx, MinamoObject first, MinamoObject second) => ctx.HasErrors ? MinamoNil.Instance : invoke(ctx, Self!, first, second);
+    }
+}
+";
     internal static readonly object Nil = new();
     private static readonly string[] neverNulls = new[] { "int", "long", "float", "double", "char", "bool" };
 
@@ -120,6 +196,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
     {
         var ati = (IArrayTypeSymbol)ti;
         var (arr, elem, index, len) = ($"__arr_{par}", $"__elem_{par}", $"__index_{par}", $"__len_{par}");
+        var collection = $"__coll_{par}";
         var elementTypeName = ati.ElementType.GetSafeName();
 
         sb.AppendLine($"{Types.MinamoObject}[] {arr};");
@@ -132,8 +209,8 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
         }
         else
         {
-            sb.AppendLine($"if ({input} is {Types.MinamoCollection} __coll)");
-            sb.AppendInBlock($"{arr} = __coll.ToArray();");
+            sb.AppendLine($"if ({input} is {Types.MinamoCollection} {collection})");
+            sb.AppendInBlock($"{arr} = {collection}.ToArray();");
             
             if (nullable)
             {
@@ -143,8 +220,8 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
 
             sb.AppendLine("else");
             sb.StartBlock();
-            sb.AppendLine($"{arr} = {Types.MinamoIterator}.ToEnumerable(ctx, {input}).ToArray();");
-            sb.AppendLine($"if (ctx.HasErrors) return {Types.MinamoNil}.Instance;");
+            sb.AppendLine($"{arr} = global::System.Linq.Enumerable.ToArray({Types.MinamoIterator}.ToEnumerable(__ctx, {input}));");
+            sb.AppendLine($"if (__ctx.HasErrors) return {Types.MinamoNil}.Instance;");
             sb.EndBlock();
         }
 
@@ -182,8 +259,8 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
     {
         { "long", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, $"(({Types.MinamoInteger}){{0}}).Value", flag, "Integer") },
         { "long?", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, $"(long?)(({Types.MinamoInteger}){{0}}).Value", flag, "Integer") },
-        { "int", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, $"(int)(({Types.MinamoInteger}){{0}}).Value", flag, "Integer") },
-        { "int?", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, $"(int?)(({Types.MinamoInteger}){{0}}).Value", flag, "Integer") },
+        { "int", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, "global::Minamo.Hosting.MinamoCommandConvert.ToInt32(__ctx, {0})", flag | ParFlags.CheckErr, "Integer") },
+        { "int?", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, "(int?)global::Minamo.Hosting.MinamoCommandConvert.ToInt32(__ctx, {0})", flag | ParFlags.CheckErr, "Integer") },
         { "double", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, "{0}.GetFloat()", flag, "Float", "Integer") },
         { "double?", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, "(double?){0}.GetFloat()", flag, "Float", "Integer") },
         { "float", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, "(float){0}.GetFloat()", flag, "Float", "Integer") },
@@ -192,7 +269,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
         { "char", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, "{0}.GetChar()", flag, "Char", "String") },
         { "char?", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, "(char?){0}.GetChar()", flag, "Char", "String") },
         { "bool", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, $"!ReferenceEquals({{0}}, {Types.MinamoBool}.False) && !ReferenceEquals({{0}}, {Types.MinamoNil}.Instance)", flag) },
-        { "bool?", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, $"(bool?)!ReferenceEquals({{0}}, {Types.MinamoBool}.False) && !ReferenceEquals({{0}}, {Types.MinamoNil}.Instance)", flag) },
+        { "bool?", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, $"(bool?)(!ReferenceEquals({{0}}, {Types.MinamoBool}.False) && !ReferenceEquals({{0}}, {Types.MinamoNil}.Instance))", flag) },
         { $"{Types.MinamoObject}", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, "{0}", flag) },
         { $"{Types.MinamoFunction}", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, $"{Types.Extensions}.ToFunction({{0}}, __ctx)", flag | ParFlags.CheckErr)},
         { $"{Types.Enumerable}", (sb, oname, name, flag, ti) => ParamCheck(sb, oname, name, $"{Types.MinamoIterator}.ToEnumerable(__ctx, {{0}})", flag | ParFlags.CheckErr)}
@@ -209,10 +286,10 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
         { "char?", name => $"({name} is null ? ({Types.MinamoObject}){Types.MinamoNil}.Instance : new {Types.MinamoChar}({name}.Value))" },
         { "double", name => $"new {Types.MinamoFloat}({name})" },
         { "double?", name => $"({name} is null ? ({Types.MinamoObject}){Types.MinamoNil}.Instance : new {Types.MinamoFloat}({name}.Value))" },
-        { "single", name => $"new {Types.MinamoFloat}({name})" },
-        { "single?", name => $"({name} is null ? ({Types.MinamoObject}){Types.MinamoNil}.Instance : new {Types.MinamoFloat}({name}.Value))" },
+        { "float", name => $"new {Types.MinamoFloat}({name})" },
+        { "float?", name => $"({name} is null ? ({Types.MinamoObject}){Types.MinamoNil}.Instance : new {Types.MinamoFloat}({name}.Value))" },
         { "bool", name => $"({name} ? {Types.MinamoBool}.True : {Types.MinamoBool}.False)" },
-        { "bool?", name => $"({name} is null ? ({Types.MinamoObject}){Types.MinamoNil}.Instance : ({name} ? {Types.MinamoBool}.True : {Types.MinamoBool}.False))" },
+        { "bool?", name => $"({name} is null ? ({Types.MinamoObject}){Types.MinamoNil}.Instance : ({name}.Value ? {Types.MinamoBool}.True : {Types.MinamoBool}.False))" },
         { $"{Types.MinamoObject}", name => $"({name} ?? {Types.MinamoNil}.Instance)" },
         { $"{Types.Enumerable}", name => $"{Types.MinamoIterator}.Create({name})" },
         { $"{Types.Enumerable}?", name => $"({name} is null ? ({Types.MinamoObject}){Types.MinamoNil}.Instance : {Types.MinamoIterator}.Create({name})" },
@@ -230,6 +307,13 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(
             targets,
             (productionContext, target) => Emit(productionContext, target!.Value));
+        context.RegisterSourceOutput(targets.Collect(), (productionContext, values) =>
+        {
+            if (values.Length > 0)
+            {
+                productionContext.AddSource("GeneratedBuiltinFunction.cs", Microsoft.CodeAnalysis.Text.SourceText.From(SharedSource, Encoding.UTF8));
+            }
+        });
     }
 
     private static GeneratorTarget? GetTarget(
@@ -245,6 +329,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
 
         foreach (var attribute in type.GetAttributes())
         {
+            if (!GeneratorSupport.IsDeclaredOn(attribute, declaration)) continue;
             var attributeName = attribute.AttributeClass?.ToDisplayString();
 
             if (attributeName == "Minamo.Codegen.MinamoTypeAttribute")
@@ -276,18 +361,45 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
             }
         }
 
+        foreach (var importedNamespace in new[] { "Minamo.Runtime", "Minamo.Runtime.Types" })
+        {
+            if (unit?.Usings.Any(us => us.Alias is null && us.Name?.ToString() == importedNamespace) != true)
+            {
+                builder.AppendLine($"using {importedNamespace};");
+            }
+        }
+
         builder.AppendLine($"namespace {t.ContainingNamespace}.Internal");
         builder.StartBlock();
+        builder.AppendLine($"internal static class {t.Name}GeneratedCalls");
+        builder.StartBlock();
         var methods = new List<(string name, bool instance)>();
+        var factories = new List<string>();
 
         foreach (IMethodSymbol m in t.GetMembers().OfType<IMethodSymbol>())
         {
-            if (!ProcessMethod(ctx, t, m, builder, methods))
+            if (!ProcessMethod(ctx, t, m, builder, methods, factories))
             {
                 return;
             }
         }
 
+        if (factories.Count > 0)
+        {
+            builder.AppendLine($"internal static {Types.MinamoFunction} Create(int id)");
+            builder.StartBlock();
+            builder.AppendLine("switch (id)");
+            builder.StartBlock();
+            foreach (var factory in factories)
+            {
+                builder.AppendLine(factory);
+            }
+            builder.AppendLine("default: throw new global::System.ArgumentOutOfRangeException(nameof(id));");
+            builder.EndBlock();
+            builder.EndBlock();
+        }
+
+        builder.EndBlock();
         builder.EndBlock();
         builder.AppendLine($"namespace {t.ContainingNamespace}");
         builder.StartBlock();
@@ -301,7 +413,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
                 var staticMethods = methods.Where(kv => !kv.instance).ToList();
 
                 builder.AppendLine();
-                builder.AppendLine($"partial class {t.Name}");
+                builder.AppendLine($"partial class {Identifier(t.Name)}");
                 builder.StartBlock();
 
                 if (instanceMethods.Count > 0)
@@ -312,7 +424,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
                     builder.StartBlock();
                     foreach (var (im, _) in instanceMethods)
                     {
-                        builder.AppendLine($"\"{im}\" => new in_{t.Name}_{im}_WrapperFunction(),");
+                        builder.AppendLine($"{Literal(im)} => {t.Name}GeneratedCalls.Create({methods.IndexOf((im, true))}),");
                     }
 
                     builder.AppendLine("_ => base.InitializeInstanceMember(self, name, ctx)");
@@ -329,7 +441,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
                     builder.StartBlock();
                     foreach (var (im, _) in staticMethods)
                     {
-                        builder.AppendLine($"\"{im}\" => new st_{t.Name}_{im}_WrapperFunction(),");
+                        builder.AppendLine($"{Literal(im)} => {t.Name}GeneratedCalls.Create({methods.IndexOf((im, false))}),");
                     }
 
                     builder.AppendLine("_ => base.InitializeStaticMember(name, ctx)");
@@ -351,14 +463,14 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
                 }
 
                 builder.AppendLine();
-                builder.AppendLine($"partial class {t.Name}");
+                builder.AppendLine($"partial class {Identifier(t.Name)}");
                 builder.StartBlock();
                 builder.AppendLine("protected override void InitializeMembers()");
                 builder.StartBlock();
 
                 foreach (var m in staticMethods)
                 {
-                    builder.AppendLine($"Add(\"{m}\", new st_{t.Name}_{m}_WrapperFunction());");
+                    builder.AppendLine($"Add({Literal(m)}, {t.Name}GeneratedCalls.Create({methods.IndexOf((m, false))}));");
                 }
 
                 builder.EndBlock();
@@ -367,10 +479,10 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
         }
 
         builder.EndBlock();
-        ctx.AddSource($"{t.Name}.generated.cs", builder.ToSourceText());
+        ctx.AddSource($"{GeneratorSupport.HintName(t)}.generated.cs", builder.ToSourceText());
     }
 
-    private bool ProcessMethod(SourceProductionContext ctx, INamedTypeSymbol t, IMethodSymbol m, CodeWriter builder, List<(string name, bool instance)> methods)
+    private bool ProcessMethod(SourceProductionContext ctx, INamedTypeSymbol t, IMethodSymbol m, CodeWriter builder, List<(string name, bool instance)> methods, List<string> factories)
     {
         var attr = m.GetAttributes().FirstOrDefault(a => a.AttributeClass.BaseType.ToString() == Types.MinamoMemberAttribute);
 
@@ -397,7 +509,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
             var isProperty = attr.AttributeClass.ToString() is Types.MinamoPropertyAttribute or Types.MinamoStaticPropertyAttribute;
             var flags = (!isInstance ? MethodFlags.Static : MethodFlags.None) | (isProperty ? MethodFlags.Property : MethodFlags.None);
 
-            if (ProcessMethod(ctx, t, m, builder, methodName, flags))
+            if (ProcessMethod(ctx, t, m, builder, methodName, flags, factories))
             {
                 methods.Add((methodName, isInstance));
                 return true;
@@ -411,32 +523,34 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
         return true;
     }
 
-    private bool ProcessMethod(SourceProductionContext ctx, INamedTypeSymbol t, IMethodSymbol m, CodeWriter builder, string methodName, MethodFlags implFlags)
+    private bool ProcessMethod(SourceProductionContext ctx, INamedTypeSymbol t, IMethodSymbol m, CodeWriter builder, string methodName, MethodFlags implFlags, List<string> factories)
     {
         var isStatic = (implFlags & MethodFlags.Static) == MethodFlags.Static;
         var prefix = isStatic ? "st" : "in";
-        var className = $"{prefix}_{t.Name}_{methodName}_WrapperFunction";
-
-        builder.AppendLine($"internal sealed class {className} : {Types.MinamoForeignFunction}");
+        var callName = $"{prefix}_{GeneratorSupport.EncodeName(methodName)}";
+        var isProperty = (implFlags & MethodFlags.Property) == MethodFlags.Property;
+        var hasContext = m.Parameters.Length > 0 && m.Parameters[0].Type.ToString() == Types.ExecutionContext;
+        var parameters = m.Parameters.Skip((hasContext ? 1 : 0) + (isStatic ? 0 : 1)).ToArray();
+        var arity = parameters.Length;
+        // Optional and variable arguments still use the normal argument layout and default filling.
+        var direct = arity <= 2 && parameters.All(parameter =>
+            !parameter.IsParams
+            && !parameter.HasExplicitDefaultValue
+            && !parameter.GetAttributes().Any(attribute =>
+                attribute.AttributeClass.Name is "VarArgAttribute" or "DefaultAttribute"));
+        var extra = direct
+            ? string.Concat(Enumerable.Range(0, arity).Select(index => $", {Types.MinamoObject} __arg{index}"))
+            : $", {Types.MinamoObject}[] __args";
+        var functionClass = "global::Minamo.Generated.GeneratedBuiltinFunction" + (direct ? arity.ToString() : "");
+        builder.AppendLine($"internal static {Types.MinamoObject} Call_{callName}({Types.ExecutionContext} __ctx, {Types.MinamoObject} __self{extra})");
         builder.StartBlock();
-        builder.AppendLine($"protected override {Types.MinamoObject} CallWithMemoryLayout({Types.ExecutionContext} __ctx, {Types.MinamoObject}[] __args)");
-        builder.StartBlock();
-
-        var pars = EmitParameters(ctx, builder, t, m, isStatic, false, out var varArgIndex);
-
-        if (pars is null)
-        {
-            return false;
-        }
-
-        if (!EmitReturnType(ctx, builder, t, m))
+        var pars = EmitParameters(ctx, builder, t, m, isStatic, false, out var varArgIndex, direct);
+        if (pars is null || !EmitReturnType(ctx, builder, t, m))
         {
             return false;
         }
 
         builder.EndBlock();
-        builder.AppendLine();
-
         var sb = new StringBuilder();
 
         if (pars.Count > 0)
@@ -451,7 +565,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
                 }
 
                 var (name, def, vararg) = pars[i];
-                sb.Append($"new {Types.Par}(\"{name}\"");
+                sb.Append($"new {Types.Par}({Literal(name)}");
 
                 if (vararg)
                 {
@@ -474,36 +588,24 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
             sb.Append($"{Types.Array}.Empty<{Types.Par}>()");
         }
 
-        builder.AppendLine($"public {className}() : base(\"{methodName}\", {sb}, {varArgIndex})");
-        builder.StartBlock();
-
-        if ((implFlags & MethodFlags.Property) == MethodFlags.Property)
+        var reusePropertyCall = isProperty && direct && arity == 0;
+        var propertyCall = isProperty
+            ? $"{(reusePropertyCall ? "Call" : "Property")}_{callName}"
+            : "null";
+        factories.Add($"case {factories.Count}: return new {functionClass}({Literal(methodName)}, {sb}, {varArgIndex}, Call_{callName}, Create, {factories.Count}, {propertyCall});");
+        if (isProperty && !reusePropertyCall)
         {
-            builder.AppendLine($"Attr |= 0x01;");
-        }
-
-        builder.EndBlock();
-        builder.AppendLine();
-        builder.AppendLine($"protected override {Types.MinamoFunction} Clone({Types.ExecutionContext} ctx) => new {prefix}_{t.Name}_{methodName}_WrapperFunction();");
-
-        if ((implFlags & MethodFlags.Property) == MethodFlags.Property)
-        {
-            builder.AppendLine();
-            builder.AppendLine($"protected override MinamoObject BindOrRun({Types.ExecutionContext} __ctx, {Types.MinamoObject} __arg)");
+            builder.AppendLine($"internal static {Types.MinamoObject} Property_{callName}({Types.ExecutionContext} __ctx, {Types.MinamoObject} __arg)");
             builder.StartBlock();
             EmitParameters(ctx, builder, t, m, isStatic, true, out _);
             EmitReturnType(ctx, builder, t, m);
             builder.EndBlock();
         }
 
-        builder.AppendLine();
-        builder.AppendLine($"protected override bool Equals({Types.MinamoFunction} func) => func is {className} cn && (ReferenceEquals(cn.Self, Self) || (cn.Self is not null && cn.Self.Equals(Self)));");
-        builder.EndBlock();
-
         return true;
     }
 
-    private List<(string name, string def, bool vararg)> EmitParameters(SourceProductionContext ctx, CodeWriter builder, ITypeSymbol t, IMethodSymbol m, bool isStatic, bool specialCall, out int varArgIndex)
+    private List<(string name, string def, bool vararg)> EmitParameters(SourceProductionContext ctx, CodeWriter builder, ITypeSymbol t, IMethodSymbol m, bool isStatic, bool specialCall, out int varArgIndex, bool directCall = false)
     {
         var hasContext = m.Parameters.Length > 0 && m.Parameters[0].Type.ToString() == Types.ExecutionContext;
         var pars = new List<(string name, string def, bool vararg)>();
@@ -512,6 +614,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
         for (var i = 0; i < m.Parameters.Length; i++)
         {
             var mp = m.Parameters[i];
+            var localName = $"__p{i}";
             var parName = mp.Name;
             var parNameAttr = m.Parameters[i].GetAttributes().FirstOrDefault(a => a.AttributeClass.Name == "ParameterNameAttribute");
 
@@ -522,7 +625,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
 
             if (hasContext && i == 0) //First parameter is a context
             {
-                builder.AppendLine($"var {mp.Name} = __ctx;");
+                builder.AppendLine($"var {localName} = __ctx;");
                 continue;
             }
 
@@ -554,7 +657,9 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
             }
 
             var firstParam = i == 1 && hasContext || i == 0 && !hasContext;
-            var sourceParName = firstParam && !isStatic ? "Self" : $"__args[{i + indexShift}]";
+            var sourceParName = firstParam && !isStatic
+                ? "__self"
+                : directCall ? $"__arg{i + indexShift}" : $"__args[{i + indexShift}]";
 
             if (specialCall)
             {
@@ -574,12 +679,12 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
 
             if (typeConversions.TryGetValue(typeName, out var conv1))
             {
-                conv1(builder, sourceParName, mp.Name, flags, mp.Type);
+                conv1(builder, sourceParName, localName, flags, mp.Type);
             }
             else if (mp.Type is IArrayTypeSymbol arr)
             {
                 var elementType = arr.ElementType;
-                var res = ParamCheckArray(sourceParName, mp.Name, flags, mp.Type, builder, nullable);
+                var res = ParamCheckArray(sourceParName, localName, flags, mp.Type, builder, nullable);
 
                 if (!res)
                 {
@@ -591,11 +696,11 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
             {
                 if ((firstParam && !isStatic) || (vararg && typeName == Types.MinamoTuple))
                 {
-                    builder.AppendLine($"var {mp.Name} = ({typeName}){sourceParName};");
+                    builder.AppendLine($"var {localName} = ({typeName}){sourceParName};");
                 }
                 else
                 {
-                    ConvertToMinamoObject(builder, typeName, sourceParName, mp.Name, nullable);
+                    ConvertToMinamoObject(builder, typeName, sourceParName, localName, nullable);
                 }
             }
             else
@@ -613,7 +718,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
         if (IsAsyncReturnType(m.ReturnType))
         {
             builder.AppendLine(
-                $"return global::Minamo.Hosting.MinamoCommandConvert.FromAwaitable({t.Name}.{m.Name}({m.Parameters.ToString("{0}", p => p.Name)}));");
+                $"return global::Minamo.Hosting.MinamoCommandConvert.FromAwaitable({t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{Identifier(m.Name)}({string.Join(", ", Enumerable.Range(0, m.Parameters.Length).Select(index => $"__p{index}"))}));");
             return true;
         }
 
@@ -621,7 +726,7 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
         {
             var returnTypeName = m.ReturnType.GetSafeName();
 
-            builder.AppendLine($"var __ret = {t.Name}.{m.Name}({m.Parameters.ToString("{0}", p => p.Name)});");
+            builder.AppendLine($"var __ret = {t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{Identifier(m.Name)}({string.Join(", ", Enumerable.Range(0, m.Parameters.Length).Select(index => $"__p{index}"))});");
 
             if (returnTypeConversions.TryGetValue(returnTypeName, out var conv2))
             {
@@ -629,10 +734,11 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
             }
             else if (IsMinamoObject(m.ReturnType))
             {
-                builder.AppendLine("return __ret;");
+                builder.AppendLine($"return __ret ?? ({Types.MinamoObject}){Types.MinamoNil}.Instance;");
             }
             else if (m.ReturnType is IArrayTypeSymbol arr)
             {
+                builder.AppendLine($"if (__ret is null) return {Types.MinamoNil}.Instance;");
                 if (IsMinamoObject(arr.ElementType))
                 {
                     builder.AppendLine($"return new {Types.MinamoArray}(__ret);");
@@ -665,11 +771,15 @@ public sealed class MinamoTypeGenerator : IIncrementalGenerator
         }
         else
         {
-            builder.AppendLine($"{t.Name}.{m.Name}({m.Parameters.ToString("{0}", p => p.Name)});");
+            builder.AppendLine($"{t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{Identifier(m.Name)}({string.Join(", ", Enumerable.Range(0, m.Parameters.Length).Select(index => $"__p{index}"))});");
             builder.AppendLine($"return {Types.MinamoNil}.Instance;");
             return true;
         }
     }
+
+    private static string Identifier(string name) => SyntaxFacts.GetKeywordKind(name) == SyntaxKind.None ? name : "@" + name;
+
+    private static string Literal(string value) => SymbolDisplay.FormatLiteral(value, true);
 
     private static bool IsAsyncReturnType(ITypeSymbol type)
     {

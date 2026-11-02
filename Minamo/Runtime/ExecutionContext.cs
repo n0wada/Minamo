@@ -153,7 +153,14 @@ public sealed class ExecutionContext
         return ret;
     }
 
-    internal ArgContainer PopArguments() => containers[--count];
+    internal MinamoObject[] PopArguments()
+    {
+        var container = containers[--count];
+        var locals = container.Locals;
+        container.Locals = null!;
+        container.VarArgs = null;
+        return locals;
+    }
 
     internal ArgContainer PeekArguments() => containers[count - 1];
     #endregion

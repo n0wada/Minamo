@@ -38,15 +38,19 @@ internal static class StringUtil
         }
         else if (obj is char c)
         {
-            return $"new {Types.MinamoChar}({Escape(c.ToString(), "'")})";
+            return $"new {Types.MinamoChar}({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(c, true)})";
         }
         else if (obj is double d)
         {
-            return $"new {Types.MinamoFloat}({d.ToString(CultureInfo.InvariantCulture)})";
+            return $"new {Types.MinamoFloat}({FloatingLiteral(d)})";
         }
         else if (obj is float f)
         {
-            return $"new {Types.MinamoFloat}({f.ToString(CultureInfo.InvariantCulture)})";
+            return $"new {Types.MinamoFloat}({FloatingLiteral(f)})";
+        }
+        else if (obj is long integer)
+        {
+            return $"{Types.MinamoInteger}.Get({integer.ToString(CultureInfo.InvariantCulture)}L)";
         }
         else if (ReferenceEquals(obj, MinamoTypeGenerator.Nil))
         {
@@ -57,6 +61,18 @@ internal static class StringUtil
             return obj?.ToString();
         }
     }
+
+    internal static string FloatingLiteral(double value) =>
+        double.IsNaN(value) ? "global::System.Double.NaN"
+        : double.IsPositiveInfinity(value) ? "global::System.Double.PositiveInfinity"
+        : double.IsNegativeInfinity(value) ? "global::System.Double.NegativeInfinity"
+        : value.ToString("R", CultureInfo.InvariantCulture) + "D";
+
+    internal static string FloatingLiteral(float value) =>
+        float.IsNaN(value) ? "global::System.Single.NaN"
+        : float.IsPositiveInfinity(value) ? "global::System.Single.PositiveInfinity"
+        : float.IsNegativeInfinity(value) ? "global::System.Single.NegativeInfinity"
+        : value.ToString("R", CultureInfo.InvariantCulture) + "F";
 
     private static string Match(Match m)
     {

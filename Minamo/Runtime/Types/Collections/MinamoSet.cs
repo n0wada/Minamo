@@ -197,6 +197,24 @@ public class MinamoSet : MinamoEnumerable
             return false;
         }
 
+        // Arbitrary iterators can mutate this set while running; keep their snapshot path.
+        if (seq.GetType() == typeof(MinamoArray))
+        {
+            var array = (MinamoArray)seq;
+            for (var i = 0; i < array.Count; i++)
+            {
+                if (!Set.ContainsKey(array[i])) return false;
+            }
+            return true;
+        }
+        if (seq.GetType() == typeof(MinamoSet))
+        {
+            foreach (var item in ((MinamoSet)seq).Set.Keys)
+            {
+                if (!Set.ContainsKey(item)) return false;
+            }
+            return true;
+        }
         return new HashSet<MinamoObject>(Set.Keys, MinamoObjectKeyComparer.Instance).IsSupersetOf(seq);
     }
 
@@ -227,8 +245,20 @@ public class MinamoSet : MinamoEnumerable
         return SetEquals(seq);
     }
 
-    private bool SetEquals(IEnumerable<MinamoObject> values) =>
-        new HashSet<MinamoObject>(Set.Keys, MinamoObjectKeyComparer.Instance).SetEquals(values);
+    private bool SetEquals(IEnumerable<MinamoObject> values)
+    {
+        if (values.GetType() == typeof(MinamoSet))
+        {
+            var other = (MinamoSet)values;
+            if (Set.Count != other.Set.Count) return false;
+            foreach (var item in other.Set.Keys)
+            {
+                if (!Set.ContainsKey(item)) return false;
+            }
+            return true;
+        }
+        return new HashSet<MinamoObject>(Set.Keys, MinamoObjectKeyComparer.Instance).SetEquals(values);
+    }
 }
 
 [MinamoType]

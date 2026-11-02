@@ -37,7 +37,8 @@ internal sealed class MinamoObjectKeyComparer : IEqualityComparer<MinamoObject>
             or MinamoChar
             or MinamoString
             or MinamoForeignObject { HasStableValueEquality: true }
-            || IsCompoundValueKey(value, new HashSet<MinamoObject>(ReferenceEqualityComparer.Instance));
+            || ((value is MinamoTuple or MinamoClass or MinamoExceptionObject)
+                && IsCompoundValueKey(value, new HashSet<MinamoObject>(ReferenceEqualityComparer.Instance)));
 
     private static bool IsCompoundValueKey(MinamoObject value, HashSet<MinamoObject> visiting) =>
         value switch

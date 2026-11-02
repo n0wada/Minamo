@@ -3,7 +3,6 @@ using Minamo.Runtime;
 using Minamo.Runtime.Types;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 
 namespace Minamo.Runtime.Types;
@@ -28,6 +27,8 @@ public sealed class MinamoByteArray : MinamoForeignObject
     }
 
     public int Count => size;
+
+    internal byte[] UnsafeAccess() => buffer;
 
     public override object ToObject() => GetBytes();
 
@@ -72,9 +73,17 @@ public sealed partial class MinamoByteArrayTypeInfo : MinamoForeignTypeInfo
 
     protected override MinamoObject ToStringOp(ExecutionContext ctx, MinamoObject arg, MinamoObject format)
     {
-        var buffer = ((MinamoByteArray)arg).GetBytes();
-        var strs = buffer.Select(b => "0x" + b.ToString("X").PadLeft(2, '0')).ToArray();
-        return new MinamoString("{" + string.Join(",", strs) + "}");
+        var builder = new StringBuilder("{");
+        var bytes = (MinamoByteArray)arg;
+        for (var i = 0; i < bytes.Count; i++)
+        {
+            if (builder.Length > 1)
+            {
+                builder.Append(',');
+            }
+            builder.Append("0x").Append(bytes.UnsafeAccess()[i].ToString("X2"));
+        }
+        return new MinamoString(builder.Append('}').ToString());
     }
 
     protected override MinamoObject LengthOp(ExecutionContext ctx, MinamoObject arg) =>
@@ -91,22 +100,29 @@ public sealed partial class MinamoByteArrayTypeInfo : MinamoForeignTypeInfo
         position = position < 0 ? bytes.Count + position : position;
         return position < 0 || position >= bytes.Count
             ? ctx.IndexOutOfRange(index)
-            : MinamoInteger.Get(bytes.GetBytes()[position]);
+            : MinamoInteger.Get(bytes.UnsafeAccess()[position]);
     }
 
     [MinamoMethod]
-    internal static MinamoObject ToArray(MinamoByteArray self) =>
-        new MinamoArray(self.GetBytes().Select(value => (MinamoObject)MinamoInteger.Get(value)).ToArray());
+    internal static MinamoObject ToArray(MinamoByteArray self)
+    {
+        var values = new MinamoObject[self.Count];
+        for (var i = 0; i < values.Length; i++)
+        {
+            values[i] = MinamoInteger.Get(self.UnsafeAccess()[i]);
+        }
+        return new MinamoArray(values);
+    }
 
     [MinamoMethod]
     internal static string ToHex(MinamoByteArray self, bool lowerCase = false)
     {
-        var value = Convert.ToHexString(self.GetBytes());
+        var value = Convert.ToHexString(self.UnsafeAccess(), 0, self.Count);
         return lowerCase ? value.ToLowerInvariant() : value;
     }
 
     [MinamoMethod]
-    internal static string ToBase64(MinamoByteArray self) => Convert.ToBase64String(self.GetBytes());
+    internal static string ToBase64(MinamoByteArray self) => Convert.ToBase64String(self.UnsafeAccess(), 0, self.Count);
 
     [MinamoMethod]
     internal static MinamoObject Decode(ExecutionContext ctx, MinamoByteArray self, string encoding = "utf-8")
@@ -119,7 +135,7 @@ public sealed partial class MinamoByteArrayTypeInfo : MinamoForeignTypeInfo
 
         try
         {
-            return MinamoString.Get(selected.GetString(self.GetBytes()));
+            return MinamoString.Get(selected.GetString(self.UnsafeAccess(), 0, self.Count));
         }
         catch (DecoderFallbackException)
         {
@@ -130,11 +146,11 @@ public sealed partial class MinamoByteArrayTypeInfo : MinamoForeignTypeInfo
     [MinamoStaticMethod]
     internal static MinamoObject Concat(ExecutionContext ctx, MinamoByteArray first, MinamoByteArray second)
     {
-        var a1 = first.GetBytes();
-        var a2 = second.GetBytes();
-        var a3 = new byte[a1.Length + a2.Length];
-        Array.Copy(a1, a3, a1.Length);
-        Array.Copy(a2, 0, a3, a1.Length, a2.Length);
+        var a1 = first.UnsafeAccess();
+        var a2 = second.UnsafeAccess();
+        var a3 = new byte[first.Count + second.Count];
+        Array.Copy(a1, a3, first.Count);
+        Array.Copy(a2, 0, a3, first.Count, second.Count);
         return new MinamoByteArray(ctx.Type<MinamoByteArrayTypeInfo>(), a3);
     }
 

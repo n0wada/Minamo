@@ -150,11 +150,11 @@ internal static partial class MinamoMachineHelpers
         if (!callFun.IsExternal)
         {
             nextFunction = (MinamoNativeFunction)callFun;
-            nextLocals = ctx.PopArguments().Locals;
+            nextLocals = ctx.PopArguments();
             return true;
         }
 
-        var result = CallExternalFunction(callFun, ctx);
+        var result = CallExternalFunction(callFun, ctx, -1, MinamoNil.Instance, MinamoNil.Instance);
         if (ctx.Error is null)
         {
             if (result is MinamoAwaitable pending)
@@ -178,6 +178,17 @@ internal static partial class MinamoMachineHelpers
         out MinamoNativeFunction? nextFunction, out MinamoObject[]? nextLocals,
         out MinamoAwaitable? awaitable)
     {
+        if (argumentCount <= 2 && CanCallWithoutArgumentFrame(evalStack.Peek(argumentCount + 1), argumentCount))
+        {
+            var second = argumentCount == 2 ? evalStack.Pop() : MinamoNil.Instance;
+            var first = argumentCount > 0 ? evalStack.Pop() : MinamoNil.Instance;
+            nextFunction = null;
+            nextLocals = null;
+            awaitable = ExecuteDirectExternalCall(evalStack, ctx,
+                new Caller(function, offset, evalStack, locals), argumentCount, first, second);
+            return false;
+        }
+
         var arguments = PopPositionalArguments(evalStack, argumentCount);
 
         if (!TryPrepareFunction(evalStack, types, ctx, argumentCount, out _))
@@ -209,6 +220,48 @@ internal static partial class MinamoMachineHelpers
             throw new InvalidOperationException($"Unsupported member call opcode: {code}.");
         }
 
+        if (argumentCount <= 2)
+        {
+            var second = argumentCount == 2 ? evalStack.Pop() : MinamoNil.Instance;
+            var first = argumentCount > 0 ? evalStack.Pop() : MinamoNil.Instance;
+            if (!ExecuteNamedMemberAccess(OpCode.LoadMember, evalStack, types, memberName, ctx, out _))
+            {
+                nextFunction = null;
+                nextLocals = null;
+                awaitable = null;
+                return false;
+            }
+
+            if (CanCallWithoutArgumentFrame(evalStack.Peek(), argumentCount))
+            {
+                nextFunction = null;
+                nextLocals = null;
+                awaitable = ExecuteDirectExternalCall(evalStack, ctx,
+                    new Caller(function, offset, evalStack, locals), argumentCount, first, second);
+                return false;
+            }
+
+            if (!TryPrepareFunction(evalStack, types, ctx, argumentCount, out _))
+            {
+                nextFunction = null;
+                nextLocals = null;
+                awaitable = null;
+                return false;
+            }
+
+            var smallContainer = ctx.PeekArguments();
+            if (argumentCount > 0)
+            {
+                AssignIndexedArgument(smallContainer, first!, 0);
+            }
+            if (argumentCount > 1)
+            {
+                AssignIndexedArgument(smallContainer, second!, 1);
+            }
+            return ExecuteFunctionCall(evalStack, ctx, function, offset, locals, argumentCount,
+                out nextFunction, out nextLocals, out awaitable);
+        }
+
         var arguments = PopPositionalArguments(evalStack, argumentCount);
 
         if (!ExecuteNamedMemberAccess(OpCode.LoadMember, evalStack, types, memberName, ctx, out _))
@@ -236,6 +289,32 @@ internal static partial class MinamoMachineHelpers
         return ExecuteFunctionCall(
             evalStack, ctx, function, offset, locals, argumentCount,
             out nextFunction, out nextLocals, out awaitable);
+    }
+
+    private static bool CanCallWithoutArgumentFrame(MinamoObject candidate, int argumentCount) =>
+        candidate is MinamoForeignFunction function && function.IsExternal
+        && function.VarArgIndex < 0 && function.Parameters.Length == argumentCount;
+
+    private static MinamoAwaitable? ExecuteDirectExternalCall(EvalStack evalStack, ExecutionContext ctx,
+        Caller caller, int argumentCount, MinamoObject first, MinamoObject second)
+    {
+        var callFun = (MinamoFunction)evalStack.Pop();
+        ctx.CallStack.Push(caller);
+        // This call owns no argument frame; an outer prepared call may still have one.
+        var result = CallExternalFunction(callFun, ctx, argumentCount, first, second);
+        if (ctx.Error is null)
+        {
+            if (result is MinamoAwaitable pending)
+            {
+                return pending;
+            }
+            else
+            {
+                evalStack.Push(result);
+                ctx.CallStack.Pop();
+            }
+        }
+        return null;
     }
 
     private static MinamoObject[] PopPositionalArguments(EvalStack evalStack, int argumentCount)
@@ -281,7 +360,7 @@ internal static partial class MinamoMachineHelpers
         }
 
         var caller = ctx.CallStack.Pop();
-        if (ReferenceEquals(caller, Caller.External))
+        if (caller.IsExternal)
         {
             return false;
         }
@@ -331,11 +410,18 @@ internal static partial class MinamoMachineHelpers
         }
     }
 
-    internal static MinamoObject CallExternalFunction(MinamoFunction func, ExecutionContext ctx)
+    internal static MinamoObject CallExternalFunction(MinamoFunction func, ExecutionContext ctx,
+        int argumentCount, MinamoObject first, MinamoObject second)
     {
         try
         {
-            return func.FastCall(ctx, ctx.PopArguments().Locals);
+            return argumentCount switch
+            {
+                0 => func.Call(ctx),
+                1 => func.Call(ctx, first!),
+                2 => func.Call(ctx, first!, second!),
+                _ => func.FastCall(ctx, ctx.PopArguments())
+            };
         }
         catch (IterationException)
         {

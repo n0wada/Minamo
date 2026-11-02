@@ -10,14 +10,20 @@ public static class SnapshotCommandsHostingExtensions
         {
             module.RawCommand("echo", "Echoes text.", "snapshot.read", context =>
             {
-                var result = global::GeneratorFixture.SnapshotCommands.Echo(global::Minamo.Hosting.MinamoCommandConvert.ToString(context.ExecutionContext, context.RawArgument(0)), global::Minamo.Hosting.MinamoCommandConvert.ToInt32(context.ExecutionContext, context.RawArgument(1)));
+                var __arg0 = global::Minamo.Hosting.MinamoCommandConvert.ToString(context.ExecutionContext, context.RawArgument(0));
+                if (context.ExecutionContext.HasErrors) return global::Minamo.Runtime.Types.MinamoNil.Instance;
+                var __arg1 = global::Minamo.Hosting.MinamoCommandConvert.ToInt32(context.ExecutionContext, context.RawArgument(1));
+                if (context.ExecutionContext.HasErrors) return global::Minamo.Runtime.Types.MinamoNil.Instance;
+                var result = global::GeneratorFixture.SnapshotCommands.Echo(__arg0, __arg1);
                 return global::Minamo.Hosting.MinamoCommandConvert.FromString(result);
             },
             global::Minamo.Hosting.MinamoCommandParameter.Required<string>("value"),
             global::Minamo.Hosting.MinamoCommandParameter.Optional<int>("count", 2));
             module.RawCommand("Maybe", null, null, context =>
             {
-                var result = global::GeneratorFixture.SnapshotCommands.Maybe(context.RawArgument(0) is global::Minamo.Runtime.Types.MinamoNil ? default(int?) : global::Minamo.Hosting.MinamoCommandConvert.ToInt32(context.ExecutionContext, context.RawArgument(0)));
+                var __arg0 = context.RawArgument(0) is global::Minamo.Runtime.Types.MinamoNil ? default(int?) : global::Minamo.Hosting.MinamoCommandConvert.ToInt32(context.ExecutionContext, context.RawArgument(0));
+                if (context.ExecutionContext.HasErrors) return global::Minamo.Runtime.Types.MinamoNil.Instance;
+                var result = global::GeneratorFixture.SnapshotCommands.Maybe(__arg0);
                 return result.HasValue ? global::Minamo.Hosting.MinamoCommandConvert.FromInteger(result.Value) : global::Minamo.Runtime.Types.MinamoNil.Instance;
             },
             global::Minamo.Hosting.MinamoCommandParameter.Required<int?>("value"));

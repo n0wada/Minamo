@@ -53,7 +53,8 @@ public sealed class MinamoCommandGenerator : IIncrementalGenerator
         var declaration = (ClassDeclarationSyntax)context.Node;
         var type = context.SemanticModel.GetDeclaredSymbol(declaration, cancellationToken) as INamedTypeSymbol;
 
-        return type?.GetAttributes().Any(IsModuleAttribute) == true ? type : null!;
+        return type?.GetAttributes().Any(attribute => IsModuleAttribute(attribute)
+            && GeneratorSupport.IsDeclaredOn(attribute, declaration)) == true ? type : null!;
     }
 
     private static void Emit(SourceProductionContext context, INamedTypeSymbol moduleType)
@@ -449,15 +450,13 @@ public sealed class MinamoCommandGenerator : IIncrementalGenerator
             ? TypeName(moduleType)
             : instance ?? $"context.Host<{TypeName(moduleType)}>()";
         var argumentIndex = 0;
-        var arguments = method.Parameters.Select(parameter =>
+        var arguments = new List<string>();
+        foreach (var parameter in method.Parameters)
         {
-            if (IsCommandContext(parameter.Type))
-            {
-                return "context";
-            }
-
-            return ArgumentConversion(parameter.Type, argumentIndex++);
-        });
+            arguments.Add(IsCommandContext(parameter.Type)
+                ? "context"
+                : EmitArgumentConversion(writer, parameter.Type, argumentIndex++));
+        }
         var invocation = $"{target}.{Identifier(method.Name)}({string.Join(", ", arguments)})";
 
         if (IsAsyncReturnType(method.ReturnType))
@@ -521,13 +520,20 @@ public sealed class MinamoCommandGenerator : IIncrementalGenerator
 
         writer.AppendLine("context =>");
         writer.StartBlock();
-        writer.AppendLine(
-            $"{target}.{Identifier(symbol.Name)} = "
-            + $"{ArgumentConversion(symbol.Type, 0)};");
+        var value = EmitArgumentConversion(writer, symbol.Type, 0);
+        writer.AppendLine($"{target}.{Identifier(symbol.Name)} = {value};");
         writer.AppendLine("return global::Minamo.Runtime.Types.MinamoNil.Instance;");
         writer.EndBlock(",");
         writer.AppendLine(
             $"global::Minamo.Hosting.MinamoCommandParameter.Required<{TypeName(symbol.Type)}>(\"value\"));");
+    }
+
+    private static string EmitArgumentConversion(CodeWriter writer, ITypeSymbol type, int index)
+    {
+        var name = "__arg" + index.ToString(CultureInfo.InvariantCulture);
+        writer.AppendLine($"var {name} = {ArgumentConversion(type, index)};");
+        writer.AppendLine("if (context.ExecutionContext.HasErrors) return global::Minamo.Runtime.Types.MinamoNil.Instance;");
+        return name;
     }
 
     private static string ArgumentConversion(ITypeSymbol type, int index)
@@ -677,8 +683,8 @@ public sealed class MinamoCommandGenerator : IIncrementalGenerator
         uint number => number.ToString(CultureInfo.InvariantCulture) + "U",
         long number => number.ToString(CultureInfo.InvariantCulture) + "L",
         ulong number => number.ToString(CultureInfo.InvariantCulture) + "UL",
-        float number => number.ToString("R", CultureInfo.InvariantCulture) + "F",
-        double number => number.ToString("R", CultureInfo.InvariantCulture) + "D",
+        float number => StringUtil.FloatingLiteral(number),
+        double number => StringUtil.FloatingLiteral(number),
         decimal number => number.ToString(CultureInfo.InvariantCulture) + "M",
         _ => Convert.ToString(value, CultureInfo.InvariantCulture)!
     };
@@ -756,7 +762,7 @@ public sealed class MinamoCommandGenerator : IIncrementalGenerator
     }
 
     private static string GetHintName(INamedTypeSymbol type) =>
-        Sanitize(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        GeneratorSupport.HintName(type);
 
     private static string GroupVariable(string group) => "__type_" + Sanitize(group);
 

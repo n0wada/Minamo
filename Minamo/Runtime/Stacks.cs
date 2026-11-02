@@ -24,9 +24,20 @@ internal sealed class CallStack : IEnumerable<Caller>
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    public CallStack Clone() => (CallStack)MemberwiseClone();
+    public CallStack Clone()
+    {
+        var clone = new CallStack(Math.Max(DefaultSize, Count)) { Count = Count };
+        Array.Copy(array, clone.array, Count);
+        return clone;
+    }
 
-    public Caller Pop() => Count == 0 ? throw new IndexOutOfRangeException() : array[--Count];
+    public Caller Pop()
+    {
+        if (Count == 0) throw new IndexOutOfRangeException();
+        var value = array[--Count];
+        array[Count] = default;
+        return value;
+    }
 
     public void Push(Caller val)
     {
@@ -46,25 +57,30 @@ internal sealed class CallStack : IEnumerable<Caller>
     }
 }
 
-internal sealed class Caller
+internal readonly struct Caller
 {
-    public static readonly Caller Root = new();
-    public static readonly Caller External = new();
+    public static readonly Caller Root = new(1);
+    public static readonly Caller External = new(2);
+    private readonly byte kind;
+    public bool IsRoot => kind == 1;
+    public bool IsExternal => kind == 2;
 
     public readonly MinamoObject[] Locals;
     public readonly EvalStack EvalStack;
     public readonly int Offset;
     public readonly MinamoNativeFunction Function;
 
-    private Caller()
+    private Caller(int kind)
     {
-        Locals = Array.Empty<MinamoObject>();
-        EvalStack = new(0);
-        Function = new(null, 0, 0, FastList<MinamoObject[]>.Empty, 0);
+        this.kind = (byte)kind;
+        Locals = null!;
+        EvalStack = null!;
+        Function = null!;
+        Offset = 0;
     }
 
     public Caller(MinamoNativeFunction function, int offset, EvalStack evalStack, MinamoObject[] locals) =>
-        (Function, Offset, EvalStack, Locals) = (function, offset, evalStack, locals);
+        (Function, Offset, EvalStack, Locals, kind) = (function, offset, evalStack, locals, 0);
 }
 
 internal sealed class EvalStack
@@ -136,7 +152,13 @@ internal sealed class SectionStack : IEnumerable<CatchMarks>
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    public CatchMarks Pop() => Count == 0 ? throw new IndexOutOfRangeException() : array[--Count];
+    public CatchMarks Pop()
+    {
+        if (Count == 0) throw new IndexOutOfRangeException();
+        var value = array[--Count];
+        array[Count] = null!;
+        return value;
+    }
 
     public CatchMarks Peek() => array[Count - 1];
 

@@ -447,13 +447,13 @@ internal static partial class MinamoMachine
             return false;
         }
 
-        Caller? cp = null;
+        var cp = default(Caller);
 
         while (ctx.CallStack.Count > mark.StackOffset)
         {
             cp = ctx.CallStack.Pop();
 
-            if (ReferenceEquals(cp, Caller.External))
+            if (cp.IsExternal)
             {
                 return false;
             }
@@ -461,11 +461,11 @@ internal static partial class MinamoMachine
 
         cm.Pop();
 
-        if (cp is not null)
+        if (cp.Function is not null)
         {
-            function = cp.Function;
-            locals = cp.Locals;
-            evalStack = cp.EvalStack;
+            function = cp.Function!;
+            locals = cp.Locals!;
+            evalStack = cp.EvalStack!;
         }
 
         offset = mark.Offset;
@@ -486,12 +486,12 @@ internal static partial class MinamoMachine
             {
                 var cm = callStack[i];
 
-                if (ReferenceEquals(cm, Caller.Root))
+                if (cm.IsRoot)
                 {
                     continue;
                 }
 
-                if (ReferenceEquals(cm, Caller.External))
+                if (cm.IsExternal)
                 {
                     sp = StackPoint.External;
                 }

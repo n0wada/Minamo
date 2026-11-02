@@ -4,6 +4,25 @@ namespace Minamo.Generators;
 
 internal static class GeneratorSupport
 {
+    internal static bool IsDeclaredOn(AttributeData attribute, Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax declaration) =>
+        attribute.ApplicationSyntaxReference is { } syntax
+        && syntax.SyntaxTree == declaration.SyntaxTree && declaration.Span.Contains(syntax.Span);
+
+    internal static string EncodeName(string name)
+    {
+        var builder = new System.Text.StringBuilder();
+        foreach (var character in name)
+        {
+            if (character == '_') builder.Append("__");
+            else if (char.IsLetterOrDigit(character)) builder.Append(character);
+            else builder.Append('_').Append(((int)character).ToString("X4", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        return builder.ToString();
+    }
+
+    internal static string HintName(INamedTypeSymbol type) =>
+        EncodeName(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+
     private static readonly DiagnosticDescriptor ErrorDescriptor = new(
         "Minamo0001",
         "Minamo.Generator",

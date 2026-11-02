@@ -166,7 +166,7 @@ internal partial class Lang : ForeignUnit
         if (ctx.CallStack.Count > 2)
         {
             var cp = ctx.CallStack[^2];
-            if (!ReferenceEquals(cp, Caller.External))
+            if (!cp.IsExternal)
             {
                 return cp.Function;
             }
