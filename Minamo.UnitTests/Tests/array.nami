@@ -138,6 +138,20 @@
     assert([1, 2, 3, 4, 5, 6], arr)
     arr.Compact(x => x < 4)
     assert([4, 5, 6], arr)
+
+    arr = [nil, nil]
+    arr.Compact()
+    arr.Compact()
+    assert([], arr)
+
+    arr = [1, 2, 3]
+    let lengths = []
+    arr.Compact(x => {
+        lengths.Add(arr.Length())
+        x != 2
+    })
+    assert([3, 2, 2], lengths)
+    assert([2], arr)
 #endregion
 
 #region "Methods: Length"

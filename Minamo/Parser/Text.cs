@@ -39,18 +39,18 @@ public abstract class SourceBuffer
 
 internal sealed class StringBuffer : SourceBuffer
 {
-    private readonly string buffer;
+    internal string Text { get; }
     private readonly int bufferLen;
     private int bufferPosition;
 
     public StringBuffer(string value) =>
-        (buffer, bufferLen) = (value, value.Length);
+        (Text, bufferLen) = (value, value.Length);
 
     public StringBuffer(string value, string fileName) : this(value) =>
         FileName = fileName.Replace('\\', '/');
 
     protected internal override int Read() =>
-        bufferPosition < bufferLen ? buffer[bufferPosition++] : Constants.EOF;
+        bufferPosition < bufferLen ? Text[bufferPosition++] : Constants.EOF;
 
     public override string? FileName { get; }
 

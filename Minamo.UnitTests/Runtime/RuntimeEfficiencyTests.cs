@@ -96,6 +96,74 @@ public sealed class RuntimeEfficiencyTests
     }
 
     [Fact]
+    public void ArrayCompactRetainsOrderAndClearsRemovedSlotsInPlace()
+    {
+        MinamoObject[] storage = [MinamoInteger.One, MinamoNil.Instance, MinamoNil.Terminator, MinamoInteger.Two, MinamoNil.Instance];
+        var array = new MinamoArray(storage);
+        using var before = array.GetEnumerator();
+
+        MinamoArrayTypeInfo.Compact(null!, array);
+
+        Assert.Same(storage, array.UnsafeAccess());
+        Assert.Equal(2, array.Count);
+        Assert.Equal(3, array.Version);
+        Assert.Same(MinamoInteger.One, storage[0]);
+        Assert.Same(MinamoInteger.Two, storage[1]);
+        Assert.All(storage[2..], item => Assert.Null(item));
+        Assert.Throws<IterationException>(() => before.MoveNext());
+
+        using var after = array.GetEnumerator();
+        MinamoArrayTypeInfo.Compact(null!, array);
+        Assert.True(after.MoveNext());
+        Assert.Same(MinamoInteger.One, after.Current);
+    }
+
+    [Fact]
+    public void ArrayCompactKeepsUnprocessedElementsOnFailure()
+    {
+        MinamoObject[] storage = [MinamoNil.Instance, MinamoInteger.One, null!, MinamoInteger.Two];
+        var array = new MinamoArray(storage);
+
+        Assert.Throws<NullReferenceException>(() => MinamoArrayTypeInfo.Compact(null!, array));
+
+        Assert.Equal(3, array.Count);
+        Assert.Equal(1, array.Version);
+        Assert.Same(MinamoInteger.One, storage[0]);
+        Assert.Null(storage[1]);
+        Assert.Same(MinamoInteger.Two, storage[2]);
+        Assert.Null(storage[3]);
+    }
+
+    [Fact]
+    public void ArrayCompactAppliesEarlierRemovalsBeforeReadingACustomTypeId()
+    {
+        MinamoObject[] storage = [MinamoNil.Instance, MinamoInteger.One, MinamoNil.Instance, MinamoNil.Instance];
+        var array = new MinamoArray(storage);
+        var observer = new ArrayObserver(array);
+        storage[2] = observer;
+
+        MinamoArrayTypeInfo.Compact(null!, array);
+
+        Assert.Equal(3, observer.ObservedCount);
+        Assert.Equal(2, array.Count);
+        Assert.Same(observer, array[1]);
+    }
+
+    private sealed class ArrayObserver(MinamoArray array) : MinamoArray([])
+    {
+        public int ObservedCount { get; private set; }
+
+        public override int TypeId
+        {
+            get
+            {
+                ObservedCount = array.Count;
+                return base.TypeId;
+            }
+        }
+    }
+
+    [Fact]
     public void SetFastPathsKeepDuplicateAndIteratorMutationSemantics()
     {
         using var instance = new MinamoHost().CreateInstance();

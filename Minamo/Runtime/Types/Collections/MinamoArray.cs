@@ -119,6 +119,43 @@ public class MinamoArray : MinamoCollection, IEnumerable<MinamoObject>
         Version++;
     }
 
+    internal int CompactNilsFrom(int firstNil)
+    {
+        var count = Count;
+        var read = firstNil + 1;
+        var write = firstNil;
+        for (; read < count; read++)
+        {
+            var value = values[read];
+            if (value is MinamoNil)
+            {
+                continue;
+            }
+
+            // A host-defined TypeId getter can observe or change the array.
+            if (value?.GetType().Assembly != typeof(MinamoArray).Assembly
+                || value is MinamoForeignObject { TypeInfo: null })
+            {
+                break;
+            }
+
+            if (value.TypeId != MinamoTypeCodes.Nil)
+            {
+                values[write++] = value;
+            }
+        }
+
+        var removed = read - write;
+        if (read < count)
+        {
+            Array.Copy(values, read, values, write, count - read);
+        }
+        Array.Clear(values, count - removed, removed);
+        Count = count - removed;
+        Version += removed;
+        return write;
+    }
+
     public void Clear()
     {
         Count = 0;
@@ -469,19 +506,14 @@ internal sealed partial class MinamoArrayTypeInfo : MinamoCollTypeInfo
         while (idx < self.Count)
         {
             var e = self[idx];
-            bool flag;
-
-            if (predicate is not null)
+            if (e is MinamoNil && predicate is null && self.GetType() == typeof(MinamoArray))
             {
-                var res = predicate.Call(ctx, e);
-                flag = res.IsTrue();
-            }
-            else
-            {
-                flag = e.TypeId == MinamoTypeCodes.Nil;
+                idx = self.CompactNilsFrom(idx);
+                continue;
             }
 
-            if (flag)
+            var remove = predicate is null ? e.TypeId == MinamoTypeCodes.Nil : predicate.Call(ctx, e).IsTrue();
+            if (remove)
             {
                 self.RemoveAt(idx);
             }

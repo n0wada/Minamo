@@ -495,6 +495,11 @@ internal sealed class Lexer
 
     internal static string ReadSource(SourceBuffer buffer)
     {
+        if (buffer is StringBuffer stringBuffer)
+        {
+            return stringBuffer.Text;
+        }
+
         var oldPosition = buffer.Pos;
         buffer.Pos = 0;
         var chars = new List<char>();

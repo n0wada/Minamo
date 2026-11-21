@@ -48,6 +48,29 @@ public sealed class ParserTests
     }
 
     [Fact]
+    public void LexerReusesTheFullStringRegardlessOfBufferPosition()
+    {
+        const string source = "let value = 42";
+        var buffer = SourceBuffer.FromString(source);
+        buffer.Pos = 4;
+
+        Assert.Same(source, Lexer.ReadSource(buffer));
+        Assert.Equal(4, buffer.Pos);
+    }
+
+    [Fact]
+    public void ParsesCustomBufferFromTheStartAndRestoresItsPosition()
+    {
+        var buffer = new CustomSourceBuffer("let value = 42") { Pos = 4 };
+
+        var result = MinamoParser.Parse(buffer);
+
+        Assert.True(result.Success);
+        Assert.IsType<BindingSyntax>(Assert.Single(result.Value!.Root.Nodes));
+        Assert.Equal(4, buffer.Pos);
+    }
+
+    [Fact]
     public void AllowsManyAsAnIdentifierWhileTypeRemainsReserved()
     {
         var many = MinamoParser.Parse("let many = 1\nmany");
@@ -308,5 +331,12 @@ public sealed class ParserTests
 
         Assert.False(result.Success);
         Assert.Contains(result.Errors, error => error.Line == 3);
+    }
+
+    private sealed class CustomSourceBuffer(string text) : SourceBuffer
+    {
+        public override string FileName => "<custom-buffer>";
+        protected internal override int Pos { get; set; }
+        protected internal override int Read() => Pos < text.Length ? text[Pos++] : Constants.EOF;
     }
 }
